@@ -95,7 +95,32 @@
               repository layer in poll-persistence needs the generated classes,
               and anyone touching repository code already has Postgres up for
               the tests.
+
+              build-helper-maven-plugin attaches the on-disk codegen output
+              to every invocation's compile source roots. The codegen profile
+              *produces* those sources; this plugin *wires* them to the
+              compiler so a plain `./mvnw -pl backend/poll-persistence -am
+              compile` picks them up without a `-Pcodegen` re-run each time.
             -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-jooq-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/jooq</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -177,7 +202,24 @@
                                               exclude regex against every pgcrypto release.
                                             -->
                                             <includes>admin_user|polls|poll_questions|poll_options|votes|deck_tokens</includes>
-                                            <inputSchema>${db.codegen.schema}</inputSchema>
+                                            <!--
+                                              Codegen runs against a disposable `polls_codegen`
+                                              schema, but the generated classes live above the
+                                              schema boundary: production uses `public`, every
+                                              integration test uses a fresh Flyway-owned database
+                                              whose default schema is `public`. `outputSchemaToDefault`
+                                              tells jOOQ to emit classes that do NOT qualify the
+                                              schema, so the generated `POLLS` table reference
+                                              resolves against whatever schema is on the session
+                                              search_path — no render-schema toggles required at
+                                              runtime.
+                                            -->
+                                            <schemata>
+                                                <schema>
+                                                    <inputSchema>${db.codegen.schema}</inputSchema>
+                                                    <outputSchemaToDefault>true</outputSchemaToDefault>
+                                                </schema>
+                                            </schemata>
                                         </database>
                                         <target>
                                             <packageName>site.asm0dey.slidev.polls.persistence.jooq</packageName>
