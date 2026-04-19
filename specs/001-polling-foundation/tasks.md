@@ -52,10 +52,10 @@
 
 ### Backend module skeletons
 
-- [ ] T010 Create `backend/poll-core` module POM: `spring-context`, `jakarta.validation-api` only (no web, no JDBC)
-- [ ] T011 [P] Create `backend/poll-persistence` module POM: `jooq`, `flyway-core`, `postgresql`, `testcontainers-jooq-codegen-maven-plugin`, `testcontainers-postgresql` (test scope)
-- [ ] T012 [P] Create `backend/poll-realtime` module POM: `spring-web` (for `SseEmitter`), `spring-context`
-- [ ] T013 Create `backend/poll-api` module POM (generated via start.spring.io baseline): `spring-boot-starter-web`, `spring-boot-starter-security`, `spring-boot-starter-validation`, `flyway-core`, `zxing-core`, `zxing-javase`; depends on the three sibling modules
+- [x] T010 Create `backend/poll-core` module POM: `spring-context`, `jakarta.validation-api` only (no web, no JDBC) — scaffold ships the two required deps plus `spring-boot-starter-test` (test scope) for the unit tests that arrive in later tasks.
+- [x] T011 [P] Create `backend/poll-persistence` module POM: `jooq`, `flyway-core`, `postgresql`, `testcontainers-jooq-codegen-maven-plugin`, `testcontainers-postgresql` (test scope) — scaffold uses `spring-boot-starter-jooq` (brings jOOQ transitively) and adds `flyway-database-postgresql` (required for Flyway to recognise the dialect under Flyway 10+). The jOOQ codegen plugin is wired but commented out; T018 activates it.
+- [x] T012 [P] Create `backend/poll-realtime` module POM: `spring-web` (for `SseEmitter`), `spring-context` — scaffold uses `spring-web` + `spring-webmvc`; `spring-context` arrives transitively.
+- [x] T013 Create `backend/poll-api` module POM (generated via start.spring.io baseline): `spring-boot-starter-web`, `spring-boot-starter-security`, `spring-boot-starter-validation`, `flyway-core`, `zxing-core`, `zxing-javase`; depends on the three sibling modules — scaffold uses `spring-boot-starter-webmvc` (the explicit MVC-only starter in Spring Boot 4) instead of `spring-boot-starter-web`; `flyway-core` arrives transitively through `poll-persistence`. `spring-boot-starter-actuator` was removed from the scaffold because plan.md does not record a use for it and Principle VIII forbids speculative additions.
 
 ### Database schema + jOOQ codegen (shared by all stories)
 
