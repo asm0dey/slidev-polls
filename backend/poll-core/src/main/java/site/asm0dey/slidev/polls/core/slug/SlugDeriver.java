@@ -3,11 +3,11 @@ package site.asm0dey.slidev.polls.core.slug;
 import java.text.Normalizer;
 
 /**
- * Derives a kebab-case slug from a human-authored poll title (FR-005, {@code @TS-010}). The
- * output is guaranteed to match {@link SlugValidator#PATTERN} so it can round-trip through the
- * same validator the API applies to presenter-supplied slugs. If the title has no slug-worthy
- * characters at all, the caller is expected to treat that as a validation failure upstream —
- * deriveFromTitle returns {@code null} in that case rather than inventing an identifier.
+ * Derives a kebab-case slug from a human-authored poll title (FR-005, {@code @TS-010}). The output
+ * is guaranteed to match {@link SlugValidator#PATTERN} so it can round-trip through the same
+ * validator the API applies to presenter-supplied slugs. If the title has no slug-worthy characters
+ * at all, the caller is expected to treat that as a validation failure upstream — deriveFromTitle
+ * returns {@code null} in that case rather than inventing an identifier.
  */
 public final class SlugDeriver {
 

@@ -149,8 +149,7 @@ public class PollService {
 
   private void requireOwner(Poll poll, String ownerUsername) {
     if (!poll.ownerUsername().equals(ownerUsername)) {
-      throw new NotOwnerException(
-          "poll " + poll.id() + " is not owned by " + ownerUsername);
+      throw new NotOwnerException("poll " + poll.id() + " is not owned by " + ownerUsername);
     }
   }
 
@@ -167,7 +166,8 @@ public class PollService {
       for (int j = 0; j < draft.options().size(); j++) {
         options.add(new Option(UUID.randomUUID(), qid, draft.options().get(j).label(), j));
       }
-      out.add(new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+      out.add(
+          new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
     }
     return out;
   }

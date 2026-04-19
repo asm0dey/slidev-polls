@@ -13,7 +13,9 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
  */
 public interface PollRepository {
 
-  /** Insert a new poll aggregate (with its questions and options). Returns the hydrated aggregate. */
+  /**
+   * Insert a new poll aggregate (with its questions and options). Returns the hydrated aggregate.
+   */
   Poll insert(Poll poll);
 
   Optional<Poll> findById(UUID pollId);

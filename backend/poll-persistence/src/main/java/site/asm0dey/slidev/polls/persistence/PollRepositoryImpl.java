@@ -32,13 +32,13 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
 
 /**
  * jOOQ-backed implementation of {@link PollRepository}. All methods are thin projections over the
- * generated {@code POLLS / POLL_QUESTIONS / POLL_OPTIONS} tables; the only piece of non-trivial
- * SQL is {@link #activateQuestion} which leans on the partial unique index defined in
- * {@code V1__core_tables.sql} to serialise concurrent activations (FR-004, {@code @TS-004}).
+ * generated {@code POLLS / POLL_QUESTIONS / POLL_OPTIONS} tables; the only piece of non-trivial SQL
+ * is {@link #activateQuestion} which leans on the partial unique index defined in {@code
+ * V1__core_tables.sql} to serialise concurrent activations (FR-004, {@code @TS-004}).
  *
  * <p>Transaction boundaries are supplied by the caller (typically Spring's {@code @Transactional}
- * on {@link site.asm0dey.slidev.polls.core.service.PollService}); this class does not open its
- * own transactions.
+ * on {@link site.asm0dey.slidev.polls.core.service.PollService}); this class does not open its own
+ * transactions.
  */
 @Repository
 public class PollRepositoryImpl implements PollRepository {
@@ -84,7 +84,8 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public List<Poll> findByOwner(String ownerUsername) {
-    return dsl.selectFrom(POLLS)
+    return dsl
+        .selectFrom(POLLS)
         .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
         .orderBy(POLLS.CREATED_AT.desc())
         .fetch()
@@ -95,7 +96,10 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public boolean slugTaken(String slug, UUID excludingPollId) {
-    var base = dsl.selectOne().from(POLLS).where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()));
+    var base =
+        dsl.selectOne()
+            .from(POLLS)
+            .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()));
     var scoped = excludingPollId == null ? base : base.and(POLLS.ID.ne(excludingPollId));
     return scoped.fetchOptional().isPresent();
   }
@@ -132,7 +136,9 @@ public class PollRepositoryImpl implements PollRepository {
       for (int j = 0; j < draft.options().size(); j++) {
         options.add(new Option(UUID.randomUUID(), questionId, draft.options().get(j).label(), j));
       }
-      drafts.add(new Question(questionId, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+      drafts.add(
+          new Question(
+              questionId, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
     }
     insertQuestions(pollId, drafts);
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
@@ -166,7 +172,8 @@ public class PollRepositoryImpl implements PollRepository {
         dsl.selectFrom(POLL_QUESTIONS)
             .where(POLL_QUESTIONS.ID.eq(questionId).and(POLL_QUESTIONS.POLL_ID.eq(pollId)))
             .fetchOptional()
-            .orElseThrow(() -> new NotFoundException("question " + questionId + " not in poll " + pollId));
+            .orElseThrow(
+                () -> new NotFoundException("question " + questionId + " not in poll " + pollId));
 
     switch (QuestionStatus.valueOf(existing.getStatus())) {
       case ACTIVE -> {
@@ -254,7 +261,8 @@ public class PollRepositoryImpl implements PollRepository {
         insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
       }
       ordered.add(
-          new Question(qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
+          new Question(
+              qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
     }
     return ordered;
   }
@@ -262,7 +270,8 @@ public class PollRepositoryImpl implements PollRepository {
   private Poll hydrate(Record row) {
     UUID pollId = row.get(POLLS.ID);
     List<Question> questions =
-        dsl.selectFrom(POLL_QUESTIONS)
+        dsl
+            .selectFrom(POLL_QUESTIONS)
             .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
             .orderBy(POLL_QUESTIONS.ORDINAL.asc())
             .fetch()
@@ -271,7 +280,8 @@ public class PollRepositoryImpl implements PollRepository {
                 q -> {
                   UUID questionId = q.get(POLL_QUESTIONS.ID);
                   List<Option> options =
-                      dsl.selectFrom(POLL_OPTIONS)
+                      dsl
+                          .selectFrom(POLL_OPTIONS)
                           .where(POLL_OPTIONS.QUESTION_ID.eq(questionId))
                           .orderBy(POLL_OPTIONS.POSITION.asc())
                           .fetch()
@@ -338,11 +348,11 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   /**
-   * Thrown by {@link #activateQuestion} when the partial unique index
-   * {@code poll_questions_one_active_uq} refuses a second concurrent activation on the same poll
-   * (FR-004, {@code @TS-004}). Callers translate this into a presenter-visible error via
-   * {@link org.springframework.retry.support.RetryTemplate} or by surfacing the failure to the
-   * other transaction that raced.
+   * Thrown by {@link #activateQuestion} when the partial unique index {@code
+   * poll_questions_one_active_uq} refuses a second concurrent activation on the same poll (FR-004,
+   * {@code @TS-004}). Callers translate this into a presenter-visible error via {@link
+   * org.springframework.retry.support.RetryTemplate} or by surfacing the failure to the other
+   * transaction that raced.
    */
   public static final class ConcurrentActivationException extends RuntimeException {
     public ConcurrentActivationException(UUID pollId, UUID questionId, Throwable cause) {

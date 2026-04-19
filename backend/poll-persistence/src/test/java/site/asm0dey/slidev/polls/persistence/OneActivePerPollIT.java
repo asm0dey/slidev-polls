@@ -23,11 +23,11 @@ import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 
 /**
- * Storage-level coverage for {@code @TS-004}: the partial unique index
- * {@code poll_questions_one_active_uq ON poll_questions(poll_id) WHERE status = 'ACTIVE'} must
- * serialise concurrent activations. Two threads race to mark different DRAFT questions ACTIVE on
- * the same poll; exactly one succeeds, the other's UPDATE surfaces as a
- * {@link site.asm0dey.slidev.polls.persistence.PollRepositoryImpl.ConcurrentActivationException}.
+ * Storage-level coverage for {@code @TS-004}: the partial unique index {@code
+ * poll_questions_one_active_uq ON poll_questions(poll_id) WHERE status = 'ACTIVE'} must serialise
+ * concurrent activations. Two threads race to mark different DRAFT questions ACTIVE on the same
+ * poll; exactly one succeeds, the other's UPDATE surfaces as a {@link
+ * site.asm0dey.slidev.polls.persistence.PollRepositoryImpl.ConcurrentActivationException}.
  */
 class OneActivePerPollIT extends AbstractPostgresTest {
 
@@ -81,30 +81,18 @@ class OneActivePerPollIT extends AbstractPostgresTest {
       Object r1 = f1.get();
       Object r2 = f2.get();
 
-      long successes =
-          List.of(r1, r2).stream().filter(r -> r instanceof Poll).count();
+      long successes = List.of(r1, r2).stream().filter(r -> r instanceof Poll).count();
       long failures =
           List.of(r1, r2).stream()
-              .filter(
-                  r ->
-                      r
-                          instanceof
-                          PollRepositoryImpl.ConcurrentActivationException)
+              .filter(r -> r instanceof PollRepositoryImpl.ConcurrentActivationException)
               .count();
 
-      assertThat(successes)
-          .as("exactly one activation wins under concurrent start")
-          .isEqualTo(1);
+      assertThat(successes).as("exactly one activation wins under concurrent start").isEqualTo(1);
       assertThat(failures).as("the other hits the partial unique index").isEqualTo(1);
 
-      Poll finalState =
-          repository
-              .findById(seeded.id())
-              .orElseThrow();
+      Poll finalState = repository.findById(seeded.id()).orElseThrow();
       long activeCount =
-          finalState.questions().stream()
-              .filter(q -> q.status() == QuestionStatus.ACTIVE)
-              .count();
+          finalState.questions().stream().filter(q -> q.status() == QuestionStatus.ACTIVE).count();
       assertThat(activeCount)
           .as("the poll still has at most one ACTIVE question after the race")
           .isEqualTo(1);

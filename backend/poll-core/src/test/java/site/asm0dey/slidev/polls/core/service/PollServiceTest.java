@@ -26,10 +26,10 @@ import site.asm0dey.slidev.polls.core.error.SlugTakenException;
 
 /**
  * Pure-Java unit coverage for {@link PollService}. A {@link FakePollRepository} stands in for the
- * jOOQ-backed {@code PollRepositoryImpl} so every branch of slug derivation, ownership
- * enforcement, activation precondition, and the ≥2-options gate can be exercised without Spring or
- * a live Postgres. The Gherkin scenarios enumerated in the method docs are the assertion anchors
- * per Principle VII.
+ * jOOQ-backed {@code PollRepositoryImpl} so every branch of slug derivation, ownership enforcement,
+ * activation precondition, and the ≥2-options gate can be exercised without Spring or a live
+ * Postgres. The Gherkin scenarios enumerated in the method docs are the assertion anchors per
+ * Principle VII.
  */
 class PollServiceTest {
 
@@ -50,7 +50,10 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "Quickstart demo", null, null, List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM"))));
+                "Quickstart demo",
+                null,
+                null,
+                List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM"))));
 
     assertThat(created.slug()).isEqualTo("quickstart-demo");
     assertThat(created.ownerUsername()).isEqualTo("alice");
@@ -66,10 +69,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant",
-                        "UPPER",
-                        null,
-                        List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")))))
         .isInstanceOf(SlugInvalidException.class);
   }
 
@@ -82,10 +82,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant",
-                        "admin",
-                        null,
-                        List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")))))
         .isInstanceOf(SlugReservedException.class);
   }
 
@@ -103,10 +100,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "another",
-                        "my-talk",
-                        null,
-                        List.of(questionDraft("Prompt?", "A", "B")))))
+                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")))))
         .isInstanceOf(SlugTakenException.class);
   }
 
@@ -160,10 +154,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "broken",
-                "broken",
-                null,
-                List.of(questionDraft("Q?", "only-one"))));
+                "broken", "broken", null, List.of(questionDraft("Q?", "only-one"))));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "alice", qid))
@@ -209,8 +200,7 @@ class PollServiceTest {
     Poll created =
         service.create(
             "alice",
-            new CreatePollCommand(
-                "x", "x-slug", null, List.of(questionDraft("Q?", "A", "B"))));
+            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B"))));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
@@ -226,10 +216,7 @@ class PollServiceTest {
   }
 
   private static Question findQuestion(Poll poll, UUID id) {
-    return poll.questions().stream()
-        .filter(q -> q.id().equals(id))
-        .findFirst()
-        .orElseThrow();
+    return poll.questions().stream().filter(q -> q.id().equals(id)).findFirst().orElseThrow();
   }
 
   /**
@@ -254,9 +241,7 @@ class PollServiceTest {
 
     @Override
     public Optional<Poll> findBySlug(String slug) {
-      return byId.values().stream()
-          .filter(p -> p.slug().equalsIgnoreCase(slug))
-          .findFirst();
+      return byId.values().stream().filter(p -> p.slug().equalsIgnoreCase(slug)).findFirst();
     }
 
     @Override
@@ -303,7 +288,8 @@ class PollServiceTest {
         for (int j = 0; j < d.options().size(); j++) {
           opts.add(new Option(UUID.randomUUID(), qid, d.options().get(j).label(), j));
         }
-        rebuilt.add(new Question(qid, pollId, d.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
+        rebuilt.add(
+            new Question(qid, pollId, d.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
       }
       Poll updated =
           new Poll(
