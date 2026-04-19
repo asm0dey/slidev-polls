@@ -275,10 +275,10 @@ T001 → T002 → T013 → T014 → T015 → T018 → T052 → T053 → T058 →
 |-------|-------|-----------:|-----------:|------:|
 | Setup + Foundational | 1–2 | 4 | 27 | 31 |
 | US1 (P1 MVP) | 3 | 8 | 17 | 25 |
-| US2 (P2) | 4 | 6 | 14 | 20 |
-| US3 (P3 / P2 deck) | 5 | 6 | 14 | 20 |
+| US2 (P2) | 4 | 6 | 13 | 19 |
+| US3 (P3 / P2 deck) | 5 | 6 | 13 | 19 |
 | Polish | 6 | — | 6 | 6 |
-| **Total** | | **24** | **78** | **102** |
+| **Total** | | **24** | **76** | **100** |
 
 **MVP scope suggestion**: Phases 1 + 2 + 3 deliver a usable backoffice and satisfy all P1 scenarios (`@US-001`). Ship that first; US2 and US3 can follow independently.
 

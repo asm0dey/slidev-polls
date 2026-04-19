@@ -14,12 +14,17 @@ origin, single backend process:
 - a Vue 3 + TypeScript **voter** SPA, reached by a human-memorable slug
   URL (`/{slug}`) with no authentication, no account, and no install;
 - a Vue 3 + TypeScript **backoffice** SPA under `/admin/` for
-  authenticated presenters to author polls and control the active
-  question, including assigning and editing the slug;
+  authenticated presenters to author polls (FR-002, FR-003) and control
+  the active question (FR-006), including assigning and editing the
+  slug, and to view/copy the join link and QR (FR-005);
 - a Vue 3 + TypeScript **Slidev addon** that renders the same live
-  aggregates on-slide and, when mounted on a slide that declares a
-  specific question, automatically asks the backend to activate that
-  question (FR-018) using a presenter-minted **deck token** (FR-019).
+  aggregates on-slide (FR-012, FR-013), swaps automatically when the
+  active question changes (FR-014), and, when mounted on a slide that
+  declares a specific question, automatically asks the backend to
+  activate that question (FR-018, SC-008) using a presenter-minted
+  **deck token** (FR-019). The voter SPA immediately shows the active
+  question or a neutral waiting state (FR-008) and communicates vote
+  rejections in user-facing language (FR-010).
 
 Persistence is PostgreSQL 16 through jOOQ, with Flyway-managed
 migrations and codegen run at build time against a Testcontainers
@@ -170,7 +175,7 @@ runs as one JAR on one origin — no CORS, no separate web tier.
 | III. Test-First (NON-NEGOTIABLE) | TDD enforced via `/iikit-04-testify` and the assertion-integrity pre-commit hook. Test tasks precede implementation tasks in `/iikit-05-tasks`. `poll-core` unit-testability is preserved by keeping Spring-web and JDBC out of that module. | Pass |
 | IV. Live-Reliability Over Feature Depth | SSE client reconnects with bounded backoff and renders a paused badge; Slidev addon never throws out of a component; server-side `SseHub` survives individual emitter failures without propagating to the publisher. | Pass |
 | V. Simplicity and YAGNI | One backend process, one database, one SSE channel per poll, one Slidev addon package, one lockfile (`bun.lockb`). Multi-module split is the minimum that keeps `poll-core` web-free — not an architectural flourish. No message broker, no separate front-end server, no container orchestration beyond `docker-compose.yml` for Postgres. | Pass |
-| VI. Observability for Live Events | Structured JSON logs with a per-request `correlationId`. `GlobalExceptionHandler` maps exceptions to distinct `Problem.code` values: `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `ACTIVATION_REJECTED`, `TRANSPORT_FAILURE`. | Pass |
+| VI. Observability for Live Events | Structured JSON logs with a per-request `correlationId`. `GlobalExceptionHandler` maps exceptions to distinct `Problem.code` values: `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `ACTIVATION_REJECTED`, `TRANSPORT_FAILURE` — the distinct-message requirement of FR-017 is satisfied by these codes. | Pass |
 | VII. No BDD Frameworks | JUnit 5 and Vitest only. Gherkin scenarios from `/iikit-04-testify` are mirrored as comments above the corresponding assertions. | Pass |
 | VIII. Minimal External Dependencies | Every dependency listed above has a concrete present use. jOOQ replaces JPA/Hibernate (a smaller transitive footprint for a schema this size) and removes the reflection / entity-graph surface area. No UI framework, no additional Node tooling — bun covers install, test, run. | Pass |
 | IX. Human-Authored Presentation | Commit messages, code comments, migration comments, and generated doc artefacts MUST NOT include AI-assistant attribution lines or co-author trailers. | Pass |
@@ -196,7 +201,7 @@ specs/001-polling-foundation/
 
 ```text
 slidev-polls/
-├── pom.xml                              # parent: Java 25, Spring Boot 3.4.x, module list, plugin mgmt
+├── pom.xml                              # parent: Java 25, Spring Boot 4.0.5, module list, plugin mgmt
 ├── README.md
 ├── .gitignore
 ├── .editorconfig

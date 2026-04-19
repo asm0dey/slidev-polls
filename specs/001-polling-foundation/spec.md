@@ -131,7 +131,11 @@ changed in the backoffice.
 - What happens when a respondent submits multiple times in quick
   succession for the same active question from the same device?
 - What happens when the presenter deletes a poll while anonymous
-  viewers are currently on its join page?
+  viewers are currently on its join page? (Out of scope for this
+  feature — presenter-initiated deletion mid-session is not a
+  supported flow in v1; voter-side fetches to a deleted slug return
+  404 with a neutral user-facing message and no crash, consistent
+  with FR-015's no-crash posture.)
 - What happens when the active question is changed while a respondent
   is mid-selection but has not yet submitted?
 - What happens to the Slidev results view if the presenter pauses and
@@ -145,7 +149,10 @@ changed in the backoffice.
   activate call is refused with an auth error; the viewer behaviour
   on that slide continues to work because the stream is public.)
 - What happens when a QR code is scanned after the poll's session has
-  ended?
+  ended? (Expected: resolves normally to `/{slug}`; if no question is
+  ACTIVE the respondent sees the neutral "waiting" state per FR-008 /
+  TS-021. Poll-level CLOSED status is not distinguished from "no
+  ACTIVE question" on the respondent surface in v1.)
 - What happens when multiple presenters are signed in and one edits a
   poll another presenter is actively running? (Out of scope for this
   feature — single-presenter-per-poll assumed; flagged for future
@@ -270,7 +277,12 @@ changed in the backoffice.
   normal load.
 - **SC-004**: The system sustains at least 200 concurrent respondents
   voting on one active question without degradation of SC-001,
-  SC-002, or SC-003.
+  SC-002, or SC-003. **Acceptance deferred for this feature**
+  (clarification 2026-04-19): load testing is out of scope; the
+  architectural choices supporting this number (single SSE channel
+  per poll, partial unique index for activation, best-effort
+  single-vote constraint) are retained, and acceptance testing will
+  be re-opened when load testing returns to scope.
 - **SC-005**: Zero backoffice endpoints return protected data to an
   unauthenticated caller (verified by automated test across every
   backoffice route).
