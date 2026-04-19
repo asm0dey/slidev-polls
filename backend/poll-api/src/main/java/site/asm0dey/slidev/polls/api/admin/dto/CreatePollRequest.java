@@ -20,7 +20,11 @@ import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
  */
 public record CreatePollRequest(
     @NotBlank @Size(min = 1, max = 200) String title,
-    @Size(min = 3, max = 40) String slug,
+    // No Size constraint on slug: format, length, reserved, and uniqueness all funnel through
+    // SlugValidator / ReservedSlugs / PollRepository inside PollService, and every violation
+    // surfaces as a 409 with a slug-specific ProblemCode (@TS-011..@TS-014). A @Size here would
+    // leak short/long slugs out as 400 VALIDATION_FAILED, which is the wrong wire contract.
+    String slug,
     PollStyleDto style,
     @Valid @Size(min = 1) List<CreateQuestionRequest> questions) {
 

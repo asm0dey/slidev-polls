@@ -135,11 +135,16 @@ public class PollService {
 
   private String resolveSlug(String requested, String title, UUID excludingPollId) {
     String candidate = requested != null ? requested : SlugDeriver.deriveFromTitle(title);
-    if (candidate == null || !SlugValidator.isValidFormat(candidate)) {
-      throw new SlugInvalidException(candidate == null ? "" : candidate);
-    }
+    // Reserved check wins over format: `j` is on the reserved list (it's the intended
+    // short "join" path) yet fails SlugValidator's 3-40 length rule. @TS-012's Example
+    // table asserts `j` surfaces as SLUG_RESERVED, not SLUG_INVALID, so the reserved
+    // lookup runs first. ReservedSlugs.isReserved null-guards, so a null candidate
+    // falls through to the format branch where SLUG_INVALID is the correct code.
     if (ReservedSlugs.isReserved(candidate)) {
       throw new SlugReservedException(candidate);
+    }
+    if (candidate == null || !SlugValidator.isValidFormat(candidate)) {
+      throw new SlugInvalidException(candidate == null ? "" : candidate);
     }
     if (repository.slugTaken(candidate, excludingPollId)) {
       throw new SlugTakenException(candidate);
