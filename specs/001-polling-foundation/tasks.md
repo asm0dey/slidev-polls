@@ -59,7 +59,7 @@
 
 ### Database schema + jOOQ codegen (shared by all stories)
 
-- [ ] T014 Write Flyway migration `V1__core_tables.sql` in `backend/poll-persistence/src/main/resources/db/migration/` creating `polls`, `poll_questions`, `poll_options`, `votes` with columns and FKs per data-model.md
+- [x] T014 Write Flyway migration `V1__core_tables.sql` in `backend/poll-persistence/src/main/resources/db/migration/` creating `polls`, `poll_questions`, `poll_options`, `votes` with columns and FKs per data-model.md (scaffold also places the slug CHECK constraint, the `(poll_id, ordinal)` / `(question_id, option_id)` / `(question_id, voter_token)` indexes, and the `poll_questions_one_active_uq` partial unique index in this file; splitting those into V2 would be internal churn for a schema that nobody has deployed yet)
 - [ ] T015 Add Flyway migration `V2__slug_and_indexes.sql`: unique index `polls_slug_lower_uq` on `lower(slug)`; slug CHECK constraint; partial unique index `poll_questions_one_active_uq ON poll_questions(poll_id) WHERE status='ACTIVE'`; `(question_id, voter_token)` unique; `(question_id, option_id)` index; `(poll_id, ordinal)` index
 - [ ] T016 Add Flyway migration `V3__admin_user.sql` creating `admin_user` table (username PK lowercase, display_name, bcrypt_hash, created_at) plus seed of presenter "alice" for quickstart / tests
 - [ ] T017 Add Flyway migration `V4__deck_tokens.sql` creating `deck_tokens` table with UNIQUE(token_hash) and FK to polls ON DELETE CASCADE
