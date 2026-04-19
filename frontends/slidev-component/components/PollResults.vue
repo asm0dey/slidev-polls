@@ -36,18 +36,25 @@ onMounted(async () => {
   const base = props.server ?? "";
   await activateFromDeck(base);
   stop = openPollStream(base, props.slug, {
-    onSnapshot: (ev) => { snapshot.value = ev; paused.value = false; },
+    onSnapshot: (ev) => {
+      snapshot.value = ev;
+      paused.value = false;
+    },
     onTally: (ev: TallyDeltaEvent) => {
       if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
       const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
     },
-    onConnectionStateChange: (s) => { paused.value = s === "paused"; }
+    onConnectionStateChange: (s) => {
+      paused.value = s === "paused";
+    }
   });
 });
 
-onUnmounted(() => { stop?.(); });
+onUnmounted(() => {
+  stop?.();
+});
 </script>
 
 <template>

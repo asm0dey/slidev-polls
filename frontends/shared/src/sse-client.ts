@@ -2,7 +2,7 @@ import type { SnapshotEvent, TallyDeltaEvent } from "./types";
 
 export interface StreamHandlers {
   onSnapshot: (ev: SnapshotEvent) => void;
-  onTally:    (ev: TallyDeltaEvent) => void;
+  onTally: (ev: TallyDeltaEvent) => void;
   onQuestionClosed?: (ev: { pollId: string; questionId: string }) => void;
   onConnectionStateChange?: (state: "open" | "paused") => void;
 }
