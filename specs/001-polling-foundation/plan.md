@@ -174,7 +174,7 @@ runs as one JAR on one origin — no CORS, no separate web tier.
 | II. Respondent Zero-Friction | Voter SPA is public; slug URL is memorable (`example.com/my-poll`) and carries no auth gate. Only a device-scoped `voter_token` (UUID in `localStorage`, mirrored to a cookie for server-side uniqueness) is stored. No PII. | Pass |
 | III. Test-First (NON-NEGOTIABLE) | TDD enforced via `/iikit-04-testify` and the assertion-integrity pre-commit hook. Test tasks precede implementation tasks in `/iikit-05-tasks`. `poll-core` unit-testability is preserved by keeping Spring-web and JDBC out of that module. | Pass |
 | IV. Live-Reliability Over Feature Depth | SSE client reconnects with bounded backoff and renders a paused badge; Slidev addon never throws out of a component; server-side `SseHub` survives individual emitter failures without propagating to the publisher. | Pass |
-| V. Simplicity and YAGNI | One backend process, one database, one SSE channel per poll, one Slidev addon package, one lockfile (`bun.lockb`). Multi-module split is the minimum that keeps `poll-core` web-free — not an architectural flourish. No message broker, no separate front-end server, no container orchestration beyond `docker-compose.yml` for Postgres. | Pass |
+| V. Simplicity and YAGNI | One backend process, one database, one SSE channel per poll, one Slidev addon package, one lockfile (`bun.lock`, the text-format lockfile bun 1.2+ emits by default). Multi-module split is the minimum that keeps `poll-core` web-free — not an architectural flourish. No message broker, no separate front-end server, no container orchestration beyond `docker-compose.yml` for Postgres. | Pass |
 | VI. Observability for Live Events | Structured JSON logs with a per-request `correlationId`. `GlobalExceptionHandler` maps exceptions to distinct `Problem.code` values: `AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `ACTIVATION_REJECTED`, `TRANSPORT_FAILURE` — the distinct-message requirement of FR-017 is satisfied by these codes. | Pass |
 | VII. No BDD Frameworks | JUnit 5 and Vitest only. Gherkin scenarios from `/iikit-04-testify` are mirrored as comments above the corresponding assertions. | Pass |
 | VIII. Minimal External Dependencies | Every dependency listed above has a concrete present use. jOOQ replaces JPA/Hibernate (a smaller transitive footprint for a schema this size) and removes the reflection / entity-graph surface area. No UI framework, no additional Node tooling — bun covers install, test, run. | Pass |
@@ -220,7 +220,7 @@ slidev-polls/
 │   └── poll-api/                        # Spring Boot entrypoint, controllers, DTOs, security,
 │                                        # SPA static serving
 │
-└── frontends/                           # bun workspace root (package.json + bun.lockb)
+└── frontends/                           # bun workspace root (package.json + bun.lock)
     ├── shared/                          # @polls/shared — types, api-client, sse-client
     ├── voter/                           # @polls/voter — SPA served at '/'
     ├── backoffice/                      # @polls/backoffice — SPA served at '/admin/'

@@ -34,13 +34,13 @@
 
 **Purpose**: Monorepo skeleton, build tooling, Postgres dev container.
 
-- [ ] T001 Create monorepo top-level layout per plan.md §Project Structure: `backend/`, `frontends/`, `scripts/`, `docker-compose.yml`, `.editorconfig`, `.gitignore`
-- [ ] T002 Create parent Maven POM at `backend/pom.xml` declaring Java 25, Spring Boot 4.0.5, module list (`poll-core`, `poll-persistence`, `poll-realtime`, `poll-api`), plugin management
-- [ ] T003 [P] Check in Maven wrapper (`backend/mvnw`, `backend/mvnw.cmd`, `backend/.mvn/wrapper/maven-wrapper.properties`)
-- [ ] T004 [P] Create `docker-compose.yml` at repo root with `postgres:16` service for local dev
-- [ ] T005 [P] Create bun workspace root `frontends/package.json` listing `shared`, `voter`, `backoffice`, `slidev-component`; run `bun install` and commit the resulting `frontends/bun.lockb`
-- [ ] T006 [P] Create `scripts/build-frontends.sh` (bun install + build all SPAs + copy dists into `backend/poll-api/src/main/resources/static`)
-- [ ] T007 [P] Create `scripts/dev.sh` (docker-compose up postgres + `mvnw spring-boot:run` + `bun --cwd frontends run dev`)
+- [x] T001 Create monorepo top-level layout per plan.md §Project Structure: `backend/`, `frontends/`, `scripts/`, `docker-compose.yml`, `.editorconfig`, `.gitignore`
+- [x] T002 Create parent Maven POM at `backend/pom.xml` declaring Java 25, Spring Boot 4.0.5, module list (`poll-core`, `poll-persistence`, `poll-realtime`, `poll-api`), plugin management (reactor parent lives at repo root `pom.xml`; `backend/pom.xml` is the backend aggregator that lists the four modules, which is what plan.md §Project Structure specifies)
+- [x] T003 [P] Check in Maven wrapper (`mvnw`, `mvnw.cmd`, `.mvn/wrapper/maven-wrapper.properties` at repo root per plan.md §Project Structure)
+- [x] T004 [P] Create `docker-compose.yml` at repo root with `postgres:16` service for local dev
+- [x] T005 [P] Create bun workspace root `frontends/package.json` listing `shared`, `voter`, `backoffice`, `slidev-component`; run `bun install` and commit the resulting `frontends/bun.lock` (bun 1.2+ emits the text-format `bun.lock`; the earlier `bun.lockb` clarification predated that change)
+- [x] T006 [P] Create `scripts/build-frontends.sh` (bun install + build all SPAs + copy dists into `backend/poll-api/src/main/resources/static`)
+- [x] T007 [P] Create `scripts/dev.sh` (docker-compose up postgres + `mvnw spring-boot:run` + `bun --cwd frontends run dev`)
 - [ ] T008 [P] Configure ESLint + Prettier config at `frontends/` root; configure Checkstyle / Spotless in `backend/pom.xml`
 - [ ] T009 [P] Install Playwright at the `frontends/` workspace root; add shared `frontends/playwright.config.ts`; wire `e2e` script in `frontends/voter/package.json` and `frontends/slidev-component/package.json` so `bun --cwd frontends/<pkg> run e2e` runs the smokes added in T075 / T106
 
