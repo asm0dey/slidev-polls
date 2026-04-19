@@ -63,23 +63,23 @@
 - [ ] T015 Add Flyway migration `V2__slug_and_indexes.sql`: unique index `polls_slug_lower_uq` on `lower(slug)`; slug CHECK constraint; partial unique index `poll_questions_one_active_uq ON poll_questions(poll_id) WHERE status='ACTIVE'`; `(question_id, voter_token)` unique; `(question_id, option_id)` index; `(poll_id, ordinal)` index
 - [ ] T016 Add Flyway migration `V3__admin_user.sql` creating `admin_user` table (username PK lowercase, display_name, bcrypt_hash, created_at) plus seed of presenter "alice" for quickstart / tests
 - [ ] T017 Add Flyway migration `V4__deck_tokens.sql` creating `deck_tokens` table with UNIQUE(token_hash) and FK to polls ON DELETE CASCADE
-- [ ] T018 Configure `testcontainers-jooq-codegen-maven-plugin` in `poll-persistence/pom.xml` to run Flyway against a Testcontainers PostgreSQL and generate jOOQ classes into `target/generated-sources/jooq` under package `polls.jooq`
+- [ ] T018 Configure `testcontainers-jooq-codegen-maven-plugin` in `poll-persistence/pom.xml` to run Flyway against a Testcontainers PostgreSQL and generate jOOQ classes into `target/generated-sources/jooq` under package `site.asm0dey.slidev.polls.persistence.jooq`
 
 ### poll-core foundational types (shared by all stories)
 
-- [ ] T019 [P] Create `ReservedSlugs` constant holder in `backend/poll-core/src/main/java/polls/core/slug/ReservedSlugs.java` (`admin`, `api`, `assets`, `static`, `j`, `login`, `logout`) — empty string intentionally omitted; `SlugValidator` (T020) rejects it on length grounds before the reserved check
-- [ ] T020 [P] Create `SlugValidator` in `backend/poll-core/src/main/java/polls/core/slug/SlugValidator.java` enforcing lowercase kebab-case, 3–40 chars, `[a-z0-9]` + `-`, start/end alphanumeric, no `--`
-- [ ] T021 [P] Unit tests `SlugValidatorTest` and `ReservedSlugsTest` in `backend/poll-core/src/test/java/polls/core/slug/` mirroring `@TS-011`, `@TS-012` invalid/reserved examples
+- [ ] T019 [P] Create `ReservedSlugs` constant holder in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/slug/ReservedSlugs.java` (`admin`, `api`, `assets`, `static`, `j`, `login`, `logout`) — empty string intentionally omitted; `SlugValidator` (T020) rejects it on length grounds before the reserved check
+- [ ] T020 [P] Create `SlugValidator` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/slug/SlugValidator.java` enforcing lowercase kebab-case, 3–40 chars, `[a-z0-9]` + `-`, start/end alphanumeric, no `--`
+- [ ] T021 [P] Unit tests `SlugValidatorTest` and `ReservedSlugsTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/slug/` mirroring `@TS-011`, `@TS-012` invalid/reserved examples
 
 ### poll-api cross-cutting foundation (shared by all stories)
 
-- [ ] T022 Create Spring Boot entrypoint `PollApiApplication.java` in `backend/poll-api/src/main/java/polls/api/`
+- [ ] T022 Create Spring Boot entrypoint `PollApiApplication.java` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/`
 - [ ] T023 [P] Configure `application.yml` in `backend/poll-api/src/main/resources/`: datasource (Postgres), Flyway, Jackson, server port, session cookie settings (HttpOnly, SameSite=Lax, Secure in prod profile)
-- [ ] T024 [P] Create `Problem` record + `ProblemCode` enum in `backend/poll-api/src/main/java/polls/api/error/` matching the codes listed in `openapi.yaml` (`AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `ACTIVATION_REJECTED`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `DECK_TOKEN_INVALID`, `DECK_TOKEN_POLL_MISMATCH`, `TRANSPORT_FAILURE`)
-- [ ] T025 [P] Create `CorrelationIdFilter` in `backend/poll-api/src/main/java/polls/api/logging/` populating MDC per request; structured JSON logging config in `logback-spring.xml`
-- [ ] T026 Create `GlobalExceptionHandler` (`@RestControllerAdvice`) in `backend/poll-api/src/main/java/polls/api/error/` mapping domain exceptions to `Problem` codes with correlationId — covers `@TS-042`
-- [ ] T027 Test `GlobalExceptionHandlerTest` (`@WebMvcTest` slice) in `backend/poll-api/src/test/java/polls/api/error/` asserting every Problem code path per `@TS-042`
-- [ ] T028 [P] Create `AbstractPostgresTest` base class in `backend/poll-persistence/src/test/java/polls/persistence/AbstractPostgresTest.java` starting one shared Testcontainers Postgres per JVM and running Flyway before each test class
+- [ ] T024 [P] Create `Problem` record + `ProblemCode` enum in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/error/` matching the codes listed in `openapi.yaml` (`AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `ACTIVATION_REJECTED`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `DECK_TOKEN_INVALID`, `DECK_TOKEN_POLL_MISMATCH`, `TRANSPORT_FAILURE`)
+- [ ] T025 [P] Create `CorrelationIdFilter` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/logging/` populating MDC per request; structured JSON logging config in `logback-spring.xml`
+- [ ] T026 Create `GlobalExceptionHandler` (`@RestControllerAdvice`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/error/` mapping domain exceptions to `Problem` codes with correlationId — covers `@TS-042`
+- [ ] T027 Test `GlobalExceptionHandlerTest` (`@WebMvcTest` slice) in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/error/` asserting every Problem code path per `@TS-042`
+- [ ] T028 [P] Create `AbstractPostgresTest` base class in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/AbstractPostgresTest.java` starting one shared Testcontainers Postgres per JVM and running Flyway before each test class
 
 ### Frontend shared package (blocks all SPAs)
 
@@ -99,34 +99,34 @@
 
 ### Tests for User Story 1 (write first — MUST fail before implementation)
 
-- [ ] T040 [P] [US1] Integration test `PollAuthoringIT` in `backend/poll-api/src/test/java/polls/api/admin/` — scenarios `[TS-002, TS-006]` (create + delete poll)
-- [ ] T041 [P] [US1] Integration test `QuestionLifecycleIT` in `backend/poll-api/src/test/java/polls/api/admin/` — scenarios `[TS-003, TS-005]` (activate atomically closes prior; close rejects subsequent votes)
-- [ ] T042 [P] [US1] Concurrency test `OneActivePerPollIT` in `backend/poll-persistence/src/test/java/polls/persistence/` — scenario `[TS-004]` (partial unique index serialises concurrent activations)
-- [ ] T043 [P] [US1] Security slice test `AdminAuthWebMvcTest` in `backend/poll-api/src/test/java/polls/api/security/` — scenarios `[TS-001, TS-040, TS-041]` (401 / 403 on admin routes, per-presenter ownership)
-- [ ] T044 [P] [US1] Slug test `SlugIT` in `backend/poll-api/src/test/java/polls/api/admin/` — scenarios `[TS-010, TS-011, TS-012, TS-013, TS-014, TS-015]`
-- [ ] T045 [P] [US1] QR test `QrEndpointIT` in `backend/poll-api/src/test/java/polls/api/admin/` — scenario `[TS-026]` (PNG decodes to slug URL; also consumed by US2)
+- [ ] T040 [P] [US1] Integration test `PollAuthoringIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-002, TS-006]` (create + delete poll)
+- [ ] T041 [P] [US1] Integration test `QuestionLifecycleIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-003, TS-005]` (activate atomically closes prior; close rejects subsequent votes)
+- [ ] T042 [P] [US1] Concurrency test `OneActivePerPollIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-004]` (partial unique index serialises concurrent activations)
+- [ ] T043 [P] [US1] Security slice test `AdminAuthWebMvcTest` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/security/` — scenarios `[TS-001, TS-040, TS-041]` (401 / 403 on admin routes, per-presenter ownership)
+- [ ] T044 [P] [US1] Slug test `SlugIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-010, TS-011, TS-012, TS-013, TS-014, TS-015]`
+- [ ] T045 [P] [US1] QR test `QrEndpointIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenario `[TS-026]` (PNG decodes to slug URL; also consumed by US2)
 - [ ] T046 [P] [US1] Vitest component test for backoffice `PollList` page in `frontends/backoffice/src/pages/PollList.test.ts`
 - [ ] T047 [P] [US1] Vitest component test for backoffice `SlugField` input (client-side slug validation, reserved-slug hint) in `frontends/backoffice/src/components/SlugField.test.ts`
 
 ### Domain + persistence for US1
 
-- [ ] T050 [P] [US1] Domain records in `backend/poll-core/src/main/java/polls/core/model/`: `Poll.java`, `Question.java`, `Option.java`, `PollStatus`, `QuestionStatus`
-- [ ] T051 [P] [US1] Domain exceptions in `backend/poll-core/src/main/java/polls/core/error/`: `SlugTakenException`, `SlugInvalidException`, `SlugReservedException`, `ActivationRejectedException`, `NotOwnerException`, `NotFoundException`
-- [ ] T052 [US1] `PollRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/polls/persistence/PollRepositoryImpl.java` (insert/update/delete polls, questions, options; partial-index activation; owner-scoped queries); repository interface lives in `poll-core`
-- [ ] T053 [US1] `PollService` in `backend/poll-core/src/main/java/polls/core/service/PollService.java`: create/list/get/update/delete, activate/close with atomic "at most one ACTIVE" enforcement, ≥2-options precondition (`ACTIVATION_REJECTED`), slug derivation (kebab-case of title), slug validation via `SlugValidator` + `ReservedSlugs`, ownership checks
-- [ ] T054 [US1] Unit tests `PollServiceTest` in `backend/poll-core/src/test/java/polls/core/service/` covering activation atomicity, 2-option precondition, slug derivation, ownership — pure-Java, no Spring
+- [ ] T050 [P] [US1] Domain records in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/model/`: `Poll.java`, `Question.java`, `Option.java`, `PollStatus`, `QuestionStatus`
+- [ ] T051 [P] [US1] Domain exceptions in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/error/`: `SlugTakenException`, `SlugInvalidException`, `SlugReservedException`, `ActivationRejectedException`, `NotOwnerException`, `NotFoundException`
+- [ ] T052 [US1] `PollRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/site/asm0dey/slidev/polls/persistence/PollRepositoryImpl.java` (insert/update/delete polls, questions, options; partial-index activation; owner-scoped queries); repository interface lives in `poll-core`
+- [ ] T053 [US1] `PollService` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/service/PollService.java`: create/list/get/update/delete, activate/close with atomic "at most one ACTIVE" enforcement, ≥2-options precondition (`ACTIVATION_REJECTED`), slug derivation (kebab-case of title), slug validation via `SlugValidator` + `ReservedSlugs`, ownership checks
+- [ ] T054 [US1] Unit tests `PollServiceTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/service/` covering activation atomicity, 2-option precondition, slug derivation, ownership — pure-Java, no Spring
 
 ### Security + auth for US1
 
-- [ ] T055 [US1] Spring Security config `SecurityConfig` in `backend/poll-api/src/main/java/polls/api/security/`: `/api/admin/**` requires authenticated session; `/api/polls/**`, `/api/public/**`, `/api/deck/**`, `/`, `/{slug}`, `/admin/` permitAll; CSRF config compatible with JSON login
-- [ ] T056 [P] [US1] `AdminUserDetailsService` backed by `admin_user` table (BCrypt) in `backend/poll-api/src/main/java/polls/api/security/`
-- [ ] T057 [P] [US1] `AdminAuthController` (`POST /api/admin/login`, `POST /api/admin/logout`) in `backend/poll-api/src/main/java/polls/api/admin/`
+- [ ] T055 [US1] Spring Security config `SecurityConfig` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/security/`: `/api/admin/**` requires authenticated session; `/api/polls/**`, `/api/public/**`, `/api/deck/**`, `/`, `/{slug}`, `/admin/` permitAll; CSRF config compatible with JSON login
+- [ ] T056 [P] [US1] `AdminUserDetailsService` backed by `admin_user` table (BCrypt) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/security/`
+- [ ] T057 [P] [US1] `AdminAuthController` (`POST /api/admin/login`, `POST /api/admin/logout`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/`
 
 ### Backoffice REST endpoints (US1)
 
-- [ ] T058 [US1] `AdminPollController` in `backend/poll-api/src/main/java/polls/api/admin/PollController.java`: `GET/POST /api/admin/polls`, `GET/PATCH/DELETE /api/admin/polls/{pollId}`, `POST /api/admin/polls/{pollId}/open`, `POST /api/admin/polls/{pollId}/close`, `PUT /api/admin/polls/{pollId}/style`
-- [ ] T059 [P] [US1] `QrController` `GET /api/admin/polls/{pollId}/qr.png` producing PNG via zxing in `backend/poll-api/src/main/java/polls/api/admin/QrController.java` (encodes absolute public slug URL)
-- [ ] T060 [P] [US1] DTO records in `backend/poll-api/src/main/java/polls/api/admin/dto/`: `CreatePollRequest`, `UpdatePollRequest`, `CreateQuestionRequest`, `ActivateQuestionRequest`, `PollDto`, `PollDetailDto`, `QuestionDto`, `OptionDto`, `PollStyleDto` matching OpenAPI
+- [ ] T058 [US1] `AdminPollController` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/PollController.java`: `GET/POST /api/admin/polls`, `GET/PATCH/DELETE /api/admin/polls/{pollId}`, `POST /api/admin/polls/{pollId}/open`, `POST /api/admin/polls/{pollId}/close`, `PUT /api/admin/polls/{pollId}/style`
+- [ ] T059 [P] [US1] `QrController` `GET /api/admin/polls/{pollId}/qr.png` producing PNG via zxing in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/QrController.java` (encodes absolute public slug URL)
+- [ ] T060 [P] [US1] DTO records in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/dto/`: `CreatePollRequest`, `UpdatePollRequest`, `CreateQuestionRequest`, `ActivateQuestionRequest`, `PollDto`, `PollDetailDto`, `QuestionDto`, `OptionDto`, `PollStyleDto` matching OpenAPI
 
 ### Backoffice SPA (US1)
 
@@ -149,26 +149,26 @@
 
 ### Tests for User Story 2 (write first)
 
-- [ ] T070 [P] [US2] Integration test `PublicPollViewIT` in `backend/poll-api/src/test/java/polls/api/public_/` — scenarios `[TS-020, TS-021, TS-045]`
+- [ ] T070 [P] [US2] Integration test `PublicPollViewIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/public_/` — scenarios `[TS-020, TS-021, TS-045]`
 - [ ] T071 [P] [US2] Integration test `VoteSubmissionIT` — scenarios `[TS-022, TS-023, TS-025, TS-027]`
-- [ ] T072 [P] [US2] Concurrency test `DuplicateVoteRaceIT` in `backend/poll-persistence/src/test/java/polls/persistence/` — scenario `[TS-024]` (unique constraint on `(question_id, voter_token)`)
+- [ ] T072 [P] [US2] Concurrency test `DuplicateVoteRaceIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-024]` (unique constraint on `(question_id, voter_token)`)
 - [ ] T073 [P] [US2] SPA catch-all test `SpaCatchAllIT` — scenarios `[TS-043, TS-044]` (catch-all serves SPA shell but excludes `/api/**`, `/admin/api/**`, static prefixes)
 - [ ] T074 [P] [US2] Vitest component test for voter `PollView.vue` in `frontends/voter/src/pages/PollView.test.ts` (waiting state, active question render, submit flow, already-voted)
 - [ ] T075 [P] [US2] Playwright smoke `voter-happy-path.spec.ts` in `frontends/voter/e2e/` — open `/my-talk`, vote, see confirmation
 
 ### Domain + persistence for US2
 
-- [ ] T080 [P] [US2] `Vote` record + `VoteCastEvent` in `backend/poll-core/src/main/java/polls/core/model/`
-- [ ] T081 [P] [US2] Exceptions `AlreadyVotedException`, `QuestionNotActiveException` in `backend/poll-core/src/main/java/polls/core/error/`
-- [ ] T082 [US2] `VoteRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/polls/persistence/VoteRepositoryImpl.java` (insert with unique-constraint handling, aggregate `GROUP BY option_id`, read `alreadyVoted` by `(question_id, voter_token)`)
-- [ ] T083 [US2] `VoteService` in `backend/poll-core/src/main/java/polls/core/service/VoteService.java`: transactional insert that verifies `ACTIVE` status inside the same tx, maps duplicate-key to `AlreadyVotedException`, publishes `VoteCastEvent` on success
-- [ ] T084 [US2] `VoteServiceTest` in `backend/poll-core/src/test/java/polls/core/service/` — unit level with a stub repository
+- [ ] T080 [P] [US2] `Vote` record + `VoteCastEvent` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/model/`
+- [ ] T081 [P] [US2] Exceptions `AlreadyVotedException`, `QuestionNotActiveException` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/error/`
+- [ ] T082 [US2] `VoteRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/site/asm0dey/slidev/polls/persistence/VoteRepositoryImpl.java` (insert with unique-constraint handling, aggregate `GROUP BY option_id`, read `alreadyVoted` by `(question_id, voter_token)`)
+- [ ] T083 [US2] `VoteService` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/service/VoteService.java`: transactional insert that verifies `ACTIVE` status inside the same tx, maps duplicate-key to `AlreadyVotedException`, publishes `VoteCastEvent` on success
+- [ ] T084 [US2] `VoteServiceTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/service/` — unit level with a stub repository
 
 ### Public REST endpoints + SPA routing (US2)
 
-- [ ] T085 [US2] `PublicPollController` in `backend/poll-api/src/main/java/polls/api/public_/`: `GET /api/polls/by-slug/{slug}` returning `PublicPollView` (honours `sp_voter` cookie for `alreadyVoted` hint)
-- [ ] T086 [US2] `VoteController` `POST /api/polls/{slug}/votes` in `backend/poll-api/src/main/java/polls/api/public_/` — accepts `VoteRequest`, reads `sp_voter` cookie and sets it (HttpOnly, SameSite=Lax) when missing so the server is authoritative for duplicate detection; ignores unknown fields (Jackson `FAIL_ON_UNKNOWN_PROPERTIES=false`) for `[TS-027]`
-- [ ] T087 [US2] `SpaForwardingConfig` in `backend/poll-api/src/main/java/polls/api/web/` — Spring MVC routing: `/` and `/{slug:[a-z0-9-]{3,40}}` → voter SPA `index.html`; `/admin/**` → backoffice SPA `index.html`; exclude `/api/**`, `/admin/api/**`, and static asset prefixes per plan.md Constraints
+- [ ] T085 [US2] `PublicPollController` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/public_/`: `GET /api/polls/by-slug/{slug}` returning `PublicPollView` (honours `sp_voter` cookie for `alreadyVoted` hint)
+- [ ] T086 [US2] `VoteController` `POST /api/polls/{slug}/votes` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/public_/` — accepts `VoteRequest`, reads `sp_voter` cookie and sets it (HttpOnly, SameSite=Lax) when missing so the server is authoritative for duplicate detection; ignores unknown fields (Jackson `FAIL_ON_UNKNOWN_PROPERTIES=false`) for `[TS-027]`
+- [ ] T087 [US2] `SpaForwardingConfig` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/web/` — Spring MVC routing: `/` and `/{slug:[a-z0-9-]{3,40}}` → voter SPA `index.html`; `/admin/**` → backoffice SPA `index.html`; exclude `/api/**`, `/admin/api/**`, and static asset prefixes per plan.md Constraints
 - [ ] T088 [US2] Slug path-variable validator in `PublicPollController` returning 400/404 for invalid slug format per `[TS-045]`
 
 ### Voter SPA (US2)
@@ -190,30 +190,30 @@
 
 ### Tests for User Story 3 (write first)
 
-- [ ] T100 [P] [US3] SseHub concurrency test `SseHubConcurrencyTest` in `backend/poll-realtime/src/test/java/polls/realtime/` (subscribe/unsubscribe/broadcast under racing threads; emitter failure is isolated)
-- [ ] T101 [P] [US3] `@WebMvcTest` `TallyBroadcastTest` in `backend/poll-realtime/src/test/java/polls/realtime/` — scenarios `[TS-030, TS-031, TS-032]` (snapshot on connect, tally on vote, snapshot on active-question change)
-- [ ] T102 [P] [US3] Awaitility SSE test `StreamIT` in `backend/poll-api/src/test/java/polls/api/public_/` — scenario `[TS-030]` end-to-end (vote → tally delivered <2 s)
-- [ ] T104 [P] [US3] Deck-activation integration test `DeckActivationIT` in `backend/poll-api/src/test/java/polls/api/deck/` — scenarios `[TS-050, TS-051, TS-052, TS-053, TS-054, TS-055, TS-056, TS-057]`
+- [ ] T100 [P] [US3] SseHub concurrency test `SseHubConcurrencyTest` in `backend/poll-realtime/src/test/java/site/asm0dey/slidev/polls/realtime/` (subscribe/unsubscribe/broadcast under racing threads; emitter failure is isolated)
+- [ ] T101 [P] [US3] `@WebMvcTest` `TallyBroadcastTest` in `backend/poll-realtime/src/test/java/site/asm0dey/slidev/polls/realtime/` — scenarios `[TS-030, TS-031, TS-032]` (snapshot on connect, tally on vote, snapshot on active-question change)
+- [ ] T102 [P] [US3] Awaitility SSE test `StreamIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/public_/` — scenario `[TS-030]` end-to-end (vote → tally delivered <2 s)
+- [ ] T104 [P] [US3] Deck-activation integration test `DeckActivationIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/` — scenarios `[TS-050, TS-051, TS-052, TS-053, TS-054, TS-055, TS-056, TS-057]`
 - [ ] T105 [P] [US3] Vitest component tests in `frontends/slidev-component/src/components/` — `PollResults.test.ts` covering `[TS-032, TS-033, TS-034]` (stray-tally ignored, paused indicator, reconnect)
 - [ ] T106 [P] [US3] Playwright smoke `slidev-results.spec.ts` in `frontends/slidev-component/e2e/` — renders results on a sample deck page against running backend
 
 ### Realtime backend (US3)
 
-- [ ] T110 [P] [US3] `SseHub` in `backend/poll-realtime/src/main/java/polls/realtime/SseHub.java` — keyed by `pollId`, thread-safe add/remove, broadcast with per-emitter failure isolation
-- [ ] T111 [P] [US3] `TallyBroadcaster` in `backend/poll-realtime/src/main/java/polls/realtime/TallyBroadcaster.java` — `@EventListener(VoteCastEvent)` → fetch tally → publish `tally` event; also publishes `snapshot` on active-question change and `question-closed` on close
-- [ ] T112 [US3] `StreamController` `GET /api/polls/{slug}/stream` in `backend/poll-api/src/main/java/polls/api/public_/` — returns `SseEmitter`, emits initial `snapshot`, registers with `SseHub`, handles 404 for unknown slug
+- [ ] T110 [P] [US3] `SseHub` in `backend/poll-realtime/src/main/java/site/asm0dey/slidev/polls/realtime/SseHub.java` — keyed by `pollId`, thread-safe add/remove, broadcast with per-emitter failure isolation
+- [ ] T111 [P] [US3] `TallyBroadcaster` in `backend/poll-realtime/src/main/java/site/asm0dey/slidev/polls/realtime/TallyBroadcaster.java` — `@EventListener(VoteCastEvent)` → fetch tally → publish `tally` event; also publishes `snapshot` on active-question change and `question-closed` on close
+- [ ] T112 [US3] `StreamController` `GET /api/polls/{slug}/stream` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/public_/` — returns `SseEmitter`, emits initial `snapshot`, registers with `SseHub`, handles 404 for unknown slug
 
 ### Deck-token backoffice (US3)
 
-- [ ] T113 [P] [US3] `DeckTokenService` in `backend/poll-core/src/main/java/polls/core/service/DeckTokenService.java` — mint (generate random bearer, SHA-256 hash, persist hash, return plaintext once), list, revoke; ownership-scoped
-- [ ] T114 [P] [US3] `DeckTokenRepository` jOOQ impl in `backend/poll-persistence/src/main/java/polls/persistence/DeckTokenRepositoryImpl.java`
-- [ ] T115 [US3] `AdminDeckTokenController` in `backend/poll-api/src/main/java/polls/api/admin/DeckTokenController.java` — `GET/POST /api/admin/polls/{pollId}/deck-tokens`, `DELETE /api/admin/polls/{pollId}/deck-tokens/{tokenId}`; DTOs `DeckTokenDto`, `DeckTokenMintedDto`, `MintDeckTokenRequest`
+- [ ] T113 [P] [US3] `DeckTokenService` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/service/DeckTokenService.java` — mint (generate random bearer, SHA-256 hash, persist hash, return plaintext once), list, revoke; ownership-scoped
+- [ ] T114 [P] [US3] `DeckTokenRepository` jOOQ impl in `backend/poll-persistence/src/main/java/site/asm0dey/slidev/polls/persistence/DeckTokenRepositoryImpl.java`
+- [ ] T115 [US3] `AdminDeckTokenController` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/DeckTokenController.java` — `GET/POST /api/admin/polls/{pollId}/deck-tokens`, `DELETE /api/admin/polls/{pollId}/deck-tokens/{tokenId}`; DTOs `DeckTokenDto`, `DeckTokenMintedDto`, `MintDeckTokenRequest`
 - [ ] T116 [US3] Backoffice SPA `DeckTokensPage.vue` in `frontends/backoffice/src/pages/` — mint (shows plaintext once with copy-to-clipboard), list, revoke
 
 ### Deck activation endpoint (US3)
 
-- [ ] T117 [US3] `DeckTokenAuthenticationFilter` in `backend/poll-api/src/main/java/polls/api/security/` — reads `X-Deck-Token`, hashes, looks up non-revoked row; attaches a `DeckPrincipal` carrying `pollId`. Registered ONLY on `/api/deck/**` so token doesn't grant elsewhere per `[TS-057]`
-- [ ] T118 [US3] `DeckActivationController` `POST /api/deck/polls/{pollId}/activate` in `backend/poll-api/src/main/java/polls/api/deck/` — verifies principal's `pollId` matches path (403 `DECK_TOKEN_POLL_MISMATCH` per `[TS-054]`); delegates to `PollService.activate` which is idempotent when already ACTIVE per `[TS-052]`
+- [ ] T117 [US3] `DeckTokenAuthenticationFilter` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/security/` — reads `X-Deck-Token`, hashes, looks up non-revoked row; attaches a `DeckPrincipal` carrying `pollId`. Registered ONLY on `/api/deck/**` so token doesn't grant elsewhere per `[TS-057]`
+- [ ] T118 [US3] `DeckActivationController` `POST /api/deck/polls/{pollId}/activate` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/` — verifies principal's `pollId` matches path (403 `DECK_TOKEN_POLL_MISMATCH` per `[TS-054]`); delegates to `PollService.activate` which is idempotent when already ACTIVE per `[TS-052]`
 
 ### Slidev addon (US3)
 

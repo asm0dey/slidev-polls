@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.example.polls</groupId>
+        <groupId>site.asm0dey.slidev.polls</groupId>
         <artifactId>slidev-polls-backend</artifactId>
         <version>0.0.1-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
@@ -17,15 +17,15 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.example.polls</groupId>
+            <groupId>site.asm0dey.slidev.polls</groupId>
             <artifactId>poll-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.example.polls</groupId>
+            <groupId>site.asm0dey.slidev.polls</groupId>
             <artifactId>poll-persistence</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.example.polls</groupId>
+            <groupId>site.asm0dey.slidev.polls</groupId>
             <artifactId>poll-realtime</artifactId>
         </dependency>
 
@@ -93,7 +93,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.example.polls.api.PollApiApplication</mainClass>
+                    <mainClass>site.asm0dey.slidev.polls.api.PollApiApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

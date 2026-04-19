@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example.polls</groupId>
+    <groupId>site.asm0dey.slidev.polls</groupId>
     <artifactId>slidev-polls-parent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -31,17 +31,17 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.example.polls</groupId>
+                <groupId>site.asm0dey.slidev.polls</groupId>
                 <artifactId>poll-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.example.polls</groupId>
+                <groupId>site.asm0dey.slidev.polls</groupId>
                 <artifactId>poll-persistence</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.example.polls</groupId>
+                <groupId>site.asm0dey.slidev.polls</groupId>
                 <artifactId>poll-realtime</artifactId>
                 <version>${project.version}</version>
             </dependency>

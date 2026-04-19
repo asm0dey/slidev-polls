@@ -1,4 +1,4 @@
-package com.example.polls.core.slug;
+package site.asm0dey.slidev.polls.core.slug;
 
 import java.util.Set;
 

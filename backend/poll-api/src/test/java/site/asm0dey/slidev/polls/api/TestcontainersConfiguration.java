@@ -1,4 +1,4 @@
-package com.example.polls.api;
+package site.asm0dey.slidev.polls.api;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;

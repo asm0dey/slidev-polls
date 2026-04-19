@@ -1,4 +1,4 @@
-package com.example.polls.api;
+package site.asm0dey.slidev.polls.api;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
