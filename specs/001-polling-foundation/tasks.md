@@ -125,7 +125,7 @@
 ### Backoffice REST endpoints (US1)
 
 - [x] T058 [US1] `AdminPollController` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/PollController.java`: `GET/POST /api/admin/polls`, `GET/PATCH/DELETE /api/admin/polls/{pollId}`, `POST /api/admin/polls/{pollId}/open`, `POST /api/admin/polls/{pollId}/close`, `PUT /api/admin/polls/{pollId}/style`
-- [ ] T059 [P] [US1] `QrController` `GET /api/admin/polls/{pollId}/qr.png` producing PNG via zxing in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/QrController.java` (encodes absolute public slug URL)
+- [x] T059 [P] [US1] `QrController` `GET /api/admin/polls/{pollId}/qr.png` producing PNG via zxing in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/QrController.java` (encodes absolute public slug URL)
 - [x] T060 [P] [US1] DTO records in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/dto/`: `CreatePollRequest`, `UpdatePollRequest`, `CreateQuestionRequest`, `ActivateQuestionRequest`, `PollDto`, `PollDetailDto`, `QuestionDto`, `OptionDto`, `PollStyleDto` matching OpenAPI
 
 ### Backoffice SPA (US1)
