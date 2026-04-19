@@ -99,7 +99,7 @@
 
 ### Tests for User Story 1 (write first — MUST fail before implementation)
 
-- [ ] T040 [P] [US1] Integration test `PollAuthoringIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-002, TS-006]` (create + delete poll)
+- [x] T040 [P] [US1] Integration test `PollAuthoringIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-002, TS-006]` (create + delete poll). Bundled here: widened `PollApiApplication`'s `scanBasePackages` to `site.asm0dey.slidev.polls` so sibling-module `@Service`/`@Repository` beans publish into the api context, made `TestcontainersConfiguration` package-public so ITs can `@Import` it, and pinned the Postgres image to `postgres:16-alpine` to match prod.
 - [ ] T041 [P] [US1] Integration test `QuestionLifecycleIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-003, TS-005]` (activate atomically closes prior; close rejects subsequent votes)
 - [x] T042 [P] [US1] Concurrency test `OneActivePerPollIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-004]` (partial unique index serialises concurrent activations), plus a positive-path serial activation and a `@TS-052` idempotent-reactivate guard so the concurrent assertion has meaningful contrast.
 - [x] T043 [P] [US1] Security slice test `AdminAuthWebMvcTest` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/security/` — scenarios `[TS-001, TS-040, TS-041]` (401 / 403 on admin routes, per-presenter ownership)
