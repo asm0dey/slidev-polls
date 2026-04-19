@@ -84,8 +84,8 @@
 ### Frontend shared package (blocks all SPAs)
 
 - [x] T029 [P] Create `frontends/shared/package.json` (@polls/shared) with TS config; export DTO types mirrored from OpenAPI (`Poll`, `PollDetail`, `Question`, `Option`, `PublicPollView`, `VoteRequest`, `VoteAccepted`, `Problem`, `PollStyle`, `DeckToken`, `DeckTokenMinted`)
-- [ ] T030 [P] Create `frontends/shared/src/api-client.ts` (fetch wrapper, Problem-aware error mapping) and `frontends/shared/src/sse-client.ts` (EventSource with bounded-backoff reconnect + "paused" state callback — shared by voter and slidev-component per Principle IV)
-- [ ] T031 [P] `bun test` unit tests for `sse-client` reconnect/backoff in `frontends/shared/src/sse-client.test.ts` (plain TS in `frontends/shared`, per prior runner clarification)
+- [x] T030 [P] Create `frontends/shared/src/api-client.ts` (fetch wrapper, Problem-aware error mapping) and `frontends/shared/src/sse-client.ts` (EventSource with bounded-backoff reconnect + "paused" state callback — shared by voter and slidev-component per Principle IV)
+- [x] T031 [P] `bun test` unit tests for `sse-client` reconnect/backoff in `frontends/shared/src/sse-client.test.ts` (plain TS in `frontends/shared`, per prior runner clarification)
 
 **Checkpoint**: Foundation complete — stories can now proceed.
 
