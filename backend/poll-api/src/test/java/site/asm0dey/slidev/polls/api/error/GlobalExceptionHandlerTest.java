@@ -12,11 +12,14 @@ import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,8 +48,28 @@ import site.asm0dey.slidev.polls.core.error.SlugTakenException;
 @WebMvcTest(
     controllers = GlobalExceptionHandlerTest.ProblemProvokingController.class,
     properties = "spring.main.web-application-type=servlet")
-@Import({GlobalExceptionHandler.class, CorrelationIdFilter.class})
+@Import({
+  GlobalExceptionHandler.class,
+  CorrelationIdFilter.class,
+  GlobalExceptionHandlerTest.ProblemProvokingController.class,
+  GlobalExceptionHandlerTest.PermitAllTestSecurityConfig.class
+})
 class GlobalExceptionHandlerTest {
+
+  // The @WebMvcTest slice auto-configures Spring Security with its default
+  // "deny everything unauthenticated" chain, which would short-circuit our
+  // handlers and turn every test endpoint into a 401. Replace it with a
+  // permit-all chain so the advice path is what gets exercised. Production
+  // security lives in SecurityConfig (arrives in T055).
+  @org.springframework.boot.test.context.TestConfiguration
+  static class PermitAllTestSecurityConfig {
+    @Bean
+    SecurityFilterChain permitAll(HttpSecurity http) throws Exception {
+      http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+          .csrf(csrf -> csrf.disable());
+      return http.build();
+    }
+  }
 
   @Autowired private MockMvc mvc;
 
