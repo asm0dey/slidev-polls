@@ -1,14 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
+Version change: 1.1.0 → 1.2.0
 Modified principles: none
+Added principles:
+  - X. Documentation-Verified Library Usage
+Added sections: none (addition lands inside Core Principles)
+Removed sections: none
+Templates reviewed for consistency:
+  - plan-template.md: ✅ constitution-check section still valid;
+    Principle X is a contributor-workflow rule, not a per-feature gate
+  - spec-template.md: ✅ unaffected
+  - tasks-template.md: ✅ unaffected (library-doc consultation is a
+    contributor duty, not a standalone task)
+Follow-up TODOs: none.
+
+---- Previous SYNC IMPACT REPORT (1.0.0 → 1.1.0) ----
 Added principles:
   - VII. No BDD Frameworks
   - VIII. Minimal External Dependencies
   - IX. Human-Authored Presentation
-Added sections: none (additions land inside Core Principles)
-Removed sections: none
 Templates reviewed for consistency:
   - plan-template.md: ✅ constitution-check section still valid
   - spec-template.md: ✅ unaffected
@@ -131,6 +142,25 @@ and degrades the perceived craftsmanship of the project; the repository
 should present as a coherent human-authored codebase regardless of how
 any individual change was drafted.
 
+### X. Documentation-Verified Library Usage
+
+When writing or modifying code that uses an external library, framework,
+SDK, API, CLI tool, or cloud service — even one considered well-known —
+contributors MUST consult current documentation for the exact version in
+use before landing the change. Recalled knowledge and training data go
+stale; "I already know this API" is not a substitute. In this repository
+the authoritative mechanism is the Context7 MCP server (invoked as
+`resolve-library-id` followed by `query-docs`), which MUST be preferred
+over general web search or memory for any library-specific question,
+including API syntax, configuration, version-migration notes, and setup
+instructions. This obligation does not apply to refactoring that does
+not change library surface usage, to debugging of business logic, or to
+general programming concepts. Rationale: silently-broken upgrades,
+removed APIs, and deprecated configuration surface only at runtime or on
+the next release, and the cost of that failure during a live talk — or
+of rolling back a dependency bump after the fact — far exceeds the cost
+of a single doc lookup before the change is written.
+
 ## Quality Standards
 
 - Every merged change MUST include tests covering its acceptance criteria
@@ -182,4 +212,4 @@ NOT silently deviate. Complexity or deviations introduced to meet a
 requirement MUST be justified in the plan for the feature that introduces
 them.
 
-**Version**: 1.1.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
+**Version**: 1.2.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
