@@ -10,8 +10,11 @@ public final class ReservedSlugs {
   private ReservedSlugs() {}
 
   public static boolean isReserved(String slug) {
+    // Empty / null slugs are rejected by SlugValidator on length grounds before
+    // this check runs; surfacing them as "reserved" here would make error
+    // reporting lie about which check failed (SLUG_RESERVED vs SLUG_INVALID).
     if (slug == null || slug.isEmpty()) {
-      return true;
+      return false;
     }
     return RESERVED.contains(slug.toLowerCase());
   }
