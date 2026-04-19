@@ -110,7 +110,7 @@
 
 ### Domain + persistence for US1
 
-- [ ] T050 [P] [US1] Domain records in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/model/`: `Poll.java`, `Question.java`, `Option.java`, `PollStatus`, `QuestionStatus`
+- [x] T050 [P] [US1] Domain records in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/model/`: `Poll.java`, `Question.java`, `Option.java`, `PollStatus`, `QuestionStatus` (placed under the existing `core/domain/` package that already hosts `PollStatus` / `QuestionStatus` from an earlier scaffold — `model` would split the enums from the records for no benefit)
 - [ ] T051 [P] [US1] Domain exceptions in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/error/`: `SlugTakenException`, `SlugInvalidException`, `SlugReservedException`, `ActivationRejectedException`, `NotOwnerException`, `NotFoundException`
 - [ ] T052 [US1] `PollRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/site/asm0dey/slidev/polls/persistence/PollRepositoryImpl.java` (insert/update/delete polls, questions, options; partial-index activation; owner-scoped queries); repository interface lives in `poll-core`
 - [ ] T053 [US1] `PollService` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/service/PollService.java`: create/list/get/update/delete, activate/close with atomic "at most one ACTIVE" enforcement, ≥2-options precondition (`ACTIVATION_REJECTED`), slug derivation (kebab-case of title), slug validation via `SlugValidator` + `ReservedSlugs`, ownership checks
