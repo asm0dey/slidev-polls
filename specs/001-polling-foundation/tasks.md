@@ -158,8 +158,8 @@
 
 ### Domain + persistence for US2
 
-- [ ] T080 [P] [US2] `Vote` record + `VoteCastEvent` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/model/`
-- [ ] T081 [P] [US2] Exceptions `AlreadyVotedException`, `QuestionNotActiveException` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/error/`
+- [x] T080 [P] [US2] `Vote` record + `VoteCastEvent` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/domain/` and `core/event/`. Implementation diverges from the task's `model/` path: the existing scaffold already placed `Poll`/`Question`/`Option` under `core/domain/` (T050 reconcile note) and `VoteCastEvent` under `core/event/`; creating a third sibling package for one record would split the aggregate across directories. Bundled with this task: reconciled `@polls/shared` `VoteAccepted` type (`questionId` → `recordedAt`) to match `openapi.yaml §VoteAccepted` so the upcoming `VoteController` DTO (T086) and voter SPA (T092) share one source of truth.
+- [x] T081 [P] [US2] Exceptions `AlreadyVotedException`, `QuestionNotActiveException` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/error/` — already created alongside `GlobalExceptionHandler` under T026 (handler's `@ExceptionHandler` methods could not compile without them); this task is reconciled, no code diff is required.
 - [ ] T082 [US2] `VoteRepository` jOOQ implementation in `backend/poll-persistence/src/main/java/site/asm0dey/slidev/polls/persistence/VoteRepositoryImpl.java` (insert with unique-constraint handling, aggregate `GROUP BY option_id`, read `alreadyVoted` by `(question_id, voter_token)`)
 - [ ] T083 [US2] `VoteService` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/service/VoteService.java`: transactional insert that verifies `ACTIVE` status inside the same tx, maps duplicate-key to `AlreadyVotedException`, publishes `VoteCastEvent` on success
 - [ ] T084 [US2] `VoteServiceTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/service/` — unit level with a stub repository
