@@ -147,11 +147,20 @@ export interface MintDeckTokenRequest {
   label?: string | null;
 }
 
+/** Slimmed snapshot of an active question — what the SSE `snapshot` event carries.
+ *  Lacks `status` because the SSE stream is only emitted for the currently-active question. */
+export interface SnapshotActiveQuestion {
+  id: string;
+  prompt: string;
+  ordinal: number;
+  options: Option[];
+}
+
 /** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect. */
 export interface SnapshotEvent {
   pollId: string;
   slug: string;
-  activeQuestion: Question | null;
+  activeQuestion: SnapshotActiveQuestion | null;
   tally: TallyEntry[];
   emittedAt: string;
 }
@@ -174,4 +183,5 @@ export interface TallyDeltaEvent {
 export interface QuestionClosedEvent {
   pollId: string;
   questionId: string;
+  emittedAt: string;
 }
