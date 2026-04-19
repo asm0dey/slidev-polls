@@ -1,3 +1,11 @@
+logging:
+  structured:
+    format:
+      # Elastic Common Schema — Spring Boot 4 emits line-delimited JSON with
+      # every MDC key (correlationId, user, …) merged into the event, which
+      # satisfies Principle VI without pulling in logstash-logback-encoder.
+      console: ecs
+
 spring:
   application:
     name: poll-api
