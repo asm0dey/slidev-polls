@@ -103,7 +103,8 @@ export interface VoteRequest {
 /** Vote accepted response. */
 export interface VoteAccepted {
   voteId: string;
-  questionId: string;
+  /** ISO-8601 timestamp at which the vote was persisted. */
+  recordedAt: string;
 }
 
 /** OpenAPI Problem error envelope. */
