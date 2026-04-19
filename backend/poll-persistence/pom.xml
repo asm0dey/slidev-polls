@@ -25,9 +25,29 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jooq</artifactId>
         </dependency>
+        <!--
+          Jackson 3 (tools.jackson.*) for JSONB (de)serialisation in PollRepositoryImpl.
+          Spring Boot 4 auto-configures this ObjectMapper in the application context;
+          poll-persistence declares it here so the generated jOOQ repository code
+          can compile and link against the same type at runtime.
+        -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+        <!--
+          Flyway is pulled in through Spring Boot 4's dedicated starter rather
+          than via `flyway-core` directly. In Spring Boot 4 the Flyway
+          auto-configuration lives in `spring-boot-flyway` (not in
+          `spring-boot-autoconfigure` as it did in 3.x); the starter bundles
+          that auto-configuration alongside `flyway-core`, so migrations
+          actually run on application startup. `flyway-database-postgresql`
+          is still required explicitly under Flyway 10+/11+ to register the
+          Postgres dialect.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

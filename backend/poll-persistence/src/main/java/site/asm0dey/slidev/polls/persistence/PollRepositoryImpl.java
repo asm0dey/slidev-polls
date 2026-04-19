@@ -4,8 +4,6 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +27,8 @@ import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * jOOQ-backed implementation of {@link PollRepository}. All methods are thin projections over the
@@ -330,7 +330,7 @@ public class PollRepositoryImpl implements PollRepository {
     }
     try {
       return JSONB.jsonb(objectMapper.writeValueAsString(style));
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       throw new IllegalStateException("cannot serialise poll style to jsonb", e);
     }
   }

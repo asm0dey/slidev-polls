@@ -1,6 +1,5 @@
 package site.asm0dey.slidev.polls.api.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Component;
 import site.asm0dey.slidev.polls.api.error.Problem;
 import site.asm0dey.slidev.polls.api.error.ProblemCode;
 import site.asm0dey.slidev.polls.api.logging.CorrelationIdFilter;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Translates Spring Security authorisation failures (including CSRF rejections) into a {@link

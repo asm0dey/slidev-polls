@@ -205,10 +205,11 @@ class AdminAuthWebMvcTest {
     }
 
     @Bean
-    com.fasterxml.jackson.databind.ObjectMapper objectMapper() {
-      // The WebMvcTest slice scopes out the JacksonAutoConfiguration ObjectMapper for our Problem
-      // entry-point/access-denied-handler constructors, so publish one here.
-      return new com.fasterxml.jackson.databind.ObjectMapper();
+    tools.jackson.databind.ObjectMapper objectMapper() {
+      // The WebMvcTest slice scopes out the JacksonAutoConfiguration JsonMapper for our Problem
+      // entry-point/access-denied-handler constructors, so publish one here. Jackson 3's
+      // ObjectMapper is abstract; the concrete default is JsonMapper.
+      return tools.jackson.databind.json.JsonMapper.builder().build();
     }
   }
 }
