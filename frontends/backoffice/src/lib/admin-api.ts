@@ -132,6 +132,12 @@ export class AdminApiClient {
   }
 }
 
+/**
+ * Default singleton client. Pages instantiate one client at module load and
+ * share it across navigations; tests inject their own via the apiClient prop.
+ */
+export const defaultAdminClient = new AdminApiClient();
+
 async function toAdminError(res: Response): Promise<AdminApiError> {
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
