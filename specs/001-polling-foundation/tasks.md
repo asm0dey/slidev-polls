@@ -9,6 +9,10 @@
 - Q: T064 PollEditorPage scope — split or keep as one task? -> A: Keep as one task; single Vue page with internal sections. [T064]
 - Q: Where is the slidev addon published? -> A: Out of scope for this feature. Addon consumed locally from the monorepo; publish strategy deferred. [T132]
 - Q: Canonical frontend test runner — `bun test` vs Vitest? -> A: Both — `bun test` for plain-TS unit tests (`frontends/shared`), Vitest for component / Vue packages. [T136]
+- Q: T031 uses Vitest, but it lives in `frontends/shared` (plain TS) — which runner? -> A: `bun test` — align with the prior runner clarification. [T031]
+- Q: Where are Playwright install + config placed for the e2e smokes? -> A: Add T009 installing Playwright at the `frontends/` workspace root with a shared `frontends/playwright.config.ts`; extend T136 to run the smokes. [T009, T075, T106, T136]
+- Q: Voter identity — is `sp_voter` client-owned, server-owned, or both? -> A: Server-authoritative. `VoteController` reads and (when missing) sets `sp_voter` as HttpOnly/SameSite=Lax. Client never writes it; localStorage only caches per-slug `alreadyVoted` booleans. [T086, T091]
+- Q: Is "empty" really a reserved slug when `SlugValidator` enforces length 3–40? -> A: No — drop "empty" from `ReservedSlugs`; length validation rejects it before the reserved check. [T019]
 
 
 
@@ -38,6 +42,7 @@
 - [ ] T006 [P] Create `scripts/build-frontends.sh` (bun install + build all SPAs + copy dists into `backend/poll-api/src/main/resources/static`)
 - [ ] T007 [P] Create `scripts/dev.sh` (docker-compose up postgres + `mvnw spring-boot:run` + `bun --cwd frontends run dev`)
 - [ ] T008 [P] Configure ESLint + Prettier config at `frontends/` root; configure Checkstyle / Spotless in `backend/pom.xml`
+- [ ] T009 [P] Install Playwright at the `frontends/` workspace root; add shared `frontends/playwright.config.ts`; wire `e2e` script in `frontends/voter/package.json` and `frontends/slidev-component/package.json` so `bun --cwd frontends/<pkg> run e2e` runs the smokes added in T075 / T106
 
 ---
 
@@ -62,7 +67,7 @@
 
 ### poll-core foundational types (shared by all stories)
 
-- [ ] T019 [P] Create `ReservedSlugs` constant holder in `backend/poll-core/src/main/java/polls/core/slug/ReservedSlugs.java` (`admin`, `api`, `assets`, `static`, `j`, `login`, `logout`, empty)
+- [ ] T019 [P] Create `ReservedSlugs` constant holder in `backend/poll-core/src/main/java/polls/core/slug/ReservedSlugs.java` (`admin`, `api`, `assets`, `static`, `j`, `login`, `logout`) — empty string intentionally omitted; `SlugValidator` (T020) rejects it on length grounds before the reserved check
 - [ ] T020 [P] Create `SlugValidator` in `backend/poll-core/src/main/java/polls/core/slug/SlugValidator.java` enforcing lowercase kebab-case, 3–40 chars, `[a-z0-9]` + `-`, start/end alphanumeric, no `--`
 - [ ] T021 [P] Unit tests `SlugValidatorTest` and `ReservedSlugsTest` in `backend/poll-core/src/test/java/polls/core/slug/` mirroring `@TS-011`, `@TS-012` invalid/reserved examples
 
@@ -80,7 +85,7 @@
 
 - [ ] T029 [P] Create `frontends/shared/package.json` (@polls/shared) with TS config; export DTO types mirrored from OpenAPI (`Poll`, `PollDetail`, `Question`, `Option`, `PublicPollView`, `VoteRequest`, `VoteAccepted`, `Problem`, `PollStyle`, `DeckToken`, `DeckTokenMinted`)
 - [ ] T030 [P] Create `frontends/shared/src/api-client.ts` (fetch wrapper, Problem-aware error mapping) and `frontends/shared/src/sse-client.ts` (EventSource with bounded-backoff reconnect + "paused" state callback — shared by voter and slidev-component per Principle IV)
-- [ ] T031 [P] Vitest unit tests for `sse-client` reconnect/backoff in `frontends/shared/src/sse-client.test.ts`
+- [ ] T031 [P] `bun test` unit tests for `sse-client` reconnect/backoff in `frontends/shared/src/sse-client.test.ts` (plain TS in `frontends/shared`, per prior runner clarification)
 
 **Checkpoint**: Foundation complete — stories can now proceed.
 
@@ -162,14 +167,14 @@
 ### Public REST endpoints + SPA routing (US2)
 
 - [ ] T085 [US2] `PublicPollController` in `backend/poll-api/src/main/java/polls/api/public_/`: `GET /api/polls/by-slug/{slug}` returning `PublicPollView` (honours `sp_voter` cookie for `alreadyVoted` hint)
-- [ ] T086 [US2] `VoteController` `POST /api/polls/{slug}/votes` in `backend/poll-api/src/main/java/polls/api/public_/` — accepts `VoteRequest`, sets/reads `sp_voter` cookie, ignores unknown fields (Jackson `FAIL_ON_UNKNOWN_PROPERTIES=false`) for `[TS-027]`
+- [ ] T086 [US2] `VoteController` `POST /api/polls/{slug}/votes` in `backend/poll-api/src/main/java/polls/api/public_/` — accepts `VoteRequest`, reads `sp_voter` cookie and sets it (HttpOnly, SameSite=Lax) when missing so the server is authoritative for duplicate detection; ignores unknown fields (Jackson `FAIL_ON_UNKNOWN_PROPERTIES=false`) for `[TS-027]`
 - [ ] T087 [US2] `SpaForwardingConfig` in `backend/poll-api/src/main/java/polls/api/web/` — Spring MVC routing: `/` and `/{slug:[a-z0-9-]{3,40}}` → voter SPA `index.html`; `/admin/**` → backoffice SPA `index.html`; exclude `/api/**`, `/admin/api/**`, and static asset prefixes per plan.md Constraints
 - [ ] T088 [US2] Slug path-variable validator in `PublicPollController` returning 400/404 for invalid slug format per `[TS-045]`
 
 ### Voter SPA (US2)
 
 - [ ] T090 [P] [US2] Bootstrap `frontends/voter/` Vite + Vue 3 + vue-router project (`package.json` @polls/voter); route `/` (landing) and `/:slug` (poll view)
-- [ ] T091 [P] [US2] `voterToken.ts` util in `frontends/voter/src/lib/` — generate + persist UUID in `localStorage`; mirror to `sp_voter` cookie client-side
+- [ ] T091 [P] [US2] `voterFlag.ts` util in `frontends/voter/src/lib/` — cache per-slug `alreadyVoted` booleans returned by `/api/polls/by-slug/{slug}` in `localStorage` for offline UX. Does NOT touch `sp_voter` (HttpOnly, server-authoritative per T086)
 - [ ] T092 [US2] `PollView.vue` page in `frontends/voter/src/pages/` — loads `/api/polls/by-slug/:slug`, renders WAITING vs ACTIVE, submits vote, shows confirmation, handles `ALREADY_VOTED` and `QUESTION_NOT_ACTIVE` with user-facing messages
 - [ ] T093 [P] [US2] `LandingPage.vue` at `/` with "enter a slug" input
 
@@ -228,7 +233,7 @@
 - [ ] T132 [P] Single-origin production check: `scripts/build-frontends.sh` copies the voter and backoffice SPA dists into `backend/poll-api/src/main/resources/static/` (`/`, `/admin/`); smoke test single JAR with no CORS. (Slidev addon publishing is out of scope for this feature — consumed locally from the monorepo.)
 - [ ] T134 [P] Structured-logging audit — every controller entry/exit has a `correlationId` field; every Problem response carries it per `[TS-042]`
 - [ ] T135 README quickstart instructions update referencing `scripts/dev.sh` and `scripts/build-frontends.sh`
-- [ ] T136 Run the full feature suite (`mvnw verify` + `bun test` for plain-TS unit tests in `frontends/shared` + `bun --cwd frontends/<pkg> run test` (Vitest) for every SPA / component package) and verify every `TS-###` maps to a passing assertion
+- [ ] T136 Run the full feature suite (`mvnw verify` + `bun test` for plain-TS unit tests in `frontends/shared` + `bun --cwd frontends/<pkg> run test` (Vitest) for every SPA / component package + `bun --cwd frontends/voter run e2e` and `bun --cwd frontends/slidev-component run e2e` (Playwright)) and verify every `TS-###` maps to a passing assertion
 
 ---
 
