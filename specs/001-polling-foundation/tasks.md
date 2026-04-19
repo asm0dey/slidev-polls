@@ -42,7 +42,7 @@
 - [x] T006 [P] Create `scripts/build-frontends.sh` (bun install + build all SPAs + copy dists into `backend/poll-api/src/main/resources/static`)
 - [x] T007 [P] Create `scripts/dev.sh` (docker-compose up postgres + `mvnw spring-boot:run` + `bun --cwd frontends run dev`)
 - [x] T008 [P] Configure ESLint + Prettier config at `frontends/` root; configure Spotless (google-java-format 1.28.0) in the reactor root `pom.xml` with activation in each backend module. Checkstyle is intentionally skipped: Spotless + google-java-format + removeUnusedImports + formatAnnotations subsumes the formatting surface Checkstyle would add, and Principles V/VIII disfavour a second tool with overlapping responsibilities.
-- [ ] T009 [P] Install Playwright at the `frontends/` workspace root; add shared `frontends/playwright.config.ts`; wire `e2e` script in `frontends/voter/package.json` and `frontends/slidev-component/package.json` so `bun --cwd frontends/<pkg> run e2e` runs the smokes added in T075 / T106
+- [x] T009 [P] Install Playwright at the `frontends/` workspace root; add shared `frontends/playwright.config.ts`; wire `e2e` script in `frontends/voter/package.json` and `frontends/slidev-component/package.json` so `bun --cwd frontends/<pkg> run e2e` runs the smokes added in T075 / T106
 
 ---
 

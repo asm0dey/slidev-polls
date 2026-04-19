@@ -12,11 +12,15 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check \"**/*.{ts,vue,json,md,yml,yaml,html,css}\"",
-    "format:write": "prettier --write \"**/*.{ts,vue,json,md,yml,yaml,html,css}\""
+    "format:write": "prettier --write \"**/*.{ts,vue,json,md,yml,yaml,html,css}\"",
+    "e2e": "playwright test",
+    "e2e:install-browsers": "playwright install chromium"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
+    "@playwright/test": "^1.58.2",
     "eslint": "^9.39.3",
+    "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-vue": "^10.6.0",
     "globals": "^16.0.0",
     "prettier": "^3.4.2",

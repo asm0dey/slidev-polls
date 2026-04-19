@@ -9,7 +9,8 @@
     "defaults": {}
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -p tsconfig.json --noEmit",
+    "e2e": "playwright test --config=../playwright.config.ts --project=slidev-chromium"
   },
   "dependencies": {
     "@polls/shared": "workspace:*",
