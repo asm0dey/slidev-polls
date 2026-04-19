@@ -1,103 +1,114 @@
 # Specification Analysis Report
 
-**Feature**: 001-polling-foundation
-**Generated**: 2026-04-19
-**Artifacts analysed**: spec.md, plan.md, tasks.md, tests/features/*.feature, CONSTITUTION.md
+Feature: `001-polling-foundation` — Core Polling Platform
+Generated: 2026-04-19
+Artifacts analysed: spec.md, plan.md, tasks.md, tests/features/*.feature, CONSTITUTION.md
 
 ## Findings
 
 | ID | Category | Severity | Location(s) | Summary | Recommendation |
 |----|----------|----------|-------------|---------|----------------|
-| A001 | Inconsistency / Traceability | HIGH | tests/features/live-results.feature:54; tasks.md:7 | `@TS-035` scenario still present in `live-results.feature` despite the 2026-04-19 clarification mandating its removal ("remove … TS-035 scenario entirely"). Feature files are integrity-anchored and cannot be hand-edited. | Re-run `/iikit-04-testify` so the regenerated `.feature` file and `context.json` hash reflect the clarification, then re-hash. |
-| A002 | Coverage Gaps (plan) | MEDIUM | plan.md | plan.md references only FR-001, FR-004, FR-007, FR-009, FR-011, FR-015, FR-016, FR-018, FR-019 and SC-001..SC-007. FR-002, FR-003, FR-005, FR-006, FR-008, FR-010, FR-012, FR-013, FR-014, FR-017 and SC-008 have no explicit plan.md reference. All have task coverage; the risk is narrative drift, not missing implementation. | In the Summary / Constraints / Performance sections, add ID tags where each requirement is realised (e.g. tag the SPA-catch-all constraint with FR-012..FR-014, the QR sentence with FR-005, the Problem-code list with FR-017, the auto-activation paragraph with SC-008). |
-| A003 | Coverage Gaps (NFR) | MEDIUM | spec.md:271 (SC-004); tests/features/live-results.feature:54 | SC-004 (200 concurrent respondents) is tagged only by `@TS-035`. After the clarification (load testing deferred), SC-004 will have zero remaining test-spec coverage and zero tasks. | Either (a) mark SC-004 explicitly deferred in spec.md with a note that acceptance is re-opened when load testing returns, or (b) retain a cheap non-load assertion (e.g. 50 concurrent SSE subscribers in `SseHubConcurrencyTest`, T100) and re-tag it `@SC-004`. Option (a) is cheapest and matches the clarification. |
-
-(Detection passes A–H ran; only items above reached reporting threshold. 3 findings / 50 cap.)
+| F1 | Inconsistency | MEDIUM | plan.md:204 vs plan.md:42, tasks.md T002 | Project-structure comment says "Spring Boot 3.4.x" while Technical Context and T002 specify "Spring Boot 4.0.5". | Update the inline comment in plan.md's `pom.xml` tree to "Spring Boot 4.0.5" so the structure diagram matches Technical Context. |
+| F2 | Coverage Gaps | LOW | tasks.md Story-to-task summary | Table totals: US2=20, US3=20, total=102. Actual: US2=19 (6 test + 13 impl — no T089), US3=19 (6 test + 13 impl — T103 removed per 2026-04-19 clarification), grand total=100. | Adjust the story-to-task summary to US2=19, US3=19, total=100 so the summary tracks the numbered task list. |
+| F3 | Underspecification | LOW | spec.md Edge Cases ("QR scanned after session ended") | Edge case listed, but no FR defines "session ended" semantics and no `.feature` scenario exercises the behaviour. Closest coverage is TS-010 (active QR resolves to slug) and TS-021 (waiting state when no ACTIVE question), neither of which is the scanned-after-end path. | Either add a requirement + test for the respondent experience when the poll is CLOSED, or note in spec that this edge case reduces to the "no ACTIVE question" state already covered by TS-021. |
+| F4 | Underspecification | LOW | spec.md Edge Cases ("presenter deletes poll while viewers on join page") | Edge case enumerated with no FR, no test spec, and no task. Data model cascades deletes of questions/votes, but the voter-SPA behaviour on a deleted poll is not pinned. | Either add a small requirement + test for the voter fetch after delete (expected: 404 with user-facing copy, no crash) or mark the edge case "out of scope for this feature" the way the multi-presenter edit case is. |
 
 ## Constitution Alignment
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Markdown-First Authoring | ALIGNED | `slidev-component` renders results inline in slides; presenter never leaves deck. |
-| II. Respondent Zero-Friction | ALIGNED | Voter SPA under `/{slug}`, no auth, no PII (FR-007, FR-011, SC-007). |
-| III. Test-First (NON-NEGOTIABLE) | ALIGNED | Every US phase has its test tasks listed before impl tasks; assertion-integrity hashes present in `context.json`. |
-| IV. Live-Reliability Over Feature Depth | ALIGNED | SSE reconnect + paused indicator (FR-015, SC-006); SseHub isolates emitter failures. |
-| V. Simplicity and YAGNI | ALIGNED | Single process, single DB, single SSE channel; no broker; no second web tier. |
-| VI. Observability for Live Events | ALIGNED | `CorrelationIdFilter`, structured JSON logs, enumerated `ProblemCode`s. |
-| VII. No BDD Frameworks | ALIGNED | JUnit 5 + Vitest only; no step_definitions directory; scenarios mirrored as comments. |
-| VIII. Minimal External Dependencies | ALIGNED | Every listed dependency has a concrete present use; jOOQ replaces JPA; no UI framework. |
-| IX. Human-Authored Presentation | ALIGNED | Principle stated; no AI attribution lines observed in any tracked artifact reviewed here. |
+| I. Markdown-First Authoring | ALIGNED | `slidev-component` package exposes Vue components usable inline in slides; no external authoring surface required for live results. |
+| II. Respondent Zero-Friction | ALIGNED | Public `/{slug}` route; device-scoped `voter_token`; no PII; no auth. T086 makes `sp_voter` server-authoritative and HttpOnly — consistent with FR-011/SC-007. |
+| III. Test-First (NON-NEGOTIABLE) | ALIGNED | Per-story phases put test tasks (T04x, T07x, T10x) before implementation tasks; assertion-integrity pre-commit hook enforces. |
+| IV. Live-Reliability Over Feature Depth | ALIGNED | SSE paused-indicator and bounded-backoff reconnect (T030, T031); addon never throws; TS-033/TS-034 assert deck stays usable on backend loss. |
+| V. Simplicity and YAGNI | ALIGNED | Single process, single DB, single SSE channel per poll, single lockfile. Multi-module split is justified by `poll-core` purity. |
+| VI. Observability for Live Events | ALIGNED | `CorrelationIdFilter` (T025); `Problem.code` set matches FR-017 distinction; GlobalExceptionHandler (T026) with coverage assertion (T027, TS-042). |
+| VII. No BDD Frameworks | ALIGNED | JUnit 5 / Vitest / `bun test` only. No `tests/step_definitions/` directory; Gherkin treated as spec artefact per tasks.md Notes and plan.md Testing. |
+| VIII. Minimal External Dependencies | ALIGNED | Each dependency has a concrete present use listed per module. No UI framework, no Node-on-path, no message broker. |
+| IX. Human-Authored Presentation | ALIGNED | No AI-attribution lines observed in committed artefacts under `specs/001-polling-foundation/`. |
 
-## Coverage Summary
+## Coverage Summary (Requirements → Tests / Tasks / Plan)
 
-Spec requirement IDs that have (a) feature-file coverage and (b) task coverage:
+| Requirement | Task IDs | Plan ref | Feature tag |
+|-------------|----------|----------|-------------|
+| FR-001 | T055, T043 | §Constraints | TS-001, TS-002 |
+| FR-002 | T058, T040 | §Summary | TS-002, TS-006, TS-041 |
+| FR-003 | T058, T050–T053 | §Summary | TS-002 |
+| FR-004 | T015, T053, T042 | §Constraints | TS-003, TS-004, TS-051 |
+| FR-005 | T059, T045 | §Summary | TS-002, TS-010–TS-015, TS-026 |
+| FR-006 | T058, T041 | §Summary | TS-005 |
+| FR-007 | T055, T070 | §Constraints | TS-020 |
+| FR-008 | T085, T092 | §Summary | TS-020, TS-021 |
+| FR-009 | T015, T083, T072 | §Constraints | TS-022, TS-023, TS-024 |
+| FR-010 | T083, T092 | §Summary | TS-005, TS-025 |
+| FR-011 | T131 | §Constraints | TS-027, TS-046 |
+| FR-012 | T111, T121 | §Summary | TS-030 |
+| FR-013 | T111, T121, T102 | §Summary | TS-030, TS-032 |
+| FR-014 | T111, T121 | §Summary | TS-031 |
+| FR-015 | T121, T030 | §Constraints | TS-033, TS-034 |
+| FR-016 | T055, T043 | §Constraints | TS-001, TS-040, TS-041 |
+| FR-017 | T024, T026, T027 | §Constitution Check VI | TS-042 |
+| FR-018 | T117, T118, T123, T104 | §Constraints | TS-050, TS-051, TS-052 |
+| FR-019 | T017, T113–T118, T104 | §Constraints | TS-053–TS-057 |
+| SC-001 | perf goal in plan.md | ✓ | TS-020 |
+| SC-002 | perf goal in plan.md | ✓ | TS-022 |
+| SC-003 | T102 | ✓ | TS-030 |
+| SC-004 | DEFERRED per clarification | ✓ (architectural choices retained) | TS-035 (commented out) |
+| SC-005 | T043 | ✓ | TS-001, TS-040 |
+| SC-006 | T030, T121, T105 | ✓ | TS-033, TS-034 |
+| SC-007 | T131 | ✓ | TS-020, TS-027, TS-046 |
+| SC-008 | T118, T123 | ✓ | TS-050 |
 
-| ID | Feature tag | Task(s) | Plan ref? |
-|----|-------------|---------|-----------|
-| FR-001 | ✓ | T043, T055 | yes |
-| FR-002 | ✓ | T053, T058 | no |
-| FR-003 | ✓ | T050, T053, T058 | no |
-| FR-004 | ✓ | T042, T053, T118 | yes |
-| FR-005 | ✓ | T045, T059 | no |
-| FR-006 | ✓ | T041, T053, T058 | no |
-| FR-007 | ✓ | T055, T070, T087 | yes |
-| FR-008 | ✓ | T070, T085, T092 | no |
-| FR-009 | ✓ | T072, T082, T083, T086 | yes |
-| FR-010 | ✓ | T071, T083 | no |
-| FR-011 | ✓ | T086, T091, T131 | yes |
-| FR-012 | ✓ | T110, T111, T112, T121 | no |
-| FR-013 | ✓ | T101, T102, T111, T121 | no |
-| FR-014 | ✓ | T101, T111, T121 | no |
-| FR-015 | ✓ | T105, T121 | yes |
-| FR-016 | ✓ | T043, T055 | yes |
-| FR-017 | ✓ | T024, T026, T027 | no |
-| FR-018 | ✓ | T104, T118, T123 | yes |
-| FR-019 | ✓ | T104, T113, T115, T117, T118 | yes |
-| SC-001 | ✓ | quickstart §S2 | yes |
-| SC-002 | ✓ | quickstart §S2 | yes |
-| SC-003 | ✓ | T102 | yes |
-| SC-004 | ✓ (TS-035 only — see A003) | none after clarification | yes |
-| SC-005 | ✓ | T043 | yes |
-| SC-006 | ✓ | T105 | yes |
-| SC-007 | ✓ | T131 | yes |
-| SC-008 | ✓ | T104, T123 | no |
+Coverage: 19/19 FRs (100%); 7/7 active SCs (100%). SC-004 acceptance explicitly deferred per 2026-04-19 clarification.
 
-All 19 functional requirements and all 8 success criteria carry at least one `@FR-XXX`/`@SC-XXX` tag in the feature files (H1: 0 untested requirements). No orphaned tags reference non-existent IDs (H2: 0 orphans). No step-definition directory exists — H3 not applicable (intentional per Principle VII).
+### Feature Traceability
+
+- **H1 Untested requirements**: none. Every FR and every active SC carries at least one matching `@FR-XXX`/`@SC-XXX` tag in `tests/features/*.feature`.
+- **H2 Orphaned tags**: none. Every `@FR-XXX`/`@SC-XXX` tag in `.feature` files refers to an ID that exists in spec.md.
+- **H3 Step-definition coverage**: N/A — `tests/step_definitions/` intentionally absent per Principle VII (no BDD runner).
 
 ## Phase Separation Violations
 
-None found. Constitution contains no technology choices; plan contains technology and implementation detail; spec contains no implementation detail.
+None.
+
+- Constitution stays at principle level; no technology or implementation detail.
+- Spec stays at requirement/user-story level; no schema, no endpoint shape, no library names.
+- Plan carries technology choices (Java 25, jOOQ, Flyway, bun) and implementation constraints; no governance principles re-litigated.
 
 ## Metrics
 
 - Total requirements: 27 (19 FR + 8 SC)
-- Total tasks: 102
-- Feature-file tag coverage: 27 / 27 (100 %)
-- Plan.md explicit reference coverage: 16 / 27 (59 %) — see A002
+- Total tasks: 100
+- Requirement coverage (active): 100%
 - Ambiguity findings: 0
 - Critical issues: 0
+- Total findings: 4 (0 CRITICAL / 0 HIGH / 1 MEDIUM / 3 LOW)
 
 ## Health Score
 
-**Score: 91/100 (→ stable — first run)**
+**Health Score: 97/100 (↑ improving)**
 
-Formula: `100 − (0·20 + 1·5 + 2·2 + 0·0.5) = 91`.
+Previous: 91/100 (2026-04-19T00:00:00Z, 1 HIGH + 2 MEDIUM).
 
 ## Score History
 
 | Run | Score | Coverage | Critical | High | Medium | Low | Total |
 |-----|-------|----------|----------|------|--------|-----|-------|
 | 2026-04-19T00:00:00Z | 91 | 100% | 0 | 1 | 2 | 0 | 3 |
+| 2026-04-19T12:00:00Z | 97 | 100% | 0 | 0 | 1 | 3 | 4 |
 
 ## Next Actions
 
-No CRITICAL issues. Proceeding to `/iikit-07-implement` is permitted, but resolving **A001** is strongly recommended first because `.feature`-file drift will block pre-commit hooks as soon as any commit touches a feature-tagged area. **A002** and **A003** are documentation-level tidy-ups and do not block implementation.
+No CRITICAL or HIGH issues. Feature is ready to proceed to `/iikit-07-implement`.
 
-Suggested order:
-1. Re-run `/iikit-04-testify` to regenerate `live-results.feature` without the TS-035 scenario and refresh `context.json` hashes (fixes A001, reinforces A003).
-2. Edit plan.md to tag FR-002/003/005/006/008/010/012/013/014/017 and SC-008 where they are realised (fixes A002).
-3. Add an explicit "deferred — load testing out of scope for this feature" note beside SC-004 in spec.md (completes A003).
+Suggested low-cost fixes before implement:
+
+1. Fix plan.md:204 "Spring Boot 3.4.x" → "Spring Boot 4.0.5" (F1).
+2. Correct the story-to-task summary totals (F2).
+3. Either pin or explicitly out-of-scope the two orphan edge cases (F3, F4).
+
+None of the above block implementation.
 
 ## Remediation Offer
 
-Want concrete remediation edits drafted for any of A001, A002, A003? (No edits have been applied.)
+Would you like concrete remediation edits suggested for F1–F4? They will be proposed, not auto-applied.
