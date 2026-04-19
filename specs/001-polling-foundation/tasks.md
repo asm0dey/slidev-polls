@@ -190,7 +190,7 @@
 
 ### Tests for User Story 3 (write first)
 
-- [ ] T100 [P] [US3] SseHub concurrency test `SseHubConcurrencyTest` in `backend/poll-realtime/src/test/java/site/asm0dey/slidev/polls/realtime/` (subscribe/unsubscribe/broadcast under racing threads; emitter failure is isolated)
+- [x] T100 [P] [US3] SseHub concurrency test `SseHubConcurrencyTest` in `backend/poll-realtime/src/test/java/site/asm0dey/slidev/polls/realtime/` (subscribe/unsubscribe/broadcast under racing threads; emitter failure is isolated). Bundled with this task: `SseHub` itself (`backend/poll-realtime/src/main/java/.../SseHub.java`) — the test cannot compile without the class, and the tasks' RED-then-GREEN intent is preserved in-commit (four scenarios pin thread-safe register/unregister, fan-out reach, per-emitter failure isolation per Principle IV, and a 16-thread race between register/unregister/broadcast that surfaces no runtime exception to the caller). Uses `java.lang.System.Logger` for the per-emitter failure log line so `poll-realtime` stays free of the `slf4j-api` dependency it would otherwise need under Principle VIII. T110 is consequently a reconcile task.
 - [ ] T101 [P] [US3] `@WebMvcTest` `TallyBroadcastTest` in `backend/poll-realtime/src/test/java/site/asm0dey/slidev/polls/realtime/` — scenarios `[TS-030, TS-031, TS-032]` (snapshot on connect, tally on vote, snapshot on active-question change)
 - [ ] T102 [P] [US3] Awaitility SSE test `StreamIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/public_/` — scenario `[TS-030]` end-to-end (vote → tally delivered <2 s)
 - [ ] T104 [P] [US3] Deck-activation integration test `DeckActivationIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/` — scenarios `[TS-050, TS-051, TS-052, TS-053, TS-054, TS-055, TS-056, TS-057]`
@@ -199,7 +199,7 @@
 
 ### Realtime backend (US3)
 
-- [ ] T110 [P] [US3] `SseHub` in `backend/poll-realtime/src/main/java/site/asm0dey/slidev/polls/realtime/SseHub.java` — keyed by `pollId`, thread-safe add/remove, broadcast with per-emitter failure isolation
+- [x] T110 [P] [US3] `SseHub` in `backend/poll-realtime/src/main/java/site/asm0dey/slidev/polls/realtime/SseHub.java` — keyed by `pollId`, thread-safe add/remove, broadcast with per-emitter failure isolation. Reconciled under T100 because the test file cannot compile without the class being present; no additional code diff is required here — the impl already satisfies the four concurrency scenarios T100 asserts.
 - [ ] T111 [P] [US3] `TallyBroadcaster` in `backend/poll-realtime/src/main/java/site/asm0dey/slidev/polls/realtime/TallyBroadcaster.java` — `@EventListener(VoteCastEvent)` → fetch tally → publish `tally` event; also publishes `snapshot` on active-question change and `question-closed` on close
 - [ ] T112 [US3] `StreamController` `GET /api/polls/{slug}/stream` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/public_/` — returns `SseEmitter`, emits initial `snapshot`, registers with `SseHub`, handles 404 for unknown slug
 
