@@ -185,8 +185,13 @@ public class PollRepositoryImpl implements PollRepository {
     }
 
     OffsetDateTime now = OffsetDateTime.now();
+    // poll_questions_active_timestamp_ck: `(status = 'ACTIVE') = (activated_at IS NOT NULL)`.
+    // Clearing activated_at on ACTIVE -> CLOSED is mandatory; the constraint rolls the update
+    // back otherwise. closed_at is the authoritative "when did this question stop accepting
+    // votes?" timestamp.
     dsl.update(POLL_QUESTIONS)
         .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
         .set(POLL_QUESTIONS.CLOSED_AT, now)
         .where(
             POLL_QUESTIONS
@@ -217,8 +222,11 @@ public class PollRepositoryImpl implements PollRepository {
   @Override
   public Poll closeActiveQuestion(UUID pollId) {
     OffsetDateTime now = OffsetDateTime.now();
+    // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not ACTIVE;
+    // see the matching close branch inside activateQuestion.
     dsl.update(POLL_QUESTIONS)
         .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
         .set(POLL_QUESTIONS.CLOSED_AT, now)
         .where(
             POLL_QUESTIONS
