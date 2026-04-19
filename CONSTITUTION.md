@@ -1,19 +1,23 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (none) → 1.0.0
-Modified principles: n/a (initial ratification)
-Added sections:
-  - Core Principles (I–VI)
-  - Quality Standards
-  - Development Workflow
-  - Governance
+Version change: 1.0.0 → 1.1.0
+Modified principles: none
+Added principles:
+  - VII. No BDD Frameworks
+  - VIII. Minimal External Dependencies
+  - IX. Human-Authored Presentation
+Added sections: none (additions land inside Core Principles)
 Removed sections: none
 Templates reviewed for consistency:
-  - plan-template.md: ✅ constitution-check section present
-  - spec-template.md: ✅ no technology leakage expected
-  - tasks-template.md: ✅ TDD ordering aligns with Principle III
-Follow-up TODOs: none
+  - plan-template.md: ✅ constitution-check section still valid
+  - spec-template.md: ✅ unaffected
+  - tasks-template.md: ✅ testify step now treated as spec-only; real
+    assertions remain in standard test tasks per Principle VII
+Follow-up TODOs:
+  - When `/iikit-04-testify` runs, treat generated `.feature` files as
+    documentation artifacts; mirror Given/When/Then as comments inside
+    ordinary test code (Principle VII).
 -->
 
 # Slidev Polls Constitution
@@ -85,6 +89,48 @@ rejected." Rationale: when something breaks during a talk the presenter
 has seconds — not a debugging session — to decide whether to skip the
 poll, retry, or move on.
 
+### VII. No BDD Frameworks
+
+Tests MUST be written using standard unit and integration test frameworks
+native to the chosen language. BDD- or Gherkin-based test runners MUST
+NOT be introduced as a dependency. Given/When/Then scenarios produced by
+`/iikit-04-testify` are treated as specification artifacts only; their
+assertions MUST be expressed inside ordinary test code, and the scenario
+text SHOULD be mirrored as comments above the corresponding assertions
+with the spec ID referenced for traceability. Rationale: BDD runners add
+a second test-discovery path and a layer of indirection without catching
+failures that plain tests miss; keeping every assertion in the native
+test framework gives direct failure output, simpler tooling, and one
+obvious place to look when something breaks.
+
+### VIII. Minimal External Dependencies
+
+New runtime or build-time dependencies MUST be justified by a concrete,
+present requirement that cannot be met reasonably with the standard
+library, an already-adopted dependency, or a small amount of local code.
+Each addition MUST be recorded in the feature's `plan.md` with its
+purpose. Transitive footprint, release cadence, and maintenance burden
+count against the case for adoption. "Saves a few lines" is not
+sufficient justification. Rationale: every dependency is a supply-chain
+surface, a version-skew risk, and a future upgrade tax; a project this
+size pays more over its lifetime in dependency maintenance than in the
+code the dependency replaces.
+
+### IX. Human-Authored Presentation
+
+All committed repository content — commit messages, source code,
+comments, documentation, issue descriptions, and pull-request
+descriptions — MUST read as authored by a human contributor. AI-generated
+attribution lines (for example "Generated with …", co-author trailers
+referencing AI assistants, or tool watermarks) MUST NOT appear in
+committed artifacts. Contributors using AI assistance remain responsible
+for the output and MUST review and edit it to match the project's voice
+before committing. Rationale: AI attribution leaks tooling choices into a
+public-facing record, produces inconsistent style across contributors,
+and degrades the perceived craftsmanship of the project; the repository
+should present as a coherent human-authored codebase regardless of how
+any individual change was drafted.
+
 ## Quality Standards
 
 - Every merged change MUST include tests covering its acceptance criteria
@@ -136,4 +182,4 @@ NOT silently deviate. Complexity or deviations introduced to meet a
 requirement MUST be justified in the plan for the feature that introduces
 them.
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
+**Version**: 1.1.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
