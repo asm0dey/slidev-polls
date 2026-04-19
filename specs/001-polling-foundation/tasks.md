@@ -134,7 +134,7 @@
 - [ ] T062 [P] [US1] `LoginPage.vue` in `frontends/backoffice/src/pages/` — calls `/api/admin/login`, redirects to poll list
 - [ ] T063 [US1] `PollListPage.vue` in `frontends/backoffice/src/pages/` — lists polls via `/api/admin/polls`, shows join link, QR preview link
 - [ ] T064 [US1] `PollEditorPage.vue` in `frontends/backoffice/src/pages/` — create/edit poll, add/remove questions + options, activate/close, delete
-- [ ] T065 [P] [US1] `SlugField.vue` component in `frontends/backoffice/src/components/` — client-side slug validation + reserved-slug hint (mirrors `SlugValidator` + `ReservedSlugs`)
+- [x] T065 [P] [US1] `SlugField.vue` component in `frontends/backoffice/src/components/` — client-side slug validation + reserved-slug hint (mirrors `SlugValidator` + `ReservedSlugs`). Validation logic lives in `frontends/backoffice/src/lib/slug-rules.ts` (`checkSlug`) so both the field and any later editor-level pre-submit guard share one source of truth that the lock-step comment ties to the Java validator. Order matches `PollService.resolveSlug`: reserved check before length/format so `j` returns `RESERVED` (per `@TS-012` and the T044 reconcile note), which the original length-first ordering would have hidden behind `LENGTH`. The field tracks input internally so validation re-runs on each keystroke even when the parent has not yet round-tripped `update:modelValue` back into the prop, and the "Enter a slug." hint is suppressed until the input has been touched so a brand-new editor doesn't render a red error on first paint.
 - [ ] T066 [P] [US1] `QrPreview.vue` component rendering `<img src="/api/admin/polls/{id}/qr.png"/>`
 
 **Checkpoint**: US1 deliverable — backoffice authoring & control fully usable with no audience or slidev surfaces required.
