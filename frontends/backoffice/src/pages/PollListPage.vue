@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import type { Poll } from "@polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
+import QrPreview from "../components/QrPreview.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -102,13 +103,11 @@ onMounted(() => {
           </p>
         </div>
         <div class="poll-list__row-side">
-          <img
-            :src="client.qrUrl(poll.id)"
-            :alt="`QR for ${poll.slug}`"
+          <QrPreview
             data-testid="poll-qr-img"
-            class="poll-list__qr"
-            width="120"
-            height="120"
+            :poll-id="poll.id"
+            :slug="poll.slug"
+            :size="120"
           />
           <div class="poll-list__actions">
             <RouterLink
