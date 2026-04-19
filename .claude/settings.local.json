@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/finkel/work_self/slidev-polls/**)",
+      "Bash(mv -f .specify/context.json.tmp .specify/context.json)",
+      "Bash(\\\\cp -f /tmp/sb-init/poll-api/.mvn/wrapper/maven-wrapper.properties /home/finkel/work_self/slidev-polls/.mvn/wrapper/maven-wrapper.properties)",
+      "Bash(cp -r /tmp/sb-init/poll-api/src /home/finkel/work_self/slidev-polls/backend/poll-api/)",
+      "Bash(cp /tmp/sb-init/poll-api/HELP.md /home/finkel/work_self/slidev-polls/backend/poll-api/HELP.md)",
+      "Bash(./mvnw -q -DskipTests -N help:evaluate -Dexpression=project.version -q -DforceStdout)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "tessl"
+  ]
+}

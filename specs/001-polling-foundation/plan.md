@@ -32,9 +32,10 @@ production runs as one JAR.
 ## Technical Context
 
 **Language/Version**:
-- Backend: Java 25 (LTS), Spring Boot 3.4.x (the first Spring Boot line
-  with full Java 25 runtime support). Build tool: Maven (wrapper
-  checked in).
+- Backend: Java 25 (LTS), Spring Boot 4.0.5 (Spring Framework 7,
+  Jakarta 11). Project bootstrapped via start.spring.io; reactor is a
+  hand-authored Maven multi-module layout on top of the generated
+  `poll-api` module. Build tool: Maven (wrapper checked in).
 - Frontend: TypeScript 5.x. Toolchain: **bun** (install, run, test,
   lockfile). Bundler: Vite. No Node-on-path requirement for
   developers; bun is the single runtime for the frontend workspace.

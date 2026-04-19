@@ -1,0 +1,447 @@
+#!/usr/bin/env bash
+# IIKIT-PRE-COMMIT
+# Git pre-commit hook for assertion integrity enforcement
+# Prevents committing tampered test-specs.md assertions
+#
+# This is a thin wrapper that sources testify-tdd.sh at runtime
+# to reuse existing functions (compute_assertion_hash, verify_assertion_hash, etc.)
+#
+# Installation: Automatically installed by init-project.sh
+# Manual: cp pre-commit-hook.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+# ============================================================================
+# PATH DETECTION — find the scripts directory at runtime
+# ============================================================================
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [[ -z "$REPO_ROOT" ]]; then
+    # Not a git repo — should not happen in a hook, but be safe
+    exit 0
+fi
+
+SCRIPTS_DIR=""
+CANDIDATE_PATHS=(
+    "$REPO_ROOT/.claude/skills/iikit-core/scripts/bash"
+    "$REPO_ROOT/.tessl/tiles/tessl-labs/intent-integrity-kit/skills/iikit-core/scripts/bash"
+    "$REPO_ROOT/.codex/skills/iikit-core/scripts/bash"
+)
+
+for candidate in "${CANDIDATE_PATHS[@]}"; do
+    if [[ -f "$candidate/testify-tdd.sh" ]]; then
+        SCRIPTS_DIR="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$SCRIPTS_DIR" ]]; then
+    echo "[iikit] Warning: IIKit scripts not found — skipping assertion integrity check" >&2
+    exit 0
+fi
+
+# ============================================================================
+# FAST PATH — exit immediately if nothing relevant is staged
+# ============================================================================
+
+STAGED_FEATURE_FILES=$(git diff --cached --name-only 2>/dev/null | grep -E 'tests/features/.*\.feature$') || true
+STAGED_TEST_SPECS=$(git diff --cached --name-only 2>/dev/null | grep 'test-specs\.md$') || true
+STAGED_CODE_FILES=$(git diff --cached --name-only 2>/dev/null | grep -E '\.(py|js|ts|jsx|tsx|go|java|rs|cs|rb|kt)$' | grep -vE '^(\.tessl/|\.claude/|\.codex/|\.gemini/|\.opencode/|node_modules/)') || true
+
+if [[ -z "$STAGED_FEATURE_FILES" ]] && [[ -z "$STAGED_TEST_SPECS" ]] && [[ -z "$STAGED_CODE_FILES" ]]; then
+    exit 0
+fi
+
+# ============================================================================
+# SOURCE FUNCTIONS — load testify-tdd.sh (which sources common.sh)
+# ============================================================================
+
+# testify-tdd.sh has a main block that only runs when $# > 0,
+# so sourcing it just loads the functions
+source "$SCRIPTS_DIR/testify-tdd.sh"
+
+# ============================================================================
+# TDD DETERMINATION — check constitution for TDD requirements
+# ============================================================================
+
+TDD_DETERMINATION=$(get_cached_tdd_determination "$REPO_ROOT")
+
+# ============================================================================
+# TDD MANDATORY WARNING — when TDD required but testify never run
+# ============================================================================
+
+if [[ "$TDD_DETERMINATION" == "mandatory" ]] && [[ -n "$STAGED_CODE_FILES" ]]; then
+    # Check if ANY feature directory has .feature files
+    ANY_FEATURES=false
+    for feat_dir in "$REPO_ROOT"/specs/[0-9][0-9][0-9]-*/; do
+        [[ ! -d "$feat_dir" ]] && continue
+        if [[ -d "$feat_dir/tests/features" ]]; then
+            FCOUNT=$(find "$feat_dir/tests/features" -maxdepth 1 -name "*.feature" -type f 2>/dev/null | wc -l | tr -d ' ')
+            [[ "$FCOUNT" -gt 0 ]] && ANY_FEATURES=true && break
+        fi
+        # Also check legacy test-specs.md
+        [[ -f "$feat_dir/tests/test-specs.md" ]] && ANY_FEATURES=true && break
+    done
+
+    if ! $ANY_FEATURES; then
+        echo "" >&2
+        echo "[iikit] WARNING: TDD is mandatory (per CONSTITUTION.md) but no .feature files or test-specs.md found." >&2
+        echo "[iikit]   Run /iikit-04-testify before implementing features." >&2
+        echo "" >&2
+    fi
+fi
+
+# ============================================================================
+# BDD RUNNER ENFORCEMENT — when .feature files exist, require proper BDD setup
+# ============================================================================
+# Triggered when code files are staged and specs/NNN/tests/features/*.feature
+# files exist in the repo. Committing .feature files alone (testify phase) is
+# unaffected — only code/test commits trigger this gate.
+
+if [[ -n "$STAGED_CODE_FILES" ]]; then
+    BDD_BLOCKED=false
+    BDD_BLOCK_MESSAGES=()
+
+    # Discover all feature directories containing .feature files
+    for feat_dir in "$REPO_ROOT"/specs/[0-9][0-9][0-9]-*/; do
+        [[ ! -d "$feat_dir" ]] && continue
+        FEATURES_DIR="$feat_dir/tests/features"
+        [[ ! -d "$FEATURES_DIR" ]] && continue
+
+        # Check that at least one .feature file exists
+        FEATURE_COUNT=$(find "$FEATURES_DIR" -maxdepth 1 -name "*.feature" -type f 2>/dev/null | wc -l | tr -d ' ')
+        [[ "$FEATURE_COUNT" -eq 0 ]] && continue
+
+        FEAT_NAME=$(basename "$feat_dir")
+        PLAN_FILE="$feat_dir/plan.md"
+
+        # ── Gate 1: Step definitions directory must exist with at least one file ──
+        # Warning only — agent may not have created step_definitions yet
+        STEP_DEFS_DIR="$feat_dir/tests/step_definitions"
+        if [[ ! -d "$STEP_DEFS_DIR" ]] || [[ -z "$(ls -A "$STEP_DEFS_DIR" 2>/dev/null)" ]]; then
+            echo "[iikit] Warning: specs/$FEAT_NAME — missing step definitions" >&2
+            echo "[iikit]   Expected: specs/$FEAT_NAME/tests/step_definitions/ with at least one file" >&2
+            echo "[iikit]   Run /iikit-07-implement to generate step definitions." >&2
+            continue
+        fi
+
+        # ── Gate 2: BDD runner dependency present in project dep files ──
+        # Warning only — dependency may not be installed yet
+        FRAMEWORK_RESULT=$(detect_framework "$PLAN_FILE" 2>/dev/null)
+        FRAMEWORK=$(echo "$FRAMEWORK_RESULT" | cut -d'|' -f1)
+
+        if [[ -n "$FRAMEWORK" ]]; then
+            if ! DEP_FILE=$(check_bdd_dependency "$FRAMEWORK" "$REPO_ROOT"); then
+                echo "[iikit] Warning: specs/$FEAT_NAME — BDD runner dependency '$FRAMEWORK' not found" >&2
+                echo "[iikit]   Add '$FRAMEWORK' to your project dependencies." >&2
+                continue
+            fi
+        fi
+        # If framework undetectable, skip gate 2 (can't enforce what we can't identify)
+
+        # ── Gate 3: verify-steps.sh dry-run passes ──
+        VERIFY_STEPS="$SCRIPTS_DIR/verify-steps.sh"
+        if [[ -x "$VERIFY_STEPS" ]] || [[ -f "$VERIFY_STEPS" ]]; then
+            VERIFY_OUTPUT=$(bash "$VERIFY_STEPS" --json "$FEATURES_DIR" "$PLAN_FILE" 2>/dev/null) || true
+            VERIFY_STATUS=$(echo "$VERIFY_OUTPUT" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 2>/dev/null) || true
+
+            if [[ "$VERIFY_STATUS" == "BLOCKED" ]]; then
+                BDD_BLOCKED=true
+                BDD_BLOCK_MESSAGES+=("BLOCKED: specs/$FEAT_NAME — BDD step verification failed (undefined/pending steps)")
+                BDD_BLOCK_MESSAGES+=("  Run verify-steps.sh to see which steps need definitions.")
+            fi
+            # DEGRADED = tool not on PATH; gate 2 already caught the dep file, so just warn
+            if [[ "$VERIFY_STATUS" == "DEGRADED" ]]; then
+                echo "[iikit] Warning: specs/$FEAT_NAME — BDD dry-run degraded (runner tool not on PATH)" >&2
+            fi
+        fi
+    done
+
+    if [[ "$BDD_BLOCKED" == true ]]; then
+        echo "" >&2
+        echo "+-------------------------------------------------------------+" >&2
+        echo "|  IIKIT PRE-COMMIT: BDD RUNNER ENFORCEMENT FAILED           |" >&2
+        echo "+-------------------------------------------------------------+" >&2
+        echo "" >&2
+        for msg in "${BDD_BLOCK_MESSAGES[@]}"; do
+            echo "[iikit] $msg" >&2
+        done
+        echo "" >&2
+        echo "[iikit] .feature files exist — code commits require proper BDD wiring." >&2
+        echo "[iikit] To bypass (NOT recommended): git commit --no-verify" >&2
+        echo "" >&2
+        exit 1
+    fi
+fi
+
+# ============================================================================
+# CONTEXT FILE — read stored hashes (per-feature, derived from test-specs.md path)
+# ============================================================================
+
+# ============================================================================
+# SLOW PATH — verify staged .feature files and/or test-specs.md
+# ============================================================================
+
+BLOCKED=false
+BLOCK_MESSAGES=()
+
+# Capture all staged files once for context.json co-staging detection
+STAGED_FILES_ALL=$(git diff --cached --name-only 2>/dev/null) || true
+
+# ============================================================================
+# .feature file verification (new format)
+# Groups staged .feature files by feature directory, computes combined hash
+# ============================================================================
+
+if [[ -n "$STAGED_FEATURE_FILES" ]]; then
+    # Group staged .feature files by feature directory
+    # e.g., specs/001-feature/tests/features/login.feature -> specs/001-feature
+    # Collect unique feature directories (bash 3.2 compatible — no associative arrays)
+    FEATURE_DIRS_LIST=""
+    while IFS= read -r staged_path; do
+        [[ -z "$staged_path" ]] && continue
+        # Derive feature dir: specs/NNN/tests/features/x.feature -> specs/NNN
+        FEATURES_DIR=$(dirname "$staged_path")                    # tests/features
+        TESTS_DIR=$(dirname "$FEATURES_DIR")                      # tests
+        FEAT_DIR=$(dirname "$TESTS_DIR")                          # specs/NNN-feature
+        FEATURE_DIRS_LIST="$FEATURE_DIRS_LIST$FEAT_DIR"$'\n'
+    done <<< "$STAGED_FEATURE_FILES"
+
+    # Deduplicate feature directories
+    FEATURE_DIRS_UNIQUE=$(echo "$FEATURE_DIRS_LIST" | sort -u)
+
+    while IFS= read -r FEAT_DIR; do
+        [[ -z "$FEAT_DIR" ]] && continue
+        FEATURES_DIR_ABS="$REPO_ROOT/$FEAT_DIR/tests/features"
+        CONTEXT_FILE="$REPO_ROOT/$FEAT_DIR/context.json"
+        CONTEXT_REL_PATH="$FEAT_DIR/context.json"
+
+        # Reconstruct the full features directory for hash computation:
+        # 1. Start with all committed .feature files from HEAD
+        # 2. Overlay any staged changes on top
+        # This handles partial staging correctly (only some files staged)
+        TEMP_FEATURES_DIR=$(mktemp -d)
+        trap "rm -rf $TEMP_FEATURES_DIR" EXIT
+
+        FEATURES_REL="$FEAT_DIR/tests/features"
+
+        # Step 1: Get ALL committed .feature files from HEAD
+        COMMITTED_FEATURES=$(git ls-tree --name-only "HEAD:$FEATURES_REL" 2>/dev/null | grep '\.feature$') || true
+        while IFS= read -r fname; do
+            [[ -z "$fname" ]] && continue
+            git show "HEAD:$FEATURES_REL/$fname" > "$TEMP_FEATURES_DIR/$fname" 2>/dev/null || true
+        done <<< "$COMMITTED_FEATURES"
+
+        # Step 2: Overlay staged versions (these take precedence over HEAD)
+        STAGED_FOR_FEAT=$(echo "$STAGED_FEATURE_FILES" | grep "^$FEAT_DIR/") || true
+        while IFS= read -r staged_path; do
+            [[ -z "$staged_path" ]] && continue
+            BASENAME=$(basename "$staged_path")
+            git show ":$staged_path" > "$TEMP_FEATURES_DIR/$BASENAME" 2>/dev/null || continue
+        done <<< "$STAGED_FOR_FEAT"
+
+        # Compute combined hash of the full reconstructed directory
+        CURRENT_HASH=$(compute_assertion_hash "$TEMP_FEATURES_DIR")
+        rm -rf "$TEMP_FEATURES_DIR"
+
+        if [[ "$CURRENT_HASH" == "NO_ASSERTIONS" ]]; then
+            continue
+        fi
+
+        # Check if context.json is also being staged
+        CONTEXT_STAGED=false
+        if echo "$STAGED_FILES_ALL" | grep -qF "$CONTEXT_REL_PATH"; then
+            CONTEXT_STAGED=true
+        fi
+
+        # Read context.json (staged or committed version)
+        CONTEXT_STATUS="missing"
+        CONTEXT_JSON=""
+        if [[ "$CONTEXT_STAGED" == true ]] && [[ -f "$CONTEXT_FILE" ]]; then
+            CONTEXT_JSON=$(cat "$CONTEXT_FILE" 2>/dev/null)
+        else
+            CONTEXT_JSON=$(git show "HEAD:$CONTEXT_REL_PATH" 2>/dev/null) || true
+        fi
+
+        if [[ -n "$CONTEXT_JSON" ]] && echo "$CONTEXT_JSON" | jq empty 2>/dev/null; then
+            STORED_HASH=$(echo "$CONTEXT_JSON" | jq -r '.testify.assertion_hash // ""' 2>/dev/null || echo "")
+            # For .feature files, match by features_dir or presence of file_count
+            STORED_DIR=$(echo "$CONTEXT_JSON" | jq -r '.testify.features_dir // ""' 2>/dev/null || echo "")
+
+            if [[ -n "$STORED_HASH" ]] && [[ -n "$STORED_DIR" ]]; then
+                if [[ "$STORED_HASH" == "$CURRENT_HASH" ]]; then
+                    CONTEXT_STATUS="valid"
+                else
+                    CONTEXT_STATUS="invalid"
+                fi
+            fi
+        fi
+
+        # Combine results (git notes skipped for directory-based .feature files)
+        HASH_STATUS="missing"
+        if [[ "$CONTEXT_STAGED" == true ]] && [[ "$CONTEXT_STATUS" == "valid" ]]; then
+            HASH_STATUS="valid"
+        elif [[ "$CONTEXT_STATUS" == "invalid" ]]; then
+            HASH_STATUS="invalid"
+        elif [[ "$CONTEXT_STATUS" == "valid" ]]; then
+            HASH_STATUS="valid"
+        fi
+
+        # Decision logic
+        case "$HASH_STATUS" in
+            valid)
+                ;;
+            invalid)
+                BLOCKED=true
+                BLOCK_MESSAGES+=("BLOCKED: $FEAT_DIR/tests/features/ — .feature assertion integrity check failed")
+                BLOCK_MESSAGES+=("  .feature file assertions have been modified since /iikit-04-testify generated them.")
+                BLOCK_MESSAGES+=("  Re-run /iikit-04-testify to regenerate .feature files.")
+                ;;
+            missing)
+                if [[ "$TDD_DETERMINATION" == "mandatory" ]]; then
+                    echo "[iikit] Warning: $FEAT_DIR/tests/features/ — no stored assertion hash found (TDD is mandatory)" >&2
+                    echo "[iikit]   If this is the initial testify commit, this is expected." >&2
+                    echo "[iikit]   Otherwise, run /iikit-04-testify to generate integrity hashes." >&2
+                fi
+                ;;
+        esac
+    done <<< "$FEATURE_DIRS_UNIQUE"
+fi
+
+# ============================================================================
+# Legacy test-specs.md verification (backward compatibility)
+# ============================================================================
+
+while IFS= read -r staged_path; do
+    [[ -z "$staged_path" ]] && continue
+
+    # Extract staged version to a temp file (check what's being committed)
+    TEMP_FILE=$(mktemp)
+    trap "rm -f $TEMP_FILE" EXIT
+
+    if ! git show ":$staged_path" > "$TEMP_FILE" 2>/dev/null; then
+        rm -f "$TEMP_FILE"
+        continue
+    fi
+
+    # Compute hash of the staged version
+    CURRENT_HASH=$(compute_assertion_hash "$TEMP_FILE")
+    rm -f "$TEMP_FILE"
+
+    # Skip if no assertions in the file
+    if [[ "$CURRENT_HASH" == "NO_ASSERTIONS" ]]; then
+        continue
+    fi
+
+    # Derive per-feature context.json path from the test-specs.md path
+    FEATURE_DIR=$(dirname "$(dirname "$staged_path")")
+    CONTEXT_FILE="$REPO_ROOT/$FEATURE_DIR/context.json"
+    CONTEXT_REL_PATH="$FEATURE_DIR/context.json"
+
+    CONTEXT_STAGED=false
+    if echo "$STAGED_FILES_ALL" | grep -qF "$CONTEXT_REL_PATH"; then
+        CONTEXT_STAGED=true
+    fi
+
+    CONTEXT_STATUS="missing"
+    CONTEXT_JSON=""
+    if [[ "$CONTEXT_STAGED" == true ]] && [[ -f "$CONTEXT_FILE" ]]; then
+        CONTEXT_JSON=$(cat "$CONTEXT_FILE" 2>/dev/null)
+    else
+        CONTEXT_JSON=$(git show "HEAD:$CONTEXT_REL_PATH" 2>/dev/null) || true
+    fi
+
+    if [[ -n "$CONTEXT_JSON" ]] && echo "$CONTEXT_JSON" | jq empty 2>/dev/null; then
+        STORED_FILE=$(echo "$CONTEXT_JSON" | jq -r '.testify.test_specs_file // ""' 2>/dev/null || echo "")
+        STORED_HASH=$(echo "$CONTEXT_JSON" | jq -r '.testify.assertion_hash // ""' 2>/dev/null || echo "")
+
+        if [[ -n "$STORED_HASH" ]]; then
+            if [[ "$STORED_FILE" == *"/$staged_path" ]] || [[ "$STORED_FILE" == "$staged_path" ]]; then
+                if [[ "$STORED_HASH" == "$CURRENT_HASH" ]]; then
+                    CONTEXT_STATUS="valid"
+                else
+                    CONTEXT_STATUS="invalid"
+                fi
+            fi
+        fi
+    fi
+
+    # Check git notes (tamper-resistant)
+    NOTE_STATUS="missing"
+    GIT_NOTES_REF="refs/notes/testify"
+    NOTE_HASH=""
+    for commit_sha in $(git rev-list HEAD -50 2>/dev/null); do
+        NOTE_CONTENT=$(git notes --ref="$GIT_NOTES_REF" show "$commit_sha" 2>/dev/null) || continue
+        if [[ -n "$NOTE_CONTENT" ]]; then
+            NOTE_HASH=$(echo "$NOTE_CONTENT" | awk -v path="$staged_path" '
+                /^testify-hash:/ { hash = $2 }
+                /^test-specs-file:/ {
+                    sub(/^test-specs-file:[[:space:]]*/, "")
+                    file = $0
+                    if (file == path || index(file, "/" path) == length(file) - length("/" path) + 1) {
+                        print hash
+                        exit
+                    }
+                }
+                /^---$/ { hash = "" }
+            ')
+            if [[ -n "$NOTE_HASH" ]]; then
+                break
+            fi
+        fi
+    done
+    if [[ -n "$NOTE_HASH" ]]; then
+        if [[ "$NOTE_HASH" == "$CURRENT_HASH" ]]; then
+            NOTE_STATUS="valid"
+        else
+            NOTE_STATUS="invalid"
+        fi
+    fi
+
+    HASH_STATUS="missing"
+    if [[ "$CONTEXT_STAGED" == true ]] && [[ "$CONTEXT_STATUS" == "valid" ]]; then
+        HASH_STATUS="valid"
+    elif [[ "$NOTE_STATUS" == "invalid" ]] || [[ "$CONTEXT_STATUS" == "invalid" ]]; then
+        HASH_STATUS="invalid"
+    elif [[ "$NOTE_STATUS" == "valid" ]] || [[ "$CONTEXT_STATUS" == "valid" ]]; then
+        HASH_STATUS="valid"
+    fi
+
+    case "$HASH_STATUS" in
+        valid)
+            ;;
+        invalid)
+            BLOCKED=true
+            BLOCK_MESSAGES+=("BLOCKED: $staged_path — assertion integrity check failed")
+            BLOCK_MESSAGES+=("  Assertions have been modified since /iikit-04-testify generated them.")
+            BLOCK_MESSAGES+=("  Re-run /iikit-04-testify to regenerate test specifications.")
+            ;;
+        missing)
+            if [[ "$TDD_DETERMINATION" == "mandatory" ]]; then
+                echo "[iikit] Warning: $staged_path — no stored assertion hash found (TDD is mandatory)" >&2
+                echo "[iikit]   If this is the initial testify commit, this is expected." >&2
+                echo "[iikit]   Otherwise, run /iikit-04-testify to generate integrity hashes." >&2
+            fi
+            ;;
+    esac
+done <<< "$STAGED_TEST_SPECS"
+
+# ============================================================================
+# OUTPUT — report results
+# ============================================================================
+
+if [[ "$BLOCKED" == true ]]; then
+    echo "" >&2
+    echo "+-------------------------------------------------------------+" >&2
+    echo "|  IIKIT PRE-COMMIT: ASSERTION INTEGRITY CHECK FAILED        |" >&2
+    echo "+-------------------------------------------------------------+" >&2
+    echo "" >&2
+    for msg in "${BLOCK_MESSAGES[@]}"; do
+        echo "[iikit] $msg" >&2
+    done
+    echo "" >&2
+    echo "[iikit] To fix: Re-run /iikit-04-testify to regenerate test specs with valid hashes." >&2
+    echo "[iikit] To bypass (NOT recommended): git commit --no-verify" >&2
+    echo "" >&2
+    exit 1
+fi
+
+exit 0

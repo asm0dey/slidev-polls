@@ -57,24 +57,30 @@ at build time from the live PostgreSQL dialect.
 
 ## 3. Java 25 + Spring Boot line
 
-**Decision**: Java 25 (LTS) on Spring Boot 3.4.x.
+**Decision**: Java 25 (LTS) on **Spring Boot 4.0.5** (Spring Framework 7,
+Jakarta 11). Project scaffolded via start.spring.io.
 
 **Rationale**:
 - Java 25 is the September 2025 LTS release and is in active support
   as of 2026-04-19; it is the right default for a new service with a
   multi-year horizon.
-- Spring Boot 3.4 is the first Spring Boot line with full Java 25
-  runtime certification and still carries the framework 6.x baseline
-  the team is familiar with.
-- Virtual threads (`spring.threads.virtual.enabled`) are a clean fit
-  for the SSE endpoint's per-subscriber hold-open thread shape,
+- Spring Boot 4.0 is the current GA line (April 2026). It moves to
+  Spring Framework 7 and Jakarta 11, and renames
+  `spring-boot-starter-web` → `spring-boot-starter-webmvc` along with
+  module-specific test starters (`-webmvc-test`, `-jooq-test`,
+  `-security-test`, etc.). The plan's dependency lists reflect the
+  renamed artefacts.
+- Virtual threads (`spring.threads.virtual.enabled=true`) are a clean
+  fit for the SSE endpoint's per-subscriber hold-open thread shape,
   keeping SC-004's 200 concurrent subscribers cheap to hold.
 
 **Alternatives considered**:
 - **Java 21 LTS**: rejected as the default; it works, but starting a
   new service on the older LTS the day after the newer LTS has
   shipped just defers the upgrade.
-- **Spring Boot 3.3**: rejected. Certified against JDK 21, not JDK 25.
+- **Spring Boot 3.x**: rejected. Works against JDK 25 but is on the
+  older Framework 6 / Jakarta 10 baseline; starting a new service there
+  just defers the Framework 7 migration.
 
 ## 4. Build tooling: Maven multi-module vs Gradle vs single module
 

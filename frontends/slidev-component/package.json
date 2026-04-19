@@ -1,0 +1,21 @@
+{
+  "name": "@polls/slidev-addon",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Slidev addon that renders live poll results on-slide.",
+  "main": "./index.ts",
+  "slidev": {
+    "defaults": {}
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@polls/shared": "workspace:*",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

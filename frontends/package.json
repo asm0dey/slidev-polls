@@ -1,0 +1,10 @@
+{
+  "name": "slidev-polls-frontends",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "voter",
+    "backoffice",
+    "slidev-component"
+  ]
+}

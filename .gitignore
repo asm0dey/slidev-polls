@@ -1,0 +1,25 @@
+# Build outputs
+target/
+dist/
+**/generated-sources/
+
+# Frontend
+node_modules/
+.vite/
+.bun/
+frontends/*/dist/
+
+# Built SPA bundles copied into backend
+backend/poll-api/src/main/resources/static/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Local env
+.env
+.env.local
