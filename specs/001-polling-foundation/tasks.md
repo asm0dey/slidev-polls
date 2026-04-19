@@ -151,7 +151,7 @@
 
 - [ ] T070 [P] [US2] Integration test `PublicPollViewIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/public_/` — scenarios `[TS-020, TS-021, TS-045]`
 - [ ] T071 [P] [US2] Integration test `VoteSubmissionIT` — scenarios `[TS-022, TS-023, TS-025, TS-027]`
-- [ ] T072 [P] [US2] Concurrency test `DuplicateVoteRaceIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-024]` (unique constraint on `(question_id, voter_token)`)
+- [x] T072 [P] [US2] Concurrency test `DuplicateVoteRaceIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-024]` (unique constraint on `(question_id, voter_token)`). Two threads race with a shared `CountDownLatch` start-gate; exactly one insert wins and the other surfaces as `AlreadyVotedException`, with a final `COUNT(*)` on the votes table confirming a single row for the `(question_id, v-123)` pair. Mirrors `OneActivePerPollIT`'s pattern (shared Testcontainers Postgres, Flyway-migrated schema, admin_user seed row for the `polls.owner_username` FK) so both persistence-level concurrency tests read the same way.
 - [ ] T073 [P] [US2] SPA catch-all test `SpaCatchAllIT` — scenarios `[TS-043, TS-044]` (catch-all serves SPA shell but excludes `/api/**`, `/admin/api/**`, static prefixes)
 - [ ] T074 [P] [US2] Vitest component test for voter `PollView.vue` in `frontends/voter/src/pages/PollView.test.ts` (waiting state, active question render, submit flow, already-voted)
 - [ ] T075 [P] [US2] Playwright smoke `voter-happy-path.spec.ts` in `frontends/voter/e2e/` — open `/my-talk`, vote, see confirmation
