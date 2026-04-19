@@ -10,15 +10,39 @@ spring:
     password: polls
   flyway:
     enabled: true
+    # Migrations ship with poll-persistence and arrive on the classpath
+    # through the Maven reactor dependency.
     locations: classpath:db/migration
   jooq:
     sql-dialect: POSTGRES
+  jackson:
+    deserialization:
+      # TS-027 / TS-046: the vote endpoint must ignore unknown properties so a
+      # stale client field cannot block a valid vote.
+      fail-on-unknown-properties: false
 
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        # Session cookie that carries the presenter's authenticated identity.
+        # The separate, unauthenticated `sp_voter` cookie is set on the voter
+        # path by VoteController (T086) and is configured from code, not here.
+        name: SP_SESSION
+        http-only: true
+        same-site: lax
+        # `secure` is turned on by the `prod` profile below so local dev over
+        # plain http still works.
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
