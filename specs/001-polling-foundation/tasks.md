@@ -101,7 +101,7 @@
 
 - [ ] T040 [P] [US1] Integration test `PollAuthoringIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-002, TS-006]` (create + delete poll)
 - [ ] T041 [P] [US1] Integration test `QuestionLifecycleIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-003, TS-005]` (activate atomically closes prior; close rejects subsequent votes)
-- [ ] T042 [P] [US1] Concurrency test `OneActivePerPollIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-004]` (partial unique index serialises concurrent activations)
+- [x] T042 [P] [US1] Concurrency test `OneActivePerPollIT` in `backend/poll-persistence/src/test/java/site/asm0dey/slidev/polls/persistence/` — scenario `[TS-004]` (partial unique index serialises concurrent activations), plus a positive-path serial activation and a `@TS-052` idempotent-reactivate guard so the concurrent assertion has meaningful contrast.
 - [ ] T043 [P] [US1] Security slice test `AdminAuthWebMvcTest` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/security/` — scenarios `[TS-001, TS-040, TS-041]` (401 / 403 on admin routes, per-presenter ownership)
 - [ ] T044 [P] [US1] Slug test `SlugIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenarios `[TS-010, TS-011, TS-012, TS-013, TS-014, TS-015]`
 - [ ] T045 [P] [US1] QR test `QrEndpointIT` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/admin/` — scenario `[TS-026]` (PNG decodes to slug URL; also consumed by US2)
