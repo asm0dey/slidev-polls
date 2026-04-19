@@ -68,8 +68,8 @@
 ### poll-core foundational types (shared by all stories)
 
 - [x] T019 [P] Create `ReservedSlugs` constant holder in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/slug/ReservedSlugs.java` (`admin`, `api`, `assets`, `static`, `j`, `login`, `logout`) — empty string intentionally omitted; `SlugValidator` (T020) rejects it on length grounds before the reserved check
-- [ ] T020 [P] Create `SlugValidator` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/slug/SlugValidator.java` enforcing lowercase kebab-case, 3–40 chars, `[a-z0-9]` + `-`, start/end alphanumeric, no `--`
-- [ ] T021 [P] Unit tests `SlugValidatorTest` and `ReservedSlugsTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/slug/` mirroring `@TS-011`, `@TS-012` invalid/reserved examples
+- [x] T020 [P] Create `SlugValidator` in `backend/poll-core/src/main/java/site/asm0dey/slidev/polls/core/slug/SlugValidator.java` enforcing lowercase kebab-case, 3–40 chars, `[a-z0-9]` + `-`, start/end alphanumeric, no `--` — scaffold's implementation (regex `^[a-z0-9]+(-[a-z0-9]+)*$`, length range 3–40, null-safe) covers every invalid/valid case exercised by `SlugValidatorTest` without modification.
+- [x] T021 [P] Unit tests `SlugValidatorTest` and `ReservedSlugsTest` in `backend/poll-core/src/test/java/site/asm0dey/slidev/polls/core/slug/` mirroring `@TS-011`, `@TS-012` invalid/reserved examples
 
 ### poll-api cross-cutting foundation (shared by all stories)
 
