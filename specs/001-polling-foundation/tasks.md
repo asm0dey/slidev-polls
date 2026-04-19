@@ -1,5 +1,17 @@
 # Tasks: Core Polling Platform
 
+## Clarifications
+
+### Session 2026-04-19
+
+- Q: Should load/performance tasks stay in scope? -> A: No — remove T103 (`SseFanoutLoadIT`), T133 (perf spot-check), and TS-035 scenario entirely. Load testing deferred beyond this feature. [T103, T133, T136, live-results.feature @TS-035]
+- Q: T005 wording — empty bun.lockb placeholder vs populated? -> A: Run `bun install`, commit the populated `bun.lockb`. [T005]
+- Q: T064 PollEditorPage scope — split or keep as one task? -> A: Keep as one task; single Vue page with internal sections. [T064]
+- Q: Where is the slidev addon published? -> A: Out of scope for this feature. Addon consumed locally from the monorepo; publish strategy deferred. [T132]
+- Q: Canonical frontend test runner — `bun test` vs Vitest? -> A: Both — `bun test` for plain-TS unit tests (`frontends/shared`), Vitest for component / Vue packages. [T136]
+
+
+
 **Input**: Design documents from `/specs/001-polling-foundation/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, tests/features/
 
@@ -22,7 +34,7 @@
 - [ ] T002 Create parent Maven POM at `backend/pom.xml` declaring Java 25, Spring Boot 4.0.5, module list (`poll-core`, `poll-persistence`, `poll-realtime`, `poll-api`), plugin management
 - [ ] T003 [P] Check in Maven wrapper (`backend/mvnw`, `backend/mvnw.cmd`, `backend/.mvn/wrapper/maven-wrapper.properties`)
 - [ ] T004 [P] Create `docker-compose.yml` at repo root with `postgres:16` service for local dev
-- [ ] T005 [P] Create bun workspace root `frontends/package.json` listing `shared`, `voter`, `backoffice`, `slidev-component`; commit empty `frontends/bun.lockb` placeholder via `bun install`
+- [ ] T005 [P] Create bun workspace root `frontends/package.json` listing `shared`, `voter`, `backoffice`, `slidev-component`; run `bun install` and commit the resulting `frontends/bun.lockb`
 - [ ] T006 [P] Create `scripts/build-frontends.sh` (bun install + build all SPAs + copy dists into `backend/poll-api/src/main/resources/static`)
 - [ ] T007 [P] Create `scripts/dev.sh` (docker-compose up postgres + `mvnw spring-boot:run` + `bun --cwd frontends run dev`)
 - [ ] T008 [P] Configure ESLint + Prettier config at `frontends/` root; configure Checkstyle / Spotless in `backend/pom.xml`
@@ -176,7 +188,6 @@
 - [ ] T100 [P] [US3] SseHub concurrency test `SseHubConcurrencyTest` in `backend/poll-realtime/src/test/java/polls/realtime/` (subscribe/unsubscribe/broadcast under racing threads; emitter failure is isolated)
 - [ ] T101 [P] [US3] `@WebMvcTest` `TallyBroadcastTest` in `backend/poll-realtime/src/test/java/polls/realtime/` — scenarios `[TS-030, TS-031, TS-032]` (snapshot on connect, tally on vote, snapshot on active-question change)
 - [ ] T102 [P] [US3] Awaitility SSE test `StreamIT` in `backend/poll-api/src/test/java/polls/api/public_/` — scenario `[TS-030]` end-to-end (vote → tally delivered <2 s)
-- [ ] T103 [P] [US3] Load test `SseFanoutLoadIT` — scenario `[TS-035]` (200 subscribers, 200 votes, p95 broadcast <500 ms)
 - [ ] T104 [P] [US3] Deck-activation integration test `DeckActivationIT` in `backend/poll-api/src/test/java/polls/api/deck/` — scenarios `[TS-050, TS-051, TS-052, TS-053, TS-054, TS-055, TS-056, TS-057]`
 - [ ] T105 [P] [US3] Vitest component tests in `frontends/slidev-component/src/components/` — `PollResults.test.ts` covering `[TS-032, TS-033, TS-034]` (stray-tally ignored, paused indicator, reconnect)
 - [ ] T106 [P] [US3] Playwright smoke `slidev-results.spec.ts` in `frontends/slidev-component/e2e/` — renders results on a sample deck page against running backend
@@ -214,11 +225,10 @@
 
 - [ ] T130 [P] Run `quickstart.md` end-to-end against a freshly built single JAR + Postgres (login → create poll → open voter → vote → slidev renders)
 - [ ] T131 [P] Hardening: ensure unknown-field tolerance on `/api/polls/{slug}/votes` per `[TS-027, TS-046]`; verify no PII columns in `votes`
-- [ ] T132 [P] Single-origin production check: `scripts/build-frontends.sh` copies all three SPA dists into `backend/poll-api/src/main/resources/static/` (`/`, `/admin/`, and slidev addon bundle published separately via `bun publish` on `frontends/slidev-component`); smoke test single JAR with no CORS
-- [ ] T133 [P] Performance spot-check against plan.md §Performance Goals: join-link TTFB p95 <500 ms, vote round-trip p95 <800 ms, SSE broadcast p95 <500 ms (scenario `[TS-035]`)
+- [ ] T132 [P] Single-origin production check: `scripts/build-frontends.sh` copies the voter and backoffice SPA dists into `backend/poll-api/src/main/resources/static/` (`/`, `/admin/`); smoke test single JAR with no CORS. (Slidev addon publishing is out of scope for this feature — consumed locally from the monorepo.)
 - [ ] T134 [P] Structured-logging audit — every controller entry/exit has a `correlationId` field; every Problem response carries it per `[TS-042]`
 - [ ] T135 README quickstart instructions update referencing `scripts/dev.sh` and `scripts/build-frontends.sh`
-- [ ] T136 Run the full feature suite (`mvnw verify` + `bun test` across workspace) and verify every `TS-###` maps to a passing assertion
+- [ ] T136 Run the full feature suite (`mvnw verify` + `bun test` for plain-TS unit tests in `frontends/shared` + `bun --cwd frontends/<pkg> run test` (Vitest) for every SPA / component package) and verify every `TS-###` maps to a passing assertion
 
 ---
 
@@ -244,7 +254,7 @@ T001 → T002 → T013 → T014 → T015 → T018 → T052 → T053 → T058 →
 - **Phase 3 tests**: T040–T047 all [P] (different files).
 - **Phase 3 impl**: T050, T051 [P]. T056, T057 [P]. T059, T060 [P] after T058 is stubbed. T061, T062, T065, T066 [P].
 - **Phase 4 tests**: T070–T075 [P]. Impl: T080, T081 [P]; T090, T091, T093 [P].
-- **Phase 5 tests**: T100–T106 [P]. Impl: T110, T111 [P]; T113, T114 [P]; T120, T121, T122 [P].
+- **Phase 5 tests**: T100, T101, T102, T104, T105, T106 [P]. Impl: T110, T111 [P]; T113, T114 [P]; T120, T121, T122 [P].
 
 ### Story independence
 
@@ -261,9 +271,9 @@ T001 → T002 → T013 → T014 → T015 → T018 → T052 → T053 → T058 →
 | Setup + Foundational | 1–2 | 4 | 27 | 31 |
 | US1 (P1 MVP) | 3 | 8 | 17 | 25 |
 | US2 (P2) | 4 | 6 | 14 | 20 |
-| US3 (P3 / P2 deck) | 5 | 7 | 14 | 21 |
-| Polish | 6 | — | 7 | 7 |
-| **Total** | | **25** | **79** | **104** |
+| US3 (P3 / P2 deck) | 5 | 6 | 14 | 20 |
+| Polish | 6 | — | 6 | 6 |
+| **Total** | | **24** | **78** | **102** |
 
 **MVP scope suggestion**: Phases 1 + 2 + 3 deliver a usable backoffice and satisfy all P1 scenarios (`@US-001`). Ship that first; US2 and US3 can follow independently.
 
