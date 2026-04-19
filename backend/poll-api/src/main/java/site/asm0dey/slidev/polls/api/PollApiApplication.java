@@ -2,6 +2,7 @@ package site.asm0dey.slidev.polls.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Spring Boot entrypoint. The {@code scanBasePackages} value is widened one level (to {@code
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * this, {@code PollController} cannot find {@code PollService}.
  */
 @SpringBootApplication(scanBasePackages = "site.asm0dey.slidev.polls")
+@EnableScheduling
 public class PollApiApplication {
 
   public static void main(String[] args) {

@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder;
@@ -89,5 +90,44 @@ public class SseHub {
   /** Visible for tests: number of distinct pollIds currently tracked. */
   public int pollCount() {
     return byPoll.size();
+  }
+
+  /**
+   * Periodic heartbeat — writes a {@code : keep-alive} SSE comment to every live emitter so
+   * intermediate proxies do not close the connection after their idle window (see {@code
+   * contracts/sse-events.md §Transport}: "MUST send a comment heartbeat at least every 20
+   * seconds"). Runs every 15 seconds — well under the 20s floor — and reuses the broadcast's
+   * per-emitter failure-isolation path so a dead browser is pruned on the next tick.
+   */
+  @Scheduled(fixedDelay = 15_000L)
+  public void heartbeat() {
+    for (UUID pollId : byPoll.keySet()) {
+      broadcastComment(pollId, "keep-alive");
+    }
+  }
+
+  private void broadcastComment(UUID pollId, String comment) {
+    Set<SseEmitter> subs = byPoll.get(pollId);
+    if (subs == null || subs.isEmpty()) {
+      return;
+    }
+    SseEventBuilder event = SseEmitter.event().comment(comment);
+    for (SseEmitter emitter : subs) {
+      try {
+        emitter.send(event);
+      } catch (IOException | IllegalStateException ex) {
+        LOG.log(
+            Level.DEBUG,
+            "dropping sse emitter on pollId={0} after heartbeat failure: {1}",
+            pollId,
+            ex);
+        try {
+          emitter.completeWithError(ex);
+        } catch (Exception ignored) {
+          // emitter may already be complete; proceed to unregister
+        }
+        unregister(pollId, emitter);
+      }
+    }
   }
 }
