@@ -9,7 +9,7 @@ import { AdminApiError } from "../lib/admin-api";
 // Match @TS-002 ("poll appears in her poll list" + "poll exposes a join link")
 // and @TS-001 (auth-failure surfaces an actionable error, not a stack trace).
 
-interface FakeClient extends Pick<AdminApiClient, "listPolls" | "deletePoll" | "qrUrl"> {}
+type FakeClient = Pick<AdminApiClient, "listPolls" | "deletePoll" | "qrUrl">;
 
 function makeFake(overrides: Partial<FakeClient> = {}): AdminApiClient {
   const base: FakeClient = {

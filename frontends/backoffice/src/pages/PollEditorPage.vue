@@ -6,7 +6,6 @@ import type {
   CreatePollRequest,
   CreateQuestionRequest,
   PollDetail,
-  Question,
   UpdatePollRequest
 } from "@polls/shared";
 import {
@@ -37,7 +36,7 @@ const props = withDefaults(
     pollId?: string;
     apiClient?: AdminApiClient;
   }>(),
-  {}
+  { pollId: undefined, apiClient: undefined }
 );
 
 const client = props.apiClient ?? defaultAdminClient;

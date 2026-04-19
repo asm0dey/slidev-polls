@@ -9,7 +9,7 @@ const props = withDefaults(
   defineProps<{
     apiClient?: AdminApiClient;
   }>(),
-  {}
+  { apiClient: undefined }
 );
 
 const client = props.apiClient ?? defaultAdminClient;

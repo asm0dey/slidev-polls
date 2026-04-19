@@ -7,7 +7,7 @@ const props = withDefaults(
     slug?: string;
     size?: number;
   }>(),
-  { size: 160 }
+  { slug: undefined, size: 160 }
 );
 
 const src = computed(() => `/api/admin/polls/${encodeURIComponent(props.pollId)}/qr.png`);
