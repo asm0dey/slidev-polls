@@ -130,7 +130,7 @@
 
 ### Backoffice SPA (US1)
 
-- [ ] T061 [P] [US1] Bootstrap `frontends/backoffice/` Vite + Vue 3 + vue-router project; `package.json` (@polls/backoffice), `vite.config.ts` outputting to `dist/` mounted under `/admin/`
+- [x] T061 [P] [US1] Bootstrap `frontends/backoffice/` Vite + Vue 3 + vue-router project; `package.json` (@polls/backoffice), `vite.config.ts` outputting to `dist/` mounted under `/admin/`. Bundled with the scaffold: vue-router 4 + history base `/admin/`, vitest 2 + @vue/test-utils + jsdom for the T046/T047 component tests, `AdminApiClient` (`src/lib/admin-api.ts`) wrapping `/api/admin/**` with the same Problem-aware error mapping as the public `ApiClient`, and the OpenAPI-mirrored shared types (`Poll.publicUrl`, `LoginRequest`, `CreatePollRequest`, `UpdatePollRequest`, `CreateQuestionRequest`, `ActivateQuestionRequest`) the editor surface needs. Page files (`LoginPage`, `PollListPage`, `PollEditorPage`) ship as placeholder shells so the router compiles; T062–T064 fill them in.
 - [ ] T062 [P] [US1] `LoginPage.vue` in `frontends/backoffice/src/pages/` — calls `/api/admin/login`, redirects to poll list
 - [ ] T063 [US1] `PollListPage.vue` in `frontends/backoffice/src/pages/` — lists polls via `/api/admin/polls`, shows join link, QR preview link
 - [ ] T064 [US1] `PollEditorPage.vue` in `frontends/backoffice/src/pages/` — create/edit poll, add/remove questions + options, activate/close, delete

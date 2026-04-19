@@ -1,7 +1,7 @@
 import { createApp } from "vue";
+import App from "./App.vue";
+import { router } from "./router";
 
-const app = createApp({
-  template: `<main><h1>Slidev Polls — backoffice</h1><p>Scaffold placeholder.</p></main>`
-});
-
+const app = createApp(App);
+app.use(router);
 app.mount("#app");

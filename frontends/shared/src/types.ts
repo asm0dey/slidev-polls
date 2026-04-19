@@ -33,17 +33,16 @@ export type PollOption = Option;
 /** Backoffice-side poll summary (GET /api/admin/polls). */
 export interface Poll {
   id: string;
-  slug: string;
   title: string;
+  slug: string;
   status: PollStatus;
+  publicUrl: string;
   activeQuestionId: string | null;
-  style: PollStyle;
-  createdAt: string;
-  updatedAt: string;
 }
 
-/** Full poll with questions and options (GET /api/admin/polls/{id}). */
+/** Full poll with questions, options, and style (GET /api/admin/polls/{id}). */
 export interface PollDetail extends Poll {
+  style: PollStyle;
   questions: Question[];
 }
 
@@ -56,6 +55,43 @@ export interface PublicPollView {
   style: PollStyle;
   activeQuestion?: Question;
   alreadyVoted?: boolean;
+}
+
+/** Login payload (POST /api/admin/login). */
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+/** Option payload inside CreateQuestionRequest. */
+export interface CreateOptionRequest {
+  label: string;
+}
+
+/** Question payload for create/update (POST /api/admin/polls). */
+export interface CreateQuestionRequest {
+  prompt: string;
+  options: CreateOptionRequest[];
+}
+
+/** Create-poll payload (POST /api/admin/polls). */
+export interface CreatePollRequest {
+  title: string;
+  slug?: string;
+  style?: PollStyle;
+  questions: CreateQuestionRequest[];
+}
+
+/** Patch-style update payload (PATCH /api/admin/polls/{id}). */
+export interface UpdatePollRequest {
+  title?: string;
+  slug?: string;
+  questions?: CreateQuestionRequest[];
+}
+
+/** Activate-question payload (POST /api/admin/polls/{id}/open). */
+export interface ActivateQuestionRequest {
+  questionId: string;
 }
 
 /** Vote submission payload (POST /api/polls/{slug}/votes). */
