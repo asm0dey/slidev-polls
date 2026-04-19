@@ -73,7 +73,7 @@
 
 ### poll-api cross-cutting foundation (shared by all stories)
 
-- [ ] T022 Create Spring Boot entrypoint `PollApiApplication.java` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/`
+- [x] T022 Create Spring Boot entrypoint `PollApiApplication.java` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/` (scaffold already provides a `@SpringBootApplication`-annotated entrypoint)
 - [ ] T023 [P] Configure `application.yml` in `backend/poll-api/src/main/resources/`: datasource (Postgres), Flyway, Jackson, server port, session cookie settings (HttpOnly, SameSite=Lax, Secure in prod profile)
 - [ ] T024 [P] Create `Problem` record + `ProblemCode` enum in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/error/` matching the codes listed in `openapi.yaml` (`AUTH_REQUIRED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `ALREADY_VOTED`, `QUESTION_NOT_ACTIVE`, `ACTIVATION_REJECTED`, `SLUG_TAKEN`, `SLUG_INVALID`, `SLUG_RESERVED`, `DECK_TOKEN_INVALID`, `DECK_TOKEN_POLL_MISMATCH`, `TRANSPORT_FAILURE`)
 - [ ] T025 [P] Create `CorrelationIdFilter` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/logging/` populating MDC per request; structured JSON logging config in `logback-spring.xml`
