@@ -120,7 +120,7 @@
 
 - [x] T055 [US1] Spring Security config `SecurityConfig` in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/security/`: `/api/admin/**` requires authenticated session; `/api/polls/**`, `/api/public/**`, `/api/deck/**`, `/`, `/{slug}`, `/admin/` permitAll; CSRF config compatible with JSON login
 - [x] T056 [P] [US1] `AdminUserDetailsService` backed by `admin_user` table (BCrypt) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/security/`
-- [ ] T057 [P] [US1] `AdminAuthController` (`POST /api/admin/login`, `POST /api/admin/logout`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/`
+- [x] T057 [P] [US1] `AdminAuthController` (`POST /api/admin/login`, `POST /api/admin/logout`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/admin/`
 
 ### Backoffice REST endpoints (US1)
 
