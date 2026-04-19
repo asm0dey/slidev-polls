@@ -91,5 +91,28 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <!--
+              Bind failsafe to integration-test / verify so Maven's standard
+              `*IT.java` naming convention (PollAuthoringIT, OneActivePerPollIT,
+              StreamIT, …) actually runs. Spring Boot's parent POM only manages
+              the version; execution binding has to live here. Kept at reactor
+              root so every module inherits the same contract without per-
+              module duplication.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-it</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>
