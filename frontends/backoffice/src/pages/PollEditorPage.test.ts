@@ -61,7 +61,12 @@ function makeRouter() {
     routes: [
       { path: "/polls", name: "polls", component: { template: "<div/>" } },
       { path: "/polls/new", name: "poll-new", component: { template: "<div/>" } },
-      { path: "/polls/:pollId", name: "poll-edit", component: { template: "<div/>" } }
+      { path: "/polls/:pollId", name: "poll-edit", component: { template: "<div/>" } },
+      {
+        path: "/polls/:pollId/deck-tokens",
+        name: "deck-tokens",
+        component: { template: "<div/>" }
+      }
     ]
   });
 }

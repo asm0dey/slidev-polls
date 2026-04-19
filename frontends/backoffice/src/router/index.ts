@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router"
 import LoginPage from "../pages/LoginPage.vue";
 import PollListPage from "../pages/PollListPage.vue";
 import PollEditorPage from "../pages/PollEditorPage.vue";
+import DeckTokensPage from "../pages/DeckTokensPage.vue";
 
 const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/polls" },
@@ -13,6 +14,12 @@ const routes: RouteRecordRaw[] = [
     name: "poll-edit",
     component: PollEditorPage,
     props: (route) => ({ mode: "edit", pollId: route.params.pollId })
+  },
+  {
+    path: "/polls/:pollId/deck-tokens",
+    name: "deck-tokens",
+    component: DeckTokensPage,
+    props: (route) => ({ pollId: route.params.pollId })
   }
 ];
 

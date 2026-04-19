@@ -1,7 +1,10 @@
 import type {
   ActivateQuestionRequest,
   CreatePollRequest,
+  DeckToken,
+  DeckTokenMinted,
   LoginRequest,
+  MintDeckTokenRequest,
   Poll,
   PollDetail,
   PollStyle,
@@ -107,6 +110,30 @@ export class AdminApiClient {
 
   qrUrl(pollId: string): string {
     return `${this.baseUrl}/api/admin/polls/${encodeURIComponent(pollId)}/qr.png`;
+  }
+
+  listDeckTokens(pollId: string): Promise<DeckToken[]> {
+    return this.send<DeckToken[]>(
+      "GET",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/deck-tokens`
+    );
+  }
+
+  mintDeckToken(pollId: string, body: MintDeckTokenRequest = {}): Promise<DeckTokenMinted> {
+    return this.send<DeckTokenMinted>(
+      "POST",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/deck-tokens`,
+      body
+    );
+  }
+
+  revokeDeckToken(pollId: string, tokenId: string): Promise<void> {
+    return this.send<void>(
+      "DELETE",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/deck-tokens/${encodeURIComponent(tokenId)}`,
+      undefined,
+      false
+    );
   }
 
   private async send<T>(

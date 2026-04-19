@@ -10,10 +10,15 @@ import site.asm0dey.slidev.polls.core.domain.DeckToken;
  * DeckTokenMintedDto}.
  */
 public record DeckTokenDto(
-    UUID id, UUID pollId, String label, Instant createdAt, Instant revokedAt) {
+    UUID id, UUID pollId, String label, Instant createdAt, Instant revokedAt, boolean revoked) {
 
   public static DeckTokenDto from(DeckToken token) {
     return new DeckTokenDto(
-        token.id(), token.pollId(), token.label(), token.createdAt(), token.revokedAt());
+        token.id(),
+        token.pollId(),
+        token.label(),
+        token.createdAt(),
+        token.revokedAt(),
+        token.revokedAt() != null);
   }
 }

@@ -263,15 +263,24 @@ onMounted(() => {
   <section class="poll-editor">
     <header class="poll-editor__header">
       <h2>{{ mode === "create" ? "New poll" : "Edit poll" }}</h2>
-      <button
-        v-if="mode === 'edit'"
-        type="button"
-        data-testid="poll-delete"
-        class="poll-editor__delete"
-        @click="deletePoll"
-      >
-        Delete poll
-      </button>
+      <div v-if="mode === 'edit'" class="poll-editor__header-actions">
+        <router-link
+          v-if="pollId"
+          :to="{ name: 'deck-tokens', params: { pollId } }"
+          class="poll-editor__deck-tokens"
+          data-testid="deck-tokens-link"
+        >
+          Deck tokens
+        </router-link>
+        <button
+          type="button"
+          data-testid="poll-delete"
+          class="poll-editor__delete"
+          @click="deletePoll"
+        >
+          Delete poll
+        </button>
+      </div>
     </header>
 
     <p v-if="loading">Loading…</p>

@@ -132,6 +132,7 @@ export interface Problem {
 /** Deck token as listed in the backoffice (GET /api/admin/polls/{id}/deck-tokens). */
 export interface DeckToken {
   id: string;
+  pollId: string;
   label: string | null;
   createdAt: string;
   revokedAt: string | null;
@@ -139,7 +140,11 @@ export interface DeckToken {
 
 /** Freshly minted deck token — plaintext bearer returned once (POST .../deck-tokens). */
 export interface DeckTokenMinted extends DeckToken {
-  token: string;
+  plaintext: string;
+}
+
+export interface MintDeckTokenRequest {
+  label?: string | null;
 }
 
 /** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect. */
