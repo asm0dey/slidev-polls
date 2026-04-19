@@ -173,7 +173,7 @@
 
 ### Voter SPA (US2)
 
-- [ ] T090 [P] [US2] Bootstrap `frontends/voter/` Vite + Vue 3 + vue-router project (`package.json` @polls/voter); route `/` (landing) and `/:slug` (poll view)
+- [x] T090 [P] [US2] Bootstrap `frontends/voter/` Vite + Vue 3 + vue-router project (`package.json` @polls/voter); route `/` (landing) and `/:slug` (poll view). Adds `App.vue` (RouterView shell), `router/index.ts` with history base `/` and the slug param matched against the same kebab-case regex the server's `SlugValidator` enforces (so the SPA never renders `PollView` for a URL that could never be a poll), placeholder `LandingPage.vue` / `PollView.vue` (filled by T092 / T093), `shims-vue.d.ts`, and the Vitest + @vue/test-utils + jsdom devDependency set that mirrors `frontends/backoffice` so T074's component tests have a runner to start on. `vitest.config.ts` uses `jsdom` with `globals: false` and the same `src/**/*.{test,spec}.{ts,tsx}` include pattern.
 - [ ] T091 [P] [US2] `voterFlag.ts` util in `frontends/voter/src/lib/` — cache per-slug `alreadyVoted` booleans returned by `/api/polls/by-slug/{slug}` in `localStorage` for offline UX. Does NOT touch `sp_voter` (HttpOnly, server-authoritative per T086)
 - [ ] T092 [US2] `PollView.vue` page in `frontends/voter/src/pages/` — loads `/api/polls/by-slug/:slug`, renders WAITING vs ACTIVE, submits vote, shows confirmation, handles `ALREADY_VOTED` and `QUESTION_NOT_ACTIVE` with user-facing messages
 - [ ] T093 [P] [US2] `LandingPage.vue` at `/` with "enter a slug" input
