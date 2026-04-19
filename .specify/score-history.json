@@ -1,0 +1,14 @@
+{
+  "001-polling-foundation": [
+    {
+      "timestamp": "2026-04-19T00:00:00Z",
+      "score": 91,
+      "coverage_pct": 100,
+      "critical": 0,
+      "high": 1,
+      "medium": 2,
+      "low": 0,
+      "total_findings": 3
+    }
+  ]
+}
