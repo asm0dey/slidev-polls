@@ -1,7 +1,7 @@
 {
   "testify": {
-    "assertion_hash": "6ca62651c7654309e471657c52bf1de73002dace80a022ce5b0978ee900453b7",
-    "generated_at": "2026-04-19T11:58:23Z",
+    "assertion_hash": "11d1000d2b3bd038af8d60bef6ffb2d6ad9cb5bb7619ae98f49e3287ade34d9d",
+    "generated_at": "2026-04-19T12:39:15Z",
     "features_dir": "/home/finkel/work_self/slidev-polls/specs/001-polling-foundation/tests/features",
     "file_count": 6
   }

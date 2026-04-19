@@ -51,9 +51,10 @@ Feature: Slidev slide shows live results
     And the "paused" indicator is cleared
     And the tally shown is consistent with the backend's current state
 
-  @TS-035 @SC-004 @acceptance
-  Scenario: A single backend instance sustains 200 concurrent subscribers on one question
-    Given 200 clients are subscribed to "/api/polls/my-talk/stream"
-    When 200 votes are accepted on the active question over 10 seconds
-    Then every subscriber receives all 200 "tally" events
-    And the 95th-percentile broadcast latency from vote accept to client delivery is under 500 milliseconds
+# DEPRECATED: TS-035 removed per clarification 2026-04-19 — load testing deferred out of scope for this feature. SC-004 acceptance is marked deferred in spec.md and will be re-scenarioed when load testing returns.
+#  @TS-035 @SC-004 @acceptance
+#  Scenario: A single backend instance sustains 200 concurrent subscribers on one question
+#    Given 200 clients are subscribed to "/api/polls/my-talk/stream"
+#    When 200 votes are accepted on the active question over 10 seconds
+#    Then every subscriber receives all 200 "tally" events
+#    And the 95th-percentile broadcast latency from vote accept to client delivery is under 500 milliseconds
