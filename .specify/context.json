@@ -2,12 +2,14 @@
   "tdd_determination": "mandatory",
   "planview": {
     "nodeClassifications": {
-      "Presenter Browser (Backoffice SPA)": "client",
-      "Respondent Browser (Public SPA)": "client",
-      "Slidev Deck (Vue addon)": "client",
-      "Spring Boot Backend": "server",
-      "SSE Broadcaster": "server",
-      "PostgreSQL": "storage"
+      "Voter SPA (bun+Vite)": "client",
+      "Backoffice SPA (bun+Vite)": "client",
+      "Slidev Addon (Vue component)": "client",
+      "poll-api (Spring Boot)": "server",
+      "poll-core": "server",
+      "poll-persistence (jOOQ)": "server",
+      "poll-realtime (SseHub)": "server",
+      "PostgreSQL 16": "storage"
     }
   }
 }

@@ -6,171 +6,249 @@ the alternatives that were considered and rejected.
 
 ## 1. Live-update transport: SSE vs WebSocket vs polling
 
-**Decision**: Server-Sent Events (SSE), one stream per `(pollId,
-questionId)` subscription.
+**Decision**: Server-Sent Events (SSE), one stream per poll.
 
 **Rationale**:
-- The live-update traffic is strictly one-way: the backend pushes
-  aggregate tallies to the Slidev view. WebSockets' bidirectional
-  framing buys nothing here and doubles the surface area.
-- SSE is a plain HTTP response; it traverses corporate proxies and
-  conference Wi-Fi more reliably than WebSockets and needs no extra
-  upgrade handshake.
-- The browser `EventSource` API handles automatic reconnection with a
-  bounded backoff out of the box, which directly supports Principle IV
-  (Live-Reliability) and SC-006 (auto-recovery within 10 s).
-- Spring MVC supports SSE natively through `SseEmitter`; no extra
-  dependency is needed (serves Principle VIII).
+- Traffic is strictly one-way (backend → viewer); WebSocket's
+  bidirectional framing buys nothing and doubles surface area.
+- SSE is plain HTTP; it traverses corporate proxies and conference
+  Wi-Fi more reliably than WebSocket upgrades.
+- Browser `EventSource` gives automatic reconnection with bounded
+  backoff, directly supporting Principle IV and SC-006.
+- Spring MVC has native `SseEmitter` support — no new dependency.
 
 **Alternatives considered**:
-- **WebSocket (e.g., Spring's STOMP over SockJS)**: rejected. Adds a
-  second protocol, requires a message-broker abstraction to reach
-  interesting semantics, and the traffic pattern is one-way anyway.
-- **HTTP long-polling**: rejected. Worse latency than SSE under the same
-  network conditions and harder to cancel cleanly when the active
-  question changes.
-- **Client-side short-interval polling (e.g., every 1 s)**: rejected.
-  Wastes bandwidth, scales badly at SC-004 (200 concurrent respondents
-  implies at least as many viewers) and produces a visibly jerky
-  update cadence that would fail SC-003 at the tail.
+- **WebSocket / STOMP**: rejected. Adds a second protocol and a
+  broker-style abstraction for a one-way stream.
+- **HTTP long-polling**: rejected. Worse tail latency than SSE, harder
+  cancellation on active-question change.
+- **Client short-interval polling**: rejected. Wastes bandwidth, scales
+  badly at SC-004's 200 concurrent clients, visibly jerky under SC-003.
 
-## 2. Storage: PostgreSQL vs lighter alternatives
+## 2. Persistence: jOOQ vs JPA/Hibernate vs hand-rolled JDBC
 
-**Decision**: PostgreSQL 16 in production, with Testcontainers for
-integration tests and an H2 PostgreSQL-compatibility profile for fast
-unit-test runs.
+**Decision**: **jOOQ** over PostgreSQL 16, with Flyway for migrations
+and `testcontainers-jooq-codegen-maven-plugin` generating jOOQ classes
+at build time from the live PostgreSQL dialect.
 
 **Rationale**:
-- FR-004 requires atomic transitions of the "active question" pointer
-  per poll; a relational database with row-level locking and a
-  `CHECK` / partial-unique constraint is the simplest enforcement.
-- The read pattern for aggregates is a trivial `GROUP BY option_id`
-  keyed by question — trivially indexed in SQL.
-- Flyway for migrations is the de-facto Spring Boot default and adds
-  essentially zero new dependency weight (Spring Boot already pulls it
-  on the classpath via its starter).
+- The schema is small, relational, and queried with trivial joins and
+  a single `GROUP BY` aggregate. None of JPA's strengths
+  (relationship-graph navigation, lazy loading, cascading) are
+  exercised; all of its costs (reflection, proxying, session and
+  transaction subtleties, Hibernate version skew) would be paid.
+- jOOQ produces type-safe SQL that mirrors the migrations, which
+  catches schema drift at compile time rather than at first test run.
+- Codegen against a real PostgreSQL container means the generated
+  types encode PostgreSQL-specific column types (e.g., `jsonb` for
+  `polls.style`) accurately — no annotation workarounds.
+- Transitive footprint: jOOQ + JDBC is smaller than Hibernate + its
+  ByteBuddy / Jandex / Antlr chain. Principle VIII.
 
 **Alternatives considered**:
-- **Redis or an in-memory store**: rejected for authoritative storage;
-  durability of the presenter's authored polls and collected responses
-  is required, and adding Redis *in addition to* a database would
-  violate Principle VIII without a present requirement.
-- **SQLite**: rejected. Fine for local dev, but concurrent writes
-  under SC-004's 200-respondents load on a single question are exactly
-  SQLite's weak spot.
-- **NoSQL (MongoDB, DynamoDB)**: rejected. The schema is small,
-  relational, and benefits from transactional constraints; a document
-  store would push the "one active question" invariant into
-  application code, which Principle III (TDD) does not make easier to
-  keep correct.
+- **Spring Data JPA / Hibernate**: rejected for the reasons above. The
+  value Hibernate adds over jOOQ on a schema this shape is negative.
+- **Spring Data JDBC**: rejected. Still carries an aggregate-mapping
+  model with its own learning tax; jOOQ's SQL-first model is a closer
+  match to how the queries will actually be written.
+- **Hand-rolled JDBC / `JdbcClient`**: rejected. Loses compile-time
+  checking of column names and types against migrations — exactly the
+  property that makes jOOQ worth the codegen step.
 
-## 3. Backoffice authentication
+## 3. Java 25 + Spring Boot line
 
-**Decision**: Spring Security form login backed by a `Presenter` table
-with BCrypt-hashed passwords. Session cookies are `HttpOnly`, `Secure`,
-`SameSite=Lax`. No self-serve sign-up in this feature; presenters are
-seeded by an admin-only migration / admin CLI (out of scope for v1
-UI).
+**Decision**: Java 25 (LTS) on Spring Boot 3.4.x.
 
 **Rationale**:
-- FR-001, FR-016, and SC-005 require that every backoffice route is
-  behind auth; Spring Security's built-in filter chain is the smallest
-  amount of code that gets us there.
-- Session cookies are simpler than a JWT scheme for a single first-party
-  backoffice and avoid a token-rotation story that YAGNI does not yet
-  justify.
-- Presenter creation is intentionally not exposed as a UI in this
-  feature; the spec does not require it and adding sign-up surfaces
-  would violate Principle V.
+- Java 25 is the September 2025 LTS release and is in active support
+  as of 2026-04-19; it is the right default for a new service with a
+  multi-year horizon.
+- Spring Boot 3.4 is the first Spring Boot line with full Java 25
+  runtime certification and still carries the framework 6.x baseline
+  the team is familiar with.
+- Virtual threads (`spring.threads.virtual.enabled`) are a clean fit
+  for the SSE endpoint's per-subscriber hold-open thread shape,
+  keeping SC-004's 200 concurrent subscribers cheap to hold.
 
 **Alternatives considered**:
-- **JWT bearer tokens**: rejected for v1. No present cross-origin or
-  multi-client requirement.
-- **OAuth / social login**: rejected. Adds an external dependency and a
-  per-deploy identity-provider configuration for zero added value given
-  the presenter population is small and known.
-- **No auth, ambient trust**: rejected — violates Principle II's
-  inverse on the presenter side (backoffice is not zero-friction; it
-  is explicitly privileged).
+- **Java 21 LTS**: rejected as the default; it works, but starting a
+  new service on the older LTS the day after the newer LTS has
+  shipped just defers the upgrade.
+- **Spring Boot 3.3**: rejected. Certified against JDK 21, not JDK 25.
 
-## 4. Respondent session / single-vote enforcement
+## 4. Build tooling: Maven multi-module vs Gradle vs single module
 
-**Decision**: A short, opaque, device-scoped cookie (`sp_device`) set on
-first visit to the respondent app. Uniqueness of `(questionId,
-deviceSessionId)` is enforced at the storage layer with a unique
-constraint. Attempts to vote twice return a well-formed "already voted"
-response rather than an error.
+**Decision**: **Maven** multi-module reactor with four modules:
+`poll-core`, `poll-persistence`, `poll-realtime`, `poll-api`.
 
 **Rationale**:
-- FR-009 requires best-effort single vote per device session per
-  question; a cookie-scoped identifier is the simplest implementation
-  and carries no PII (FR-011, SC-007).
-- Enforcement at the DB level prevents double-counting under concurrent
-  submissions from the same device, which is a real-world case when
-  eager respondents double-tap on mobile.
+- Separating `poll-core` from web and JDBC dependencies lets the
+  domain be tested without booting Spring or talking to a database —
+  directly serving Principle III (cheap, fast tests where the cost
+  would otherwise silently accumulate).
+- `poll-persistence` is the only module that owns Flyway migrations
+  and jOOQ codegen, so codegen artefacts live exactly where the
+  schema they reflect does.
+- `poll-realtime` is separate because the SSE hub's concurrency
+  semantics (subscribe/unsubscribe/broadcast under races) are worth
+  unit-testing without the REST layer on top.
+- Maven is chosen over Gradle deliberately: the build needs are
+  plain (reactor + plugin), Maven's declarative pom matches the
+  "human-authored, legible repo" stance of Principle IX, and the
+  project has no build-performance problem that would justify the
+  Gradle/Groovy/Kotlin DSL surface area.
 
 **Alternatives considered**:
-- **IP-based single-vote enforcement**: rejected. Conference NAT means
-  many legitimate respondents share one IP.
-- **LocalStorage-only**: rejected as the *only* mechanism. It is
-  trivially bypassed and it is cleared unpredictably on iOS Safari; a
-  cookie is both more reliable and server-visible for enforcement.
-  LocalStorage is used as a UX hint ("you already voted") but not as
-  the authoritative check.
-- **No enforcement (audience self-moderates)**: rejected — violates the
-  spirit of FR-009 and trivially corrupts small-audience demos.
+- **Single-module Maven**: rejected. Would force `poll-core` tests to
+  carry Spring Web and JDBC on the classpath.
+- **Gradle multi-module**: rejected on Principle V — no present
+  requirement Maven does not meet.
 
-## 5. QR code generation
+## 5. Frontend toolchain: bun + Vite workspace
 
-**Decision**: ZXing (`com.google.zxing:core` + `javase`) invoked inline
-from the backend to produce a PNG for a given join URL on demand,
-cached per-poll in-process for the lifetime of the JVM.
+**Decision**: **bun** as the single frontend toolchain (install, run,
+lockfile) in a workspace rooted at `frontends/`, with **Vite** as the
+bundler for each SPA.
 
 **Rationale**:
-- FR-005 requires a QR code that resolves to the join link; ZXing is
-  the canonical Java library, small, and has no transitive surprises.
-- Generation is cheap; in-process caching per poll keyed by the join
-  URL is sufficient — no need for a distributed cache or a CDN in v1
-  (Principle V).
+- bun's workspace support with one lockfile covers the four-package
+  layout (`shared`, `voter`, `backoffice`, `slidev-component`) with
+  no extra glue.
+- Treating bun as the only installed-runtime expectation simplifies
+  developer onboarding (no `nvm` + pnpm matrix) and compresses CI.
+- Vite stays as the bundler because the Slidev addon package is
+  consumed by Slidev's Vite runtime; keeping both the addon and the
+  SPAs on Vite avoids a second build tool.
 
 **Alternatives considered**:
-- **Client-side QR rendering (e.g., a JS library in the backoffice)**:
-  rejected. The QR also appears on the presenter's Slidev deck itself
-  (a natural future use); centralising generation on the backend keeps
-  the output consistent and lets both surfaces reuse the same URL.
-- **An external QR API**: rejected on Principle VIII — a network
-  dependency and a privacy footprint for a feature that is three lines
-  of library code.
+- **pnpm workspaces**: rejected. Functionally similar for our needs,
+  but adds a second CLI / lockfile / runtime to the developer
+  environment for no present advantage.
+- **Turborepo / Nx**: rejected on Principle V. Four packages do not
+  justify a task runner.
 
-## 6. Monorepo / frontend workspace
+## 6. Backoffice authentication
 
-**Decision**: pnpm workspaces with three packages — `shared`,
-`respondent-app`, `slidev-addon` — all Vue 3 + TypeScript under Vite.
+**Decision**: Spring Security form login backed by an `admin_user`
+table with BCrypt-hashed passwords. Session cookies are `HttpOnly`,
+`Secure`, `SameSite=Lax`. No self-serve sign-up in this feature;
+users are seeded by a Flyway migration and/or a local admin CLI
+(out of scope for v1 UI).
 
 **Rationale**:
-- The respondent app and the Slidev addon both render the same
-  aggregate-tally view and both consume the same SSE stream. A shared
-  package is the honest way to express that, rather than duplicating
-  the code or forcing an import across unrelated package roots.
-- pnpm's workspace protocol gives us `workspace:*` dependencies
-  without publishing any package to a registry — a clean fit for an
-  internal monorepo.
+- FR-001, FR-016, and SC-005 require every backoffice route is behind
+  auth. Spring Security's filter chain is the smallest code path to
+  get there.
+- Session cookies are simpler than a JWT for a single first-party
+  backoffice on one origin; they also avoid any cross-origin
+  discussion that the single-origin deployment already sidesteps.
 
 **Alternatives considered**:
-- **Three unrelated projects with copy-pasted SSE client**: rejected —
-  directly invites the "my respondent app reconnects but the slide
-  freezes" class of bug that Principle IV exists to prevent.
-- **Single app that also acts as a Slidev addon**: rejected. The
-  Slidev addon's public surface (a component registered through the
-  addon hook) is different from the respondent app's public surface (a
-  routed page bundle); collapsing them would couple release cadences
-  unnaturally.
+- **JWT bearer tokens**: rejected for v1. No cross-origin or
+  multi-client need.
+- **OAuth / social login**: rejected. Adds a per-deploy IdP
+  configuration for zero present value — the presenter population is
+  small and known.
+
+## 7. Respondent identity and single-vote enforcement
+
+**Decision**: A `voter_token` (UUID) that lives in the voter SPA's
+`localStorage` and is sent in a first-party cookie for server-side
+uniqueness. The database enforces
+`UNIQUE (question_id, voter_token)`. Duplicate submissions are
+surfaced as `ALREADY_VOTED` (a 409 Problem), not a server error.
+
+**Rationale**:
+- FR-009 is best-effort single-vote per device per question.
+  A client-generated UUID persisted across reloads is the simplest
+  mechanism that does not require PII (FR-011, SC-007).
+- DB-level uniqueness prevents double-counting under concurrent
+  double-tap on mobile.
+- `localStorage` and the cookie hold the same token; the cookie is
+  the authoritative server-visible signal, `localStorage` is a UX
+  hint that lets the voter SPA render "you already voted" without a
+  round trip.
+
+**Alternatives considered**:
+- **IP-based enforcement**: rejected. Conference NAT = one IP for
+  many legitimate respondents.
+- **LocalStorage only, no cookie**: rejected. Server cannot enforce
+  uniqueness without the token on the wire; trivially bypassed if
+  relied on alone.
+
+## 8. Memorable slug addressing
+
+**Decision**: Each poll has a human-memorable **slug** (e.g.,
+`my-poll`) that forms its public URL `/{slug}`. Slugs are generated
+from the poll title at creation time, validated, and editable by the
+owning presenter. Reserved slugs cannot be allocated.
+
+**Rationale**:
+- The premise is "memorable join by link"; an opaque join code is a
+  fallback, not the primary affordance on a conference slide.
+  A slug is more memorable than `j/AB7K9Q` and easier to read out
+  loud.
+- Serving `/{slug}` on the same origin as `/api/*` and `/admin/*`
+  forces an explicit reserved-word list, which is better than letting
+  user content collide with routes.
+
+**Slug rules (enforced in `poll-core/SlugValidator` and mirrored in
+`backoffice/SlugField`)**:
+- Charset: `^[a-z0-9]+(-[a-z0-9]+)*$`.
+- Length: 3–40 characters.
+- Case-insensitive unique across live polls; stored lowercase.
+- Reserved list: `admin`, `api`, `assets`, `static`, `j`, `login`,
+  `logout`, plus the empty string (the site root reserved for the
+  voter SPA landing page).
+- Editable by the owning presenter. Rotating a slug invalidates the
+  old URL immediately; no redirect is issued in v1 (out of scope).
+
+**Alternatives considered**:
+- **Opaque `joinCode` only** (previous plan revision): rejected —
+  less memorable, works against the premise's "following a join
+  link or code" ergonomics.
+- **Short-code + optional slug alias**: rejected for v1. Two URL
+  shapes for the same resource is an extra surface; revisit if
+  presenters ask.
+
+## 9. QR code generation
+
+**Decision**: ZXing (`com.google.zxing:core` + `javase`) inside
+`poll-api` to produce a PNG for the poll's public `/{slug}` URL on
+demand, cached in-process per poll for the lifetime of the JVM.
+
+**Rationale**:
+- FR-005 requires a QR; ZXing is the canonical Java library, small,
+  no transitive surprises.
+- In-process cache keyed by the slug is sufficient — no distributed
+  cache, no CDN (Principle V).
+- Slug rotation cleanly invalidates the cache entry.
+
+**Alternatives considered**:
+- **Client-side QR in the backoffice**: rejected. The QR is also used
+  in-deck on a Slidev slide; one server implementation keeps the
+  output consistent.
+- **External QR API**: rejected on Principle VIII — a network
+  dependency and a privacy footprint for three lines of library code.
+
+## 10. Single-origin deployment
+
+**Decision**: The backoffice SPA (`/admin/`) and the voter SPA (`/`
+and `/{slug}`) are served as static resources from `poll-api`. The
+catch-all that forwards SPA routes to `index.html` explicitly excludes
+`/api/**`, `/admin/api/**`, and static-asset prefixes.
+
+**Rationale**:
+- One origin removes any CORS configuration, any separate web tier,
+  and any discussion of where the session cookie lives (Principle V).
+- It also makes "what is the poll URL printed on the QR code?" a
+  single-environment-variable question.
 
 ## Tessl Tiles
 
-No Tessl tiles are currently installed for the technologies listed in
-`plan.md` beyond the `intent-integrity-kit` workflow tile already in
-use. No eval scores are available. If, in a later feature, tiles for
-Spring Boot 3.3 or the Slidev addon framework become available in the
-workspace's registry, they should be evaluated and recorded here with
-their eval scores and the technology they cover.
+No Tessl tiles are currently installed for Java / Spring Boot / jOOQ /
+Vue 3 / Slidev / bun beyond the `intent-integrity-kit` workflow tile.
+No eval scores are available. If tiles for these technologies become
+available in the workspace's registry, they should be evaluated here
+and the relevant eval scores written into
+`.specify/context.json::planview.evalScores`.

@@ -1,25 +1,77 @@
 openapi: 3.0.3
 info:
   title: Slidev Polls — Core Polling Platform
-  version: 0.1.0
+  version: 0.2.0
   description: >
-    Contract for the HTTP surface of the Slidev Polls backend for feature
-    001-polling-foundation. All routes under /api/backoffice require an
-    authenticated presenter session; all other routes are public.
+    Contract for the HTTP surface of the Slidev Polls backend
+    (feature 001-polling-foundation). The backend is a single Spring
+    Boot service that also serves the voter and backoffice SPAs as
+    static resources. /api/admin/** requires an authenticated session;
+    /api/polls/** and /api/public/** are public.
 
 servers:
   - url: http://localhost:8080
 
 tags:
-  - name: backoffice-polls
-  - name: backoffice-questions
-  - name: public-respondent
-  - name: live-updates
+  - name: admin-auth
+  - name: admin-polls
+  - name: admin-style
+  - name: admin-qr
+  - name: public-polls
+  - name: public-votes
+  - name: public-stream
+  - name: spa
 
 paths:
-  /api/backoffice/polls:
+  /:
     get:
-      tags: [backoffice-polls]
+      tags: [spa]
+      summary: Voter SPA landing page.
+      responses:
+        '200': { description: HTML shell for the voter SPA. }
+
+  /{slug}:
+    parameters:
+      - $ref: '#/components/parameters/Slug'
+    get:
+      tags: [spa]
+      summary: >
+        Voter SPA shell for a specific poll (memorable URL). The SPA
+        resolves the slug via /api/polls/by-slug/{slug}.
+      responses:
+        '200': { description: HTML shell for the voter SPA. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/:
+    get:
+      tags: [spa]
+      summary: Backoffice SPA shell (unauthenticated shell; routes gated by /api/admin/**).
+      responses:
+        '200': { description: HTML shell for the backoffice SPA. }
+
+  /api/admin/login:
+    post:
+      tags: [admin-auth]
+      summary: Sign in as a presenter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '204': { description: Sign-in succeeded; session cookie set. }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /api/admin/logout:
+    post:
+      tags: [admin-auth]
+      security: [{ sessionAuth: [] }]
+      responses:
+        '204': { description: Session cleared. }
+
+  /api/admin/polls:
+    get:
+      tags: [admin-polls]
       summary: List polls owned by the current presenter.
       security: [{ sessionAuth: [] }]
       responses:
@@ -32,8 +84,8 @@ paths:
                 items: { $ref: '#/components/schemas/Poll' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
     post:
-      tags: [backoffice-polls]
-      summary: Create a new poll.
+      tags: [admin-polls]
+      summary: Create a new poll (server may derive a slug from the title if omitted).
       security: [{ sessionAuth: [] }]
       requestBody:
         required: true
@@ -45,15 +97,20 @@ paths:
           description: Created.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Poll' }
+              schema: { $ref: '#/components/schemas/PollDetail' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: Slug collision, reserved slug, or invalid slug format.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
-  /api/backoffice/polls/{pollId}:
+  /api/admin/polls/{pollId}:
     parameters:
       - $ref: '#/components/parameters/PollId'
     get:
-      tags: [backoffice-polls]
+      tags: [admin-polls]
       security: [{ sessionAuth: [] }]
       responses:
         '200':
@@ -64,43 +121,49 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [admin-polls]
+      summary: Update poll title, slug, questions, or options.
+      security: [{ sessionAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePollRequest' }
+      responses:
+        '200':
+          description: Updated poll detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Slug collision, reserved slug, or invalid slug format.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
     delete:
-      tags: [backoffice-polls]
+      tags: [admin-polls]
       security: [{ sessionAuth: [] }]
       responses:
         '204': { description: Deleted. }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/backoffice/polls/{pollId}/questions:
+  /api/admin/polls/{pollId}/open:
     parameters:
       - $ref: '#/components/parameters/PollId'
     post:
-      tags: [backoffice-questions]
+      tags: [admin-polls]
+      summary: Activate a question on this poll (body names which one); atomically closes any currently active question on the same poll.
       security: [{ sessionAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateQuestionRequest' }
-      responses:
-        '201':
-          description: Created.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Question' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /api/backoffice/polls/{pollId}/questions/{questionId}/activate:
-    parameters:
-      - $ref: '#/components/parameters/PollId'
-      - $ref: '#/components/parameters/QuestionId'
-    post:
-      tags: [backoffice-questions]
-      summary: Mark a question active; atomically closes any currently active question on this poll.
-      security: [{ sessionAuth: [] }]
+            schema: { $ref: '#/components/schemas/ActivateQuestionRequest' }
       responses:
         '200':
           description: Resulting poll state.
@@ -115,12 +178,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Problem' }
 
-  /api/backoffice/polls/{pollId}/questions/{questionId}/close:
+  /api/admin/polls/{pollId}/close:
     parameters:
       - $ref: '#/components/parameters/PollId'
-      - $ref: '#/components/parameters/QuestionId'
     post:
-      tags: [backoffice-questions]
+      tags: [admin-polls]
+      summary: Close the currently active question on this poll.
       security: [{ sessionAuth: [] }]
       responses:
         '200':
@@ -131,12 +194,34 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/backoffice/polls/{pollId}/qr:
+  /api/admin/polls/{pollId}/style:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    put:
+      tags: [admin-style]
+      summary: Replace the poll's style object (colors, font, layout).
+      security: [{ sessionAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollStyle' }
+      responses:
+        '200':
+          description: Updated poll detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/admin/polls/{pollId}/qr.png:
     parameters:
       - $ref: '#/components/parameters/PollId'
     get:
-      tags: [backoffice-polls]
-      summary: PNG QR code for the poll's public join URL.
+      tags: [admin-qr]
+      summary: PNG QR code for the poll's public slug URL.
       security: [{ sessionAuth: [] }]
       responses:
         '200':
@@ -145,77 +230,59 @@ paths:
             image/png:
               schema: { type: string, format: binary }
 
-  /j/{joinCode}:
+  /api/polls/by-slug/{slug}:
     parameters:
-      - in: path
-        name: joinCode
-        required: true
-        schema: { type: string, minLength: 6, maxLength: 10 }
+      - $ref: '#/components/parameters/Slug'
     get:
-      tags: [public-respondent]
-      summary: Human-facing join URL. Serves the respondent SPA shell; not a JSON endpoint.
-      responses:
-        '200': { description: HTML shell for the respondent app. }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /api/public/polls/by-code/{joinCode}/current:
-    parameters:
-      - in: path
-        name: joinCode
-        required: true
-        schema: { type: string }
-    get:
-      tags: [public-respondent]
-      summary: Current public view of the poll (active question + options + already-voted hint).
+      tags: [public-polls]
+      summary: Public view of a poll (active question + options + style + already-voted hint).
       responses:
         '200':
-          description: Active question or waiting state.
+          description: Public poll view.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CurrentPollView' }
+              schema: { $ref: '#/components/schemas/PublicPollView' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /api/public/polls/by-code/{joinCode}/responses:
+  /api/polls/{slug}/votes:
     parameters:
-      - in: path
-        name: joinCode
-        required: true
-        schema: { type: string }
+      - $ref: '#/components/parameters/Slug'
     post:
-      tags: [public-respondent]
-      summary: Submit a response to the poll's currently active question.
+      tags: [public-votes]
+      summary: Submit a vote on the poll's currently active question.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/SubmitResponseRequest' }
+            schema: { $ref: '#/components/schemas/VoteRequest' }
       responses:
         '201':
-          description: Response accepted.
+          description: Vote accepted.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SubmitResponseAccepted' }
+              schema: { $ref: '#/components/schemas/VoteAccepted' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: Rejected — already voted, or question no longer active.
+          description: Rejected — already voted (ALREADY_VOTED) or question no longer active (QUESTION_NOT_ACTIVE).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Problem' }
-        '404': { $ref: '#/components/responses/NotFound' }
 
-  /api/public/polls/{pollId}/stream:
+  /api/polls/{slug}/stream:
     parameters:
-      - $ref: '#/components/parameters/PollId'
+      - $ref: '#/components/parameters/Slug'
     get:
-      tags: [live-updates]
+      tags: [public-stream]
       summary: >
-        Server-Sent Events stream. Emits `snapshot` on connect and on each
-        active-question change, and `tally` on each accepted response.
+        Server-Sent Events stream. Emits `snapshot` on connect / active-question
+        change, `tally` on each accepted vote, `question-closed` on close.
       responses:
         '200':
           description: text/event-stream of poll events.
           content:
             text/event-stream:
               schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
 
 components:
   securitySchemes:
@@ -230,11 +297,15 @@ components:
       name: pollId
       required: true
       schema: { type: string, format: uuid }
-    QuestionId:
+    Slug:
       in: path
-      name: questionId
+      name: slug
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+        minLength: 3
+        maxLength: 40
 
   responses:
     Unauthenticated:
@@ -265,9 +336,6 @@ components:
       properties:
         code:
           type: string
-          description: >
-            Stable machine-readable code. Distinguishes auth, authorisation,
-            and transport failures per FR-017.
           enum:
             - AUTH_REQUIRED
             - FORBIDDEN
@@ -276,19 +344,56 @@ components:
             - ALREADY_VOTED
             - QUESTION_NOT_ACTIVE
             - ACTIVATION_REJECTED
+            - SLUG_TAKEN
+            - SLUG_INVALID
+            - SLUG_RESERVED
             - TRANSPORT_FAILURE
         message:
           type: string
           description: User-facing, non-technical message.
         correlationId:
           type: string
-          description: Request correlation id for log lookup.
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
 
     CreatePollRequest:
       type: object
-      required: [title]
+      required: [title, questions]
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
+        slug:
+          type: string
+          description: >
+            Optional desired slug. If omitted, the server derives a
+            slug from the title. If present, must match the slug
+            format and must not be in the reserved list.
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+          minLength: 3
+          maxLength: 40
+        style: { $ref: '#/components/schemas/PollStyle' }
+        questions:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateQuestionRequest' }
+
+    UpdatePollRequest:
+      type: object
+      description: Patch-style update. Any field may be omitted.
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug:
+          type: string
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+          minLength: 3
+          maxLength: 40
+        questions:
+          type: array
+          items: { $ref: '#/components/schemas/CreateQuestionRequest' }
 
     CreateQuestionRequest:
       type: object
@@ -304,33 +409,53 @@ components:
             properties:
               label: { type: string, minLength: 1, maxLength: 200 }
 
+    ActivateQuestionRequest:
+      type: object
+      required: [questionId]
+      properties:
+        questionId: { type: string, format: uuid }
+
+    PollStyle:
+      type: object
+      description: Theme overrides persisted as jsonb. All fields optional.
+      properties:
+        primaryColor: { type: string, description: 'CSS color; e.g. #ff6600' }
+        accentColor:  { type: string }
+        backgroundColor: { type: string }
+        fontFamily:   { type: string }
+        layout:
+          type: string
+          enum: [BARS, COLUMNS, DONUT]
+
     Poll:
       type: object
-      required: [id, title, joinCode, joinUrl, activeQuestionId]
+      required: [id, title, slug, status, publicUrl]
       properties:
-        id: { type: string, format: uuid }
-        title: { type: string }
-        joinCode: { type: string }
-        joinUrl: { type: string, format: uri }
+        id:     { type: string, format: uuid }
+        title:  { type: string }
+        slug:   { type: string }
+        status: { type: string, enum: [DRAFT, OPEN, CLOSED] }
+        publicUrl: { type: string, format: uri }
         activeQuestionId: { type: string, format: uuid, nullable: true }
 
     PollDetail:
       allOf:
         - $ref: '#/components/schemas/Poll'
         - type: object
-          required: [questions]
+          required: [questions, style]
           properties:
+            style: { $ref: '#/components/schemas/PollStyle' }
             questions:
               type: array
               items: { $ref: '#/components/schemas/Question' }
 
     Question:
       type: object
-      required: [id, prompt, state, ordinal, options]
+      required: [id, prompt, status, ordinal, options]
       properties:
         id: { type: string, format: uuid }
         prompt: { type: string }
-        state:
+        status:
           type: string
           enum: [DRAFT, ACTIVE, CLOSED]
         ordinal: { type: integer }
@@ -340,42 +465,41 @@ components:
 
     Option:
       type: object
-      required: [id, label, ordinal]
+      required: [id, label, position]
       properties:
         id: { type: string, format: uuid }
         label: { type: string }
-        ordinal: { type: integer }
+        position: { type: integer }
 
-    CurrentPollView:
+    PublicPollView:
       type: object
-      required: [pollId, title, state]
+      required: [pollId, slug, title, state, style]
       properties:
         pollId: { type: string, format: uuid }
-        title: { type: string }
+        slug:   { type: string }
+        title:  { type: string }
         state:
           type: string
           enum: [WAITING, ACTIVE]
-          description: >
-            WAITING when no question is active (FR-008); ACTIVE when an
-            active question is being served.
+        style: { $ref: '#/components/schemas/PollStyle' }
         activeQuestion:
           $ref: '#/components/schemas/Question'
         alreadyVoted:
           type: boolean
-          description: >
-            Best-effort hint derived from the respondent's device session; UI
-            uses it to render "you already voted" without a round trip.
+          description: Best-effort hint derived from the voter_token cookie.
 
-    SubmitResponseRequest:
+    VoteRequest:
       type: object
-      required: [questionId, optionId]
+      required: [optionId, voterToken]
       properties:
-        questionId: { type: string, format: uuid }
         optionId: { type: string, format: uuid }
+        voterToken:
+          type: string
+          description: UUID generated client-side and persisted in localStorage; also sent in cookie.
 
-    SubmitResponseAccepted:
+    VoteAccepted:
       type: object
-      required: [responseId, recordedAt]
+      required: [voteId, recordedAt]
       properties:
-        responseId: { type: string, format: uuid }
+        voteId: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
