@@ -1,19 +1,23 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.1.0 → 1.2.0
+Version change: 1.2.0 → 1.3.0
 Modified principles: none
 Added principles:
-  - X. Documentation-Verified Library Usage
+  - XI. Reactor-Native Maven Invocation
 Added sections: none (addition lands inside Core Principles)
 Removed sections: none
 Templates reviewed for consistency:
   - plan-template.md: ✅ constitution-check section still valid;
-    Principle X is a contributor-workflow rule, not a per-feature gate
+    Principle XI is a contributor-workflow rule, not a per-feature gate
   - spec-template.md: ✅ unaffected
-  - tasks-template.md: ✅ unaffected (library-doc consultation is a
-    contributor duty, not a standalone task)
+  - tasks-template.md: ✅ unaffected (invocation-form is a contributor
+    duty, not a standalone task)
 Follow-up TODOs: none.
+
+---- Previous SYNC IMPACT REPORT (1.1.0 → 1.2.0) ----
+Added principles:
+  - X. Documentation-Verified Library Usage
 
 ---- Previous SYNC IMPACT REPORT (1.0.0 → 1.1.0) ----
 Added principles:
@@ -161,6 +165,32 @@ the next release, and the cost of that failure during a live talk — or
 of rolling back a dependency bump after the fact — far exceeds the cost
 of a single doc lookup before the change is written.
 
+### XI. Reactor-Native Maven Invocation
+
+Contributors MUST NOT run `mvn install` or `./mvnw install` against
+this repository, nor any later lifecycle phase such as `deploy`. The
+Maven reactor already resolves sibling-module dependencies from the
+in-memory build graph without writing to `~/.m2/repository`; installing
+project artefacts into the local repository pollutes that cache with
+mutable snapshots that can shadow a later remote resolution, masks
+coupling problems that would surface on a clean contributor checkout,
+and lengthens the build with I/O that adds no verification value. All
+local Maven work MUST take one of two forms:
+
+1. A reactor-wide goal run at the repository root, e.g. `./mvnw
+   validate`, `./mvnw compile`, `./mvnw test`, `./mvnw verify`,
+   `./mvnw spotless:apply`.
+2. A targeted subset with also-make: `./mvnw -pl <module[,module...]>
+   -am <goal>` (e.g. `./mvnw -pl backend/poll-core -am test`). The
+   reactor transparently rebuilds upstream modules in memory for that
+   invocation.
+
+Rationale: reactor goals exercise the same resolution path that CI and
+a fresh contributor checkout take; `install` creates a second mutable
+path that drifts from both, so "my build works" stops being equivalent
+to "their build works". Keeping the local Maven repository free of
+project-authored JARs removes that drift surface entirely.
+
 ## Quality Standards
 
 - Every merged change MUST include tests covering its acceptance criteria
@@ -212,4 +242,4 @@ NOT silently deviate. Complexity or deviations introduced to meet a
 requirement MUST be justified in the plan for the feature that introduces
 them.
 
-**Version**: 1.2.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
+**Version**: 1.3.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
