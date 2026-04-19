@@ -1,0 +1,381 @@
+openapi: 3.0.3
+info:
+  title: Slidev Polls — Core Polling Platform
+  version: 0.1.0
+  description: >
+    Contract for the HTTP surface of the Slidev Polls backend for feature
+    001-polling-foundation. All routes under /api/backoffice require an
+    authenticated presenter session; all other routes are public.
+
+servers:
+  - url: http://localhost:8080
+
+tags:
+  - name: backoffice-polls
+  - name: backoffice-questions
+  - name: public-respondent
+  - name: live-updates
+
+paths:
+  /api/backoffice/polls:
+    get:
+      tags: [backoffice-polls]
+      summary: List polls owned by the current presenter.
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: Polls owned by the caller.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Poll' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    post:
+      tags: [backoffice-polls]
+      summary: Create a new poll.
+      security: [{ sessionAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePollRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /api/backoffice/polls/{pollId}:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    get:
+      tags: [backoffice-polls]
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: Poll detail including questions.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [backoffice-polls]
+      security: [{ sessionAuth: [] }]
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/backoffice/polls/{pollId}/questions:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    post:
+      tags: [backoffice-questions]
+      security: [{ sessionAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateQuestionRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Question' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/backoffice/polls/{pollId}/questions/{questionId}/activate:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+      - $ref: '#/components/parameters/QuestionId'
+    post:
+      tags: [backoffice-questions]
+      summary: Mark a question active; atomically closes any currently active question on this poll.
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: Resulting poll state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Question cannot be activated (e.g., fewer than two options, or already closed).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/backoffice/polls/{pollId}/questions/{questionId}/close:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+      - $ref: '#/components/parameters/QuestionId'
+    post:
+      tags: [backoffice-questions]
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: Resulting poll state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/backoffice/polls/{pollId}/qr:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    get:
+      tags: [backoffice-polls]
+      summary: PNG QR code for the poll's public join URL.
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: PNG image.
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+
+  /j/{joinCode}:
+    parameters:
+      - in: path
+        name: joinCode
+        required: true
+        schema: { type: string, minLength: 6, maxLength: 10 }
+    get:
+      tags: [public-respondent]
+      summary: Human-facing join URL. Serves the respondent SPA shell; not a JSON endpoint.
+      responses:
+        '200': { description: HTML shell for the respondent app. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/public/polls/by-code/{joinCode}/current:
+    parameters:
+      - in: path
+        name: joinCode
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public-respondent]
+      summary: Current public view of the poll (active question + options + already-voted hint).
+      responses:
+        '200':
+          description: Active question or waiting state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentPollView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/public/polls/by-code/{joinCode}/responses:
+    parameters:
+      - in: path
+        name: joinCode
+        required: true
+        schema: { type: string }
+    post:
+      tags: [public-respondent]
+      summary: Submit a response to the poll's currently active question.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitResponseRequest' }
+      responses:
+        '201':
+          description: Response accepted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmitResponseAccepted' }
+        '409':
+          description: Rejected — already voted, or question no longer active.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/public/polls/{pollId}/stream:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    get:
+      tags: [live-updates]
+      summary: >
+        Server-Sent Events stream. Emits `snapshot` on connect and on each
+        active-question change, and `tally` on each accepted response.
+      responses:
+        '200':
+          description: text/event-stream of poll events.
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+
+  parameters:
+    PollId:
+      in: path
+      name: pollId
+      required: true
+      schema: { type: string, format: uuid }
+    QuestionId:
+      in: path
+      name: questionId
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthenticated:
+      description: Caller is not authenticated.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Caller is authenticated but does not own the resource.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    BadRequest:
+      description: Request body failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: >
+            Stable machine-readable code. Distinguishes auth, authorisation,
+            and transport failures per FR-017.
+          enum:
+            - AUTH_REQUIRED
+            - FORBIDDEN
+            - NOT_FOUND
+            - VALIDATION_FAILED
+            - ALREADY_VOTED
+            - QUESTION_NOT_ACTIVE
+            - ACTIVATION_REJECTED
+            - TRANSPORT_FAILURE
+        message:
+          type: string
+          description: User-facing, non-technical message.
+        correlationId:
+          type: string
+          description: Request correlation id for log lookup.
+
+    CreatePollRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+
+    CreateQuestionRequest:
+      type: object
+      required: [prompt, options]
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 500 }
+        options:
+          type: array
+          minItems: 2
+          items:
+            type: object
+            required: [label]
+            properties:
+              label: { type: string, minLength: 1, maxLength: 200 }
+
+    Poll:
+      type: object
+      required: [id, title, joinCode, joinUrl, activeQuestionId]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        joinCode: { type: string }
+        joinUrl: { type: string, format: uri }
+        activeQuestionId: { type: string, format: uuid, nullable: true }
+
+    PollDetail:
+      allOf:
+        - $ref: '#/components/schemas/Poll'
+        - type: object
+          required: [questions]
+          properties:
+            questions:
+              type: array
+              items: { $ref: '#/components/schemas/Question' }
+
+    Question:
+      type: object
+      required: [id, prompt, state, ordinal, options]
+      properties:
+        id: { type: string, format: uuid }
+        prompt: { type: string }
+        state:
+          type: string
+          enum: [DRAFT, ACTIVE, CLOSED]
+        ordinal: { type: integer }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+
+    Option:
+      type: object
+      required: [id, label, ordinal]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        ordinal: { type: integer }
+
+    CurrentPollView:
+      type: object
+      required: [pollId, title, state]
+      properties:
+        pollId: { type: string, format: uuid }
+        title: { type: string }
+        state:
+          type: string
+          enum: [WAITING, ACTIVE]
+          description: >
+            WAITING when no question is active (FR-008); ACTIVE when an
+            active question is being served.
+        activeQuestion:
+          $ref: '#/components/schemas/Question'
+        alreadyVoted:
+          type: boolean
+          description: >
+            Best-effort hint derived from the respondent's device session; UI
+            uses it to render "you already voted" without a round trip.
+
+    SubmitResponseRequest:
+      type: object
+      required: [questionId, optionId]
+      properties:
+        questionId: { type: string, format: uuid }
+        optionId: { type: string, format: uuid }
+
+    SubmitResponseAccepted:
+      type: object
+      required: [responseId, recordedAt]
+      properties:
+        responseId: { type: string, format: uuid }
+        recordedAt: { type: string, format: date-time }

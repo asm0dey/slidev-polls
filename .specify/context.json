@@ -1,3 +1,13 @@
 {
-  "tdd_determination": "mandatory"
+  "tdd_determination": "mandatory",
+  "planview": {
+    "nodeClassifications": {
+      "Presenter Browser (Backoffice SPA)": "client",
+      "Respondent Browser (Public SPA)": "client",
+      "Slidev Deck (Vue addon)": "client",
+      "Spring Boot Backend": "server",
+      "SSE Broadcaster": "server",
+      "PostgreSQL": "storage"
+    }
+  }
 }
