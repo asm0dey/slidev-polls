@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
@@ -18,6 +19,8 @@ import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
+import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
+import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
 import site.asm0dey.slidev.polls.core.slug.ReservedSlugs;
 import site.asm0dey.slidev.polls.core.slug.SlugDeriver;
 import site.asm0dey.slidev.polls.core.slug.SlugValidator;
@@ -33,9 +36,11 @@ import site.asm0dey.slidev.polls.core.slug.SlugValidator;
 public class PollService {
 
   private final PollRepository repository;
+  private final ApplicationEventPublisher events;
 
-  public PollService(PollRepository repository) {
+  public PollService(PollRepository repository, ApplicationEventPublisher events) {
     this.repository = repository;
+    this.events = events;
   }
 
   @Transactional
@@ -107,8 +112,13 @@ public class PollService {
 
   @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    getForOwner(pollId, ownerUsername);
-    return repository.closeActiveQuestion(pollId);
+    Poll before = getForOwner(pollId, ownerUsername);
+    UUID wasActive = before.activeQuestionId();
+    Poll after = repository.closeActiveQuestion(pollId);
+    if (wasActive != null) {
+      events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
+    }
+    return after;
   }
 
   /**
@@ -130,7 +140,15 @@ public class PollService {
       throw new ActivationRejectedException(
           "question " + questionId + " needs at least two options to activate");
     }
-    return repository.activateQuestion(pollId, questionId);
+    // Idempotent-reactivate: if the target is already ACTIVE, short-circuit without touching the
+    // storage layer so the deck-driven activation flow ({@code @TS-052}) does not rotate
+    // activated_at or re-fire a snapshot event on a page remount.
+    if (questionId.equals(poll.activeQuestionId())) {
+      return poll;
+    }
+    Poll after = repository.activateQuestion(pollId, questionId);
+    events.publishEvent(new PollActiveQuestionChangedEvent(pollId, questionId, Instant.now()));
+    return after;
   }
 
   private String resolveSlug(String requested, String title, UUID excludingPollId) {

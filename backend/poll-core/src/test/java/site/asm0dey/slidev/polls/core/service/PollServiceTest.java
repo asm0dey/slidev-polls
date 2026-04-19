@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -39,7 +41,7 @@ class PollServiceTest {
   @BeforeEach
   void setUp() {
     repository = new FakePollRepository();
-    service = new PollService(repository);
+    service = new PollService(repository, new RecordingEventPublisher());
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title
@@ -423,5 +425,15 @@ class PollServiceTest {
       }
       return existing;
     }
+  }
+
+  /** No-op event sink — individual tests that care about events can subclass and inspect. */
+  static final class RecordingEventPublisher implements ApplicationEventPublisher {
+
+    @Override
+    public void publishEvent(Object event) {}
+
+    @Override
+    public void publishEvent(ApplicationEvent event) {}
   }
 }
