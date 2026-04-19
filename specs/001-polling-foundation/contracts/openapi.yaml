@@ -17,6 +17,8 @@ tags:
   - name: admin-polls
   - name: admin-style
   - name: admin-qr
+  - name: admin-deck-tokens
+  - name: deck
   - name: public-polls
   - name: public-votes
   - name: public-stream
@@ -230,6 +232,97 @@ paths:
             image/png:
               schema: { type: string, format: binary }
 
+  /api/admin/polls/{pollId}/deck-tokens:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    get:
+      tags: [admin-deck-tokens]
+      summary: List deck tokens issued for this poll (hashes / metadata only; plaintext is never returned again after mint).
+      security: [{ sessionAuth: [] }]
+      responses:
+        '200':
+          description: Deck tokens for this poll.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DeckToken' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-deck-tokens]
+      summary: Mint a new deck token for this poll. The plaintext value is returned ONCE in this response.
+      security: [{ sessionAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MintDeckTokenRequest' }
+      responses:
+        '201':
+          description: Token minted. `plaintext` is shown once; only its hash is persisted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeckTokenMinted' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/admin/polls/{pollId}/deck-tokens/{tokenId}:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+      - in: path
+        name: tokenId
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [admin-deck-tokens]
+      summary: Revoke a deck token.
+      security: [{ sessionAuth: [] }]
+      responses:
+        '204': { description: Revoked. }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/deck/polls/{pollId}/activate:
+    parameters:
+      - $ref: '#/components/parameters/PollId'
+    post:
+      tags: [deck]
+      summary: >
+        Slidev-deck-initiated activation of a specific question. Called
+        by the addon on slide mount (FR-018). Authorised by an
+        `X-Deck-Token` header carrying a valid, non-revoked deck token
+        scoped to `pollId` (FR-019). Idempotent: activating an already-
+        active question is a no-op.
+      security: [{ deckToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateQuestionRequest' }
+      responses:
+        '200':
+          description: Resulting poll state (same shape as backoffice activate).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollDetail' }
+        '401':
+          description: Missing, unknown, or revoked deck token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Token is valid but scoped to a different poll.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Question cannot be activated (e.g., fewer than two options).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /api/polls/by-slug/{slug}:
     parameters:
       - $ref: '#/components/parameters/Slug'
@@ -290,6 +383,10 @@ components:
       type: apiKey
       in: cookie
       name: JSESSIONID
+    deckToken:
+      type: apiKey
+      in: header
+      name: X-Deck-Token
 
   parameters:
     PollId:
@@ -347,6 +444,8 @@ components:
             - SLUG_TAKEN
             - SLUG_INVALID
             - SLUG_RESERVED
+            - DECK_TOKEN_INVALID
+            - DECK_TOKEN_POLL_MISMATCH
             - TRANSPORT_FAILURE
         message:
           type: string
@@ -496,6 +595,37 @@ components:
         voterToken:
           type: string
           description: UUID generated client-side and persisted in localStorage; also sent in cookie.
+
+    MintDeckTokenRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 120
+          description: Optional human-facing label.
+
+    DeckToken:
+      type: object
+      required: [id, pollId, createdAt, revoked]
+      properties:
+        id: { type: string, format: uuid }
+        pollId: { type: string, format: uuid }
+        label: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        revoked: { type: boolean }
+
+    DeckTokenMinted:
+      allOf:
+        - $ref: '#/components/schemas/DeckToken'
+        - type: object
+          required: [plaintext]
+          properties:
+            plaintext:
+              type: string
+              description: >
+                The bearer value to embed as the addon's `deckToken` prop. Shown once;
+                the backend stores only its SHA-256 hash.
 
     VoteAccepted:
       type: object

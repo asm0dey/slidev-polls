@@ -17,7 +17,9 @@ origin, single backend process:
   authenticated presenters to author polls and control the active
   question, including assigning and editing the slug;
 - a Vue 3 + TypeScript **Slidev addon** that renders the same live
-  aggregates on-slide, consuming the same SSE contract.
+  aggregates on-slide and, when mounted on a slide that declares a
+  specific question, automatically asks the backend to activate that
+  question (FR-018) using a presenter-minted **deck token** (FR-019).
 
 Persistence is PostgreSQL 16 through jOOQ, with Flyway-managed
 migrations and codegen run at build time against a Testcontainers
@@ -141,6 +143,16 @@ runs as one JAR on one origin — no CORS, no separate web tier.
   = 'ACTIVE'`.
 - FR-009 single-vote enforcement is a unique constraint on
   `(question_id, voter_token)`.
+- **Deck-driven activation (FR-018, FR-019)**: the Slidev addon's
+  `<PollResults>` component accepts a `questionId` and a `deckToken`
+  prop. On mount, if both are present and the question is not already
+  ACTIVE on the poll, the addon issues
+  `POST /api/deck/polls/{pollId}/activate` with the question id and
+  the `X-Deck-Token` header. The call is idempotent: activating an
+  already-active question is a no-op. Deck tokens are minted by the
+  backoffice (`POST /api/admin/polls/{pollId}/deck-tokens`), scoped
+  to a single poll, and revocable. They are NOT session cookies and
+  do NOT grant access to any other backoffice resource.
 
 **Scale/Scope**:
 - One backend instance sized for ~200 concurrent respondents per

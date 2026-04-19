@@ -95,6 +95,26 @@ Validation (service layer):
   to ACTIVE. Enforced in `PollService.activate`; surfaces as
   `Problem.code = ACTIVATION_REJECTED`.
 
+### `deck_tokens` (V4)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `uuid` primary key | |
+| `poll_id` | `uuid` references `polls(id)` ON DELETE CASCADE | Token is scoped to exactly one poll |
+| `token_hash` | `text` NOT NULL | SHA-256 of the opaque bearer value; plaintext is shown once at mint time |
+| `label` | `text` | Optional presenter-facing label (e.g., "Conference deck") |
+| `created_at` | `timestamptz` default `now()` | |
+| `revoked_at` | `timestamptz` | NULL while active; set on revoke |
+
+Invariants / behaviour:
+- `UNIQUE (token_hash)`.
+- Only the owning presenter of `poll_id` may mint or revoke tokens.
+- Authorisation for `POST /api/deck/polls/{pollId}/activate` succeeds
+  iff a row exists with matching `poll_id`, matching `token_hash`, and
+  `revoked_at IS NULL`.
+- Tokens do not grant read or write access to any other backoffice
+  resource (FR-019).
+
 ### `votes` (V1)
 
 | Column | Type | Notes |

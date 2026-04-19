@@ -136,6 +136,14 @@ changed in the backoffice.
   is mid-selection but has not yet submitted?
 - What happens to the Slidev results view if the presenter pauses and
   resumes the deck, or navigates away and back to the slide?
+- What happens when the presenter rapidly navigates through multiple
+  poll slides in under a second — e.g., during a "previous / next /
+  previous" jog? (Expected: the latest-navigated slide's question
+  wins; FR-018 idempotency prevents flicker.)
+- What happens when a deck presenter token (FR-019) is revoked while a
+  slide is still open in the deck? (Expected: the addon's next
+  activate call is refused with an auth error; the viewer behaviour
+  on that slide continues to work because the stream is public.)
 - What happens when a QR code is scanned after the poll's session has
   ended?
 - What happens when multiple presenters are signed in and one edits a
@@ -195,6 +203,21 @@ changed in the backoffice.
   unavailable, the Slidev view MUST NOT crash the deck, MUST surface
   a visible "live updates paused" indicator, and MUST resume updates
   when connectivity is restored.
+- **FR-018**: When the presenter navigates to a Slidev slide that
+  embeds the poll-results component for a specific question, the
+  system MUST automatically mark that question as active on the poll,
+  without the presenter taking any action in the backoffice. This
+  MUST atomically close any previously active question on the same
+  poll (per FR-004) and MUST be idempotent (re-navigating to the
+  already-active slide MUST NOT produce a spurious close-and-reopen
+  cycle).
+- **FR-019**: The automatic activation path (FR-018) MUST be
+  authorised by a presenter credential distinct from the backoffice
+  session cookie so that it works when the Slidev deck is hosted on
+  a different origin than the backend. The presenter MUST be able to
+  mint this credential from the backoffice, scope it to a specific
+  poll, and revoke it. Anonymous or unscoped callers MUST NOT be
+  able to change a poll's active question.
 
 **Cross-cutting**
 
@@ -226,6 +249,10 @@ changed in the backoffice.
   identifier used only for best-effort single-vote enforcement; does
   not carry personal data and is not linkable to any presenter-visible
   identity.
+- **DeckToken**: A presenter-minted credential scoped to a single
+  poll, used by a Slidev deck to request activation of a specific
+  question on that poll (FR-018, FR-019). Revocable; does not grant
+  access to any other backoffice resource.
 
 ## Success Criteria *(mandatory)*
 
@@ -254,3 +281,7 @@ changed in the backoffice.
 - **SC-007**: A respondent can complete a vote without entering any
   personally identifying information — zero required PII fields on
   the respondent path.
+- **SC-008**: Navigating to a poll slide in the Slidev deck causes
+  the backend's active-question pointer to match the slide's declared
+  question within 1 second under normal load, with zero presenter
+  actions in the backoffice between deck authoring and talk time.
