@@ -1,0 +1,49 @@
+# One-command dev stack: Postgres + a fat-JAR backend container that serves
+# both SPAs from the same origin. Use `task up` (from the repo Taskfile) —
+# it runs the jOOQ codegen against Postgres before `docker compose build`,
+# which is what the reactor's poll-persistence module needs.
+#
+# For inner-loop work with Vite HMR and `spring-boot:run` on the host, use
+# `task dev` instead — this file targets the "closer to prod" flow.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: slidev-polls-postgres
+    environment:
+      POSTGRES_DB: polls
+      POSTGRES_USER: polls
+      POSTGRES_PASSWORD: polls
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polls -d polls"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: slidev-polls-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Override the application.yml defaults (which point at localhost:5432)
+      # so the backend reaches the sibling service over the compose network.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/polls
+      SPRING_DATASOURCE_USERNAME: polls
+      SPRING_DATASOURCE_PASSWORD: polls
+      # Ship with the prod profile flipped on so the SP_SESSION cookie carries
+      # the Secure flag when the reverse proxy terminates TLS.
+      SPRING_PROFILES_ACTIVE: prod
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

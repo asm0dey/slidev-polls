@@ -1,0 +1,160 @@
+version: "3"
+
+# Task runner (https://taskfile.dev) entrypoints. Install once with
+# `brew install go-task/tap/go-task` or `go install github.com/go-task/task/v3/cmd/task@latest`.
+#
+# Common flows:
+#   task dev           — inner-loop (host backend + Vite HMR + Postgres in compose)
+#   task up            — "closer to prod" fat-JAR run via compose.dev.yml
+#   task down          — stop everything and remove compose containers
+#   task test          — full suite (backend verify + every frontend vitest + shared bun test)
+#   task codegen       — regenerate jOOQ sources against a running Postgres
+#   task frontends     — build the SPAs into backend/poll-api static
+#   task format        — run spotless:apply across the reactor
+
+vars:
+  POLL_API_MODULE: backend/poll-api
+  POLL_PERSISTENCE_MODULE: backend/poll-persistence
+  COMPOSE_BASE: docker-compose.yml
+  COMPOSE_DEV: compose.dev.yml
+
+tasks:
+  default:
+    desc: List the tasks in this file
+    cmds:
+      - task --list
+
+  # ---------- Docker Compose orchestration --------------------------------
+
+  postgres:up:
+    desc: Start Postgres in the background and wait for readiness
+    cmds:
+      - docker compose -f {{.COMPOSE_BASE}} up -d postgres
+      - |
+        for _ in $(seq 1 30); do
+          if docker compose -f {{.COMPOSE_BASE}} exec -T postgres pg_isready -U polls >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "postgres did not become ready in 30s"; exit 1
+
+  postgres:down:
+    desc: Stop Postgres (leaves the compose.dev.yml backend if it was up)
+    cmds:
+      - docker compose -f {{.COMPOSE_BASE}} down
+
+  up:
+    desc: Build and run the full fat-JAR stack (Postgres + backend on :8080)
+    deps: [postgres:up, codegen]
+    cmds:
+      - docker compose -f {{.COMPOSE_DEV}} up --build
+
+  up:detached:
+    desc: Same as `up` but in the background
+    deps: [postgres:up, codegen]
+    cmds:
+      - docker compose -f {{.COMPOSE_DEV}} up --build -d
+
+  down:
+    desc: Stop every compose project (compose.dev.yml + docker-compose.yml) and remove containers
+    cmds:
+      - docker compose -f {{.COMPOSE_DEV}} down
+      - docker compose -f {{.COMPOSE_BASE}} down
+
+  logs:
+    desc: Tail the backend container logs
+    cmds:
+      - docker compose -f {{.COMPOSE_DEV}} logs -f backend
+
+  # ---------- Inner-loop dev ----------------------------------------------
+
+  dev:
+    desc: Inner-loop (host spring-boot:run + Vite dev servers + Postgres in compose)
+    cmds:
+      - bash scripts/dev.sh
+
+  # ---------- Build surfaces ----------------------------------------------
+
+  frontends:
+    desc: Build the voter + backoffice SPAs into backend poll-api static
+    cmds:
+      - bash scripts/build-frontends.sh
+
+  codegen:
+    desc: Regenerate jOOQ sources against a running Postgres (needed before mvn package)
+    deps: [postgres:up]
+    cmds:
+      - ./mvnw -Pcodegen -pl {{.POLL_PERSISTENCE_MODULE}} -am compile -Dspotless.check.skip=true
+
+  package:
+    desc: Build the fat JAR on the host (runs codegen first)
+    deps: [codegen, frontends]
+    cmds:
+      - ./mvnw -pl {{.POLL_API_MODULE}} -am package -DskipTests -Dspotless.check.skip=true
+
+  # ---------- Tests --------------------------------------------------------
+
+  test:
+    desc: Full feature suite — backend verify + every frontend test runner
+    cmds:
+      - task: test:backend
+      - task: test:shared
+      - task: test:voter
+      - task: test:backoffice
+      - task: test:slidev
+
+  test:backend:
+    desc: Run the Maven reactor tests (unit + integration)
+    cmds:
+      - ./mvnw verify -Dspotless.check.skip=true
+
+  test:shared:
+    desc: Run bun test for @polls/shared (plain TS unit tests)
+    dir: frontends/shared
+    cmds:
+      - bun test
+
+  test:voter:
+    desc: Run Vitest for the voter SPA
+    dir: frontends/voter
+    cmds:
+      - bun run test
+
+  test:backoffice:
+    desc: Run Vitest for the backoffice SPA
+    dir: frontends/backoffice
+    cmds:
+      - bun run test
+
+  test:slidev:
+    desc: Run Vitest for the Slidev addon
+    dir: frontends/slidev-component
+    cmds:
+      - bun run test
+
+  test:e2e:voter:
+    desc: Run Playwright voter happy-path (needs a backend at PW_BASE_URL, default :8080)
+    dir: frontends/voter
+    cmds:
+      - bun run e2e
+
+  test:e2e:slidev:
+    desc: Run Playwright slidev SSE smoke (needs a backend at PW_BASE_URL)
+    dir: frontends/slidev-component
+    cmds:
+      - bun run e2e
+
+  # ---------- Hygiene ------------------------------------------------------
+
+  format:
+    desc: Apply spotless (google-java-format) across the reactor
+    cmds:
+      - ./mvnw spotless:apply
+
+  clean:
+    desc: Clean Maven and frontend build outputs
+    cmds:
+      - ./mvnw clean
+      - rm -rf frontends/*/dist
+      - rm -rf backend/poll-api/src/main/resources/static

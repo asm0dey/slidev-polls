@@ -8,32 +8,49 @@ renders live results on-slide.
 ## Requirements
 
 - JDK 25
-- Docker (for local Postgres and Testcontainers)
+- Docker (for local Postgres, Testcontainers, and `task up`)
 - bun (only frontend toolchain expected on `PATH`)
+- [task](https://taskfile.dev) — `brew install go-task/tap/go-task` or
+  `go install github.com/go-task/task/v3/cmd/task@latest`
 
 ## Quickstart
 
-### Single-JAR production run
+All orchestration lives in `Taskfile.yml`. Run `task` with no args to list
+the entrypoints.
+
+### Run everything in Docker (closest to prod)
 
 ```bash
-docker compose up -d postgres
-./scripts/build-frontends.sh    # bun install + build, copy dist → backend static
-./mvnw -pl backend/poll-api -am spring-boot:run
+task up
 ```
 
-Open `http://localhost:8080/` (voter) or `http://localhost:8080/admin/`
-(backoffice). Sign in as `alice` / `correct-horse`, create a poll, copy the
-join link, and have an audience load it on their phones.
+Builds a multi-stage image (bun → mvn → JRE), brings up Postgres on `:5432`,
+and serves the single-JAR backend on `:8080` with the voter + backoffice
+SPAs baked in as same-origin static assets. The task runs `task codegen`
+first to regenerate jOOQ sources; after that the image is cached and
+subsequent `task up` runs are fast. `task down` tears everything down.
 
-### Inner-loop dev
+Sign in at `http://localhost:8080/admin/` as `alice` / `correct-horse`,
+create a poll, and have an audience load the join link on their phones.
+
+### Inner-loop dev (Vite HMR + host spring-boot:run)
 
 ```bash
-./scripts/dev.sh
+task dev
 ```
 
-Starts Postgres, runs the backend on `:8080`, and spins up the two Vite dev
-servers (voter on `:5173`, backoffice on `:5174`). Ctrl-C tears everything
-down.
+Starts Postgres, runs the backend on `:8080`, and spins up the voter
+(`:5173`) + backoffice (`:5174`) Vite dev servers. Ctrl-C tears everything
+down. Good for frontend iteration; `task up` is the better check before
+pushing.
+
+### Test suite
+
+```bash
+task test          # full suite — backend verify + every frontend runner
+task test:backend  # just ./mvnw verify
+task test:voter    # vitest only
+```
 
 ### Slidev deck integration
 
