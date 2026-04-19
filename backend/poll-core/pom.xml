@@ -20,6 +20,17 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
         </dependency>
+        <!--
+          spring-tx carries @Transactional; PollService and later VoteService
+          span multi-statement operations (poll + questions + options insert,
+          atomic activate+close) and have to declare the transactional
+          boundary on the service method. spring-context does NOT drag
+          spring-tx transitively.
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-tx</artifactId>
+        </dependency>
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>

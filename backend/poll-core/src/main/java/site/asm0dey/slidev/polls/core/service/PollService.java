@@ -1,19 +1,35 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
+import site.asm0dey.slidev.polls.core.domain.PollStatus;
+import site.asm0dey.slidev.polls.core.domain.Question;
+import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
+import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.NotFoundException;
+import site.asm0dey.slidev.polls.core.error.NotOwnerException;
+import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
+import site.asm0dey.slidev.polls.core.error.SlugReservedException;
+import site.asm0dey.slidev.polls.core.error.SlugTakenException;
+import site.asm0dey.slidev.polls.core.slug.ReservedSlugs;
+import site.asm0dey.slidev.polls.core.slug.SlugDeriver;
+import site.asm0dey.slidev.polls.core.slug.SlugValidator;
 
 /**
- * Presenter-authored poll lifecycle service. Concrete class (not interface) — there is a single
- * production implementation and {@code PollServiceTest} wires it against a fake repository.
- *
- * <p>Methods suffixed with {@code ForOwner} enforce ownership — anything but the owning presenter
- * surfaces {@link site.asm0dey.slidev.polls.core.error.NotOwnerException}. Deck-initiated
- * activation (FR-018) calls {@link #activateQuestion(java.util.UUID, java.util.UUID)} after the
- * {@code DeckTokenAuthenticationFilter} has already validated the token/poll scope.
+ * Presenter-authored poll lifecycle. Methods suffixed with {@code ForOwner} enforce ownership
+ * (FR-001) — anything but the owning presenter surfaces {@link NotOwnerException}. The deck path
+ * uses {@link #activateQuestion(UUID, UUID)} directly, because the {@code
+ * DeckTokenAuthenticationFilter} has already validated the token/poll binding by the time we get
+ * here.
  */
+@Service
 public class PollService {
 
   private final PollRepository repository;
@@ -22,41 +38,137 @@ public class PollService {
     this.repository = repository;
   }
 
+  @Transactional
   public Poll create(String ownerUsername, CreatePollCommand command) {
-    throw new UnsupportedOperationException("T053 pending");
+    String slug = resolveSlug(command.slug(), command.title(), null);
+    UUID pollId = UUID.randomUUID();
+    Instant now = Instant.now();
+    List<Question> questions = buildDraftQuestions(pollId, command.questions());
+    Poll poll =
+        new Poll(
+            pollId,
+            ownerUsername,
+            command.title(),
+            slug,
+            PollStatus.DRAFT,
+            command.style() == null ? Map.of() : command.style(),
+            null,
+            questions,
+            now,
+            now);
+    return repository.insert(poll);
   }
 
+  @Transactional(readOnly = true)
   public List<Poll> listForOwner(String ownerUsername) {
-    throw new UnsupportedOperationException("T053 pending");
+    return repository.findByOwner(ownerUsername);
   }
 
+  @Transactional(readOnly = true)
   public Poll getForOwner(UUID pollId, String ownerUsername) {
-    throw new UnsupportedOperationException("T053 pending");
+    Poll poll =
+        repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    requireOwner(poll, ownerUsername);
+    return poll;
   }
 
+  @Transactional
   public Poll updateForOwner(UUID pollId, String ownerUsername, UpdatePollCommand command) {
-    throw new UnsupportedOperationException("T053 pending");
+    Poll existing = getForOwner(pollId, ownerUsername);
+    String title = command.title() != null ? command.title() : existing.title();
+    String slug = existing.slug();
+    if (command.slug() != null && !command.slug().equals(existing.slug())) {
+      slug = resolveSlug(command.slug(), title, existing.id());
+    }
+    Poll afterHeader = repository.updateHeader(pollId, title, slug);
+    if (command.questions() != null) {
+      return repository.replaceQuestions(pollId, command.questions());
+    }
+    return afterHeader;
   }
 
-  public Poll updateStyleForOwner(
-      UUID pollId, String ownerUsername, Map<String, Object> style) {
-    throw new UnsupportedOperationException("T053 pending");
+  @Transactional
+  public Poll updateStyleForOwner(UUID pollId, String ownerUsername, Map<String, Object> style) {
+    getForOwner(pollId, ownerUsername);
+    return repository.updateStyle(pollId, style == null ? Map.of() : style);
   }
 
+  @Transactional
   public void deleteForOwner(UUID pollId, String ownerUsername) {
-    throw new UnsupportedOperationException("T053 pending");
+    getForOwner(pollId, ownerUsername);
+    repository.delete(pollId);
   }
 
+  @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
-    throw new UnsupportedOperationException("T053 pending");
+    getForOwner(pollId, ownerUsername);
+    return activateQuestion(pollId, questionId);
   }
 
+  @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    throw new UnsupportedOperationException("T053 pending");
+    getForOwner(pollId, ownerUsername);
+    return repository.closeActiveQuestion(pollId);
   }
 
-  /** Pre-authorised path (deck addon): caller has already validated the deck-token/poll scope. */
+  /**
+   * Activation path that skips the ownership check — intended for callers that have already
+   * authorised by some other mechanism (the deck-token filter on {@code /api/deck/**}). FR-004
+   * atomicity and the ≥2-option precondition are still enforced here.
+   */
+  @Transactional
   public Poll activateQuestion(UUID pollId, UUID questionId) {
-    throw new UnsupportedOperationException("T053 pending");
+    Poll poll =
+        repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    Question target =
+        poll.questions().stream()
+            .filter(q -> q.id().equals(questionId))
+            .findFirst()
+            .orElseThrow(
+                () -> new NotFoundException("question " + questionId + " not in poll " + pollId));
+    if (target.options() == null || target.options().size() < 2) {
+      throw new ActivationRejectedException(
+          "question " + questionId + " needs at least two options to activate");
+    }
+    return repository.activateQuestion(pollId, questionId);
+  }
+
+  private String resolveSlug(String requested, String title, UUID excludingPollId) {
+    String candidate = requested != null ? requested : SlugDeriver.deriveFromTitle(title);
+    if (candidate == null || !SlugValidator.isValidFormat(candidate)) {
+      throw new SlugInvalidException(candidate == null ? "" : candidate);
+    }
+    if (ReservedSlugs.isReserved(candidate)) {
+      throw new SlugReservedException(candidate);
+    }
+    if (repository.slugTaken(candidate, excludingPollId)) {
+      throw new SlugTakenException(candidate);
+    }
+    return candidate;
+  }
+
+  private void requireOwner(Poll poll, String ownerUsername) {
+    if (!poll.ownerUsername().equals(ownerUsername)) {
+      throw new NotOwnerException(
+          "poll " + poll.id() + " is not owned by " + ownerUsername);
+    }
+  }
+
+  private List<Question> buildDraftQuestions(
+      UUID pollId, List<CreatePollCommand.QuestionDraft> drafts) {
+    if (drafts == null || drafts.isEmpty()) {
+      return List.of();
+    }
+    List<Question> out = new ArrayList<>(drafts.size());
+    for (int i = 0; i < drafts.size(); i++) {
+      CreatePollCommand.QuestionDraft draft = drafts.get(i);
+      UUID qid = UUID.randomUUID();
+      List<Option> options = new ArrayList<>(draft.options().size());
+      for (int j = 0; j < draft.options().size(); j++) {
+        options.add(new Option(UUID.randomUUID(), qid, draft.options().get(j).label(), j));
+      }
+      out.add(new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+    }
+    return out;
   }
 }
