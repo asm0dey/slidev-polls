@@ -38,11 +38,19 @@ public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint
       throws IOException {
     response.setStatus(HttpStatus.UNAUTHORIZED.value());
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    Problem body =
-        new Problem(
-            ProblemCode.AUTH_REQUIRED,
-            "authentication required",
-            MDC.get(CorrelationIdFilter.MDC_KEY));
+    // Deck endpoints have a distinct failure mode: the caller presented either no X-Deck-Token or
+    // a stale one. Callers map DECK_TOKEN_INVALID to the "mint a fresh token" UX, distinct from
+    // "log back in" — Principle VI.
+    String path = request.getRequestURI();
+    ProblemCode code =
+        path != null && path.startsWith("/api/deck/")
+            ? ProblemCode.DECK_TOKEN_INVALID
+            : ProblemCode.AUTH_REQUIRED;
+    String message =
+        code == ProblemCode.DECK_TOKEN_INVALID
+            ? "deck token missing or revoked"
+            : "authentication required";
+    Problem body = new Problem(code, message, MDC.get(CorrelationIdFilter.MDC_KEY));
     objectMapper.writeValue(response.getOutputStream(), body);
   }
 }

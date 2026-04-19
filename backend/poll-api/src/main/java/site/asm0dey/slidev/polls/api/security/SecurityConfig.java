@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
@@ -56,7 +57,8 @@ public class SecurityConfig {
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       ProblemAuthenticationEntryPoint entryPoint,
-      ProblemAccessDeniedHandler accessDeniedHandler)
+      ProblemAccessDeniedHandler accessDeniedHandler,
+      DeckTokenAuthenticationFilter deckTokenFilter)
       throws Exception {
     // CSRF tokens live in a cookie the backoffice SPA can read (CookieCsrfTokenRepository
     // withHttpOnlyFalse), so a JSON POST from the SPA can echo them on a header. The raw-value
@@ -78,12 +80,19 @@ public class SecurityConfig {
                     // SPA shells and public surfaces are open at the filter chain.
                     .requestMatchers("/", "/admin/", "/admin/**")
                     .permitAll()
-                    .requestMatchers("/api/polls/**", "/api/public/**", "/api/deck/**")
+                    .requestMatchers("/api/polls/**", "/api/public/**")
                     .permitAll()
+                    // Deck endpoints require the DECK authority the DeckTokenAuthenticationFilter
+                    // attaches on a valid X-Deck-Token header (@TS-053). Without the authority
+                    // the request falls through to the ProblemAuthenticationEntryPoint which
+                    // emits DECK_TOKEN_INVALID (the entry point reads from the request path).
+                    .requestMatchers("/api/deck/**")
+                    .hasAuthority(DeckPrincipal.ROLE)
                     // Everything else (SPA static, catch-all, voter slug route) is open too — the
                     // SpaForwardingConfig (T087) does the actual routing; we just don't gate it.
                     .anyRequest()
                     .permitAll())
+        .addFilterBefore(deckTokenFilter, UsernamePasswordAuthenticationFilter.class)
         .csrf(
             csrf ->
                 csrf.csrfTokenRepository(csrfRepo)

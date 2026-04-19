@@ -1,0 +1,276 @@
+package site.asm0dey.slidev.polls.api.deck;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
+import site.asm0dey.slidev.polls.core.service.PollRepository;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * End-to-end coverage for the deck-token mint / activate surface.
+ *
+ * <ul>
+ *   <li>{@code @TS-050} — mount triggers activation (Q1 → ACTIVE)
+ *   <li>{@code @TS-051} — navigation swaps active (Q1 → CLOSED, Q2 → ACTIVE)
+ *   <li>{@code @TS-052} — remounting the current slide is idempotent ({@code activated_at}
+ *       unchanged)
+ *   <li>{@code @TS-053} — anonymous caller → 401 {@code DECK_TOKEN_INVALID}
+ *   <li>{@code @TS-054} — cross-poll token → 403 {@code DECK_TOKEN_POLL_MISMATCH}
+ *   <li>{@code @TS-055} — revoked token → 401 {@code DECK_TOKEN_INVALID}
+ *   <li>{@code @TS-056} — mint returns plaintext exactly once; list rows carry no plaintext
+ *   <li>{@code @TS-057} — deck token on admin endpoint → 401 {@code AUTH_REQUIRED}
+ * </ul>
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
+class DeckActivationIT {
+
+  @Autowired private MockMvc mvc;
+  @Autowired private ObjectMapper objectMapper;
+  @Autowired private PollRepository pollRepository;
+
+  // @TS-050 — mounting activates the declared question.
+  @Test
+  void mounting_activates_the_declared_question() throws Exception {
+    PollFixture poll = createPoll("deck-mount");
+    String plaintext = mintToken(poll);
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/activate")
+                .header("X-Deck-Token", plaintext)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + poll.q1() + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activeQuestionId").value(poll.q1().toString()));
+
+    assertThat(pollRepository.findById(poll.pollId()).orElseThrow().activeQuestionId())
+        .isEqualTo(poll.q1());
+  }
+
+  // @TS-051 — navigating the deck to a second slide swaps the active question.
+  @Test
+  void navigation_swaps_active_question() throws Exception {
+    PollFixture poll = createPoll("deck-nav");
+    String plaintext = mintToken(poll);
+
+    activateViaDeck(poll.pollId(), plaintext, poll.q1());
+    activateViaDeck(poll.pollId(), plaintext, poll.q2());
+
+    var after = pollRepository.findById(poll.pollId()).orElseThrow();
+    assertThat(after.activeQuestionId()).isEqualTo(poll.q2());
+    var q1 =
+        after.questions().stream().filter(q -> q.id().equals(poll.q1())).findFirst().orElseThrow();
+    assertThat(q1.status()).isEqualTo(QuestionStatus.CLOSED);
+  }
+
+  // @TS-052 — remounting the already-active slide is idempotent. We rely on the
+  // PollService.activateQuestion short-circuit (no repository write) to keep activated_at stable.
+  @Test
+  void remount_of_active_question_is_idempotent() throws Exception {
+    PollFixture poll = createPoll("deck-idem");
+    String plaintext = mintToken(poll);
+    activateViaDeck(poll.pollId(), plaintext, poll.q1());
+    var firstActivatedAt =
+        pollRepository.findById(poll.pollId()).orElseThrow().questions().stream()
+            .filter(q -> q.id().equals(poll.q1()))
+            .findFirst()
+            .orElseThrow()
+            .activatedAt();
+
+    // Second mount of the same slide — MUST NOT rotate activated_at.
+    activateViaDeck(poll.pollId(), plaintext, poll.q1());
+    var afterSecond =
+        pollRepository.findById(poll.pollId()).orElseThrow().questions().stream()
+            .filter(q -> q.id().equals(poll.q1()))
+            .findFirst()
+            .orElseThrow()
+            .activatedAt();
+    assertThat(afterSecond).isEqualTo(firstActivatedAt);
+  }
+
+  // @TS-053 — anonymous caller cannot activate.
+  @Test
+  void anonymous_caller_is_rejected_with_deck_token_invalid() throws Exception {
+    PollFixture poll = createPoll("deck-anon");
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/activate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + poll.q1() + "\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("DECK_TOKEN_INVALID"));
+  }
+
+  // @TS-054 — a token minted for poll A can't activate on poll B.
+  @Test
+  void cross_poll_token_is_rejected_with_poll_mismatch() throws Exception {
+    PollFixture pollA = createPoll("deck-cross-a");
+    PollFixture pollB = createPoll("deck-cross-b");
+    String plaintextForA = mintToken(pollA);
+
+    mvc.perform(
+            post("/api/deck/polls/" + pollB.pollId() + "/activate")
+                .header("X-Deck-Token", plaintextForA)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + pollB.q1() + "\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("DECK_TOKEN_POLL_MISMATCH"));
+  }
+
+  // @TS-055 — a revoked token is rejected.
+  @Test
+  void revoked_token_is_rejected_with_deck_token_invalid() throws Exception {
+    PollFixture poll = createPoll("deck-revoked");
+    JsonNode minted = mintTokenRaw(poll);
+    UUID tokenId = UUID.fromString(minted.get("id").asText());
+    String plaintext = minted.get("plaintext").asText();
+
+    MockHttpSession session = loginAsAlice();
+    mvc.perform(
+            delete("/api/admin/polls/" + poll.pollId() + "/deck-tokens/" + tokenId)
+                .session(session)
+                .with(csrf()))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/activate")
+                .header("X-Deck-Token", plaintext)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + poll.q1() + "\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("DECK_TOKEN_INVALID"));
+  }
+
+  // @TS-056 — minted plaintext appears exactly once; list never returns it.
+  @Test
+  void minted_plaintext_visible_exactly_once() throws Exception {
+    PollFixture poll = createPoll("deck-mint-plain");
+    MockHttpSession session = loginAsAlice();
+    MvcResult mint =
+        mvc.perform(
+                post("/api/admin/polls/" + poll.pollId() + "/deck-tokens")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"label\":\"laptop\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    JsonNode minted = objectMapper.readTree(mint.getResponse().getContentAsString());
+    assertThat(minted.get("plaintext").asText()).as("plaintext surfaced on mint").isNotBlank();
+
+    MvcResult listing =
+        mvc.perform(get("/api/admin/polls/" + poll.pollId() + "/deck-tokens").session(session))
+            .andExpect(status().isOk())
+            .andReturn();
+    JsonNode rows = objectMapper.readTree(listing.getResponse().getContentAsString());
+    assertThat(rows.isArray()).isTrue();
+    for (JsonNode row : rows) {
+      assertThat(row.has("plaintext")).as("list rows must not carry plaintext (@TS-056)").isFalse();
+    }
+  }
+
+  // @TS-057 — the deck token must not unlock any other admin surface.
+  @Test
+  void deck_token_on_admin_endpoint_is_rejected_with_auth_required() throws Exception {
+    PollFixture poll = createPoll("deck-scope");
+    String plaintext = mintToken(poll);
+
+    mvc.perform(get("/api/admin/polls").header("X-Deck-Token", plaintext))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
+  }
+
+  // ---------- fixtures -----------------------------------------------------
+
+  private void activateViaDeck(UUID pollId, String plaintext, UUID questionId) throws Exception {
+    mvc.perform(
+            post("/api/deck/polls/" + pollId + "/activate")
+                .header("X-Deck-Token", plaintext)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + questionId + "\"}"))
+        .andExpect(status().isOk());
+  }
+
+  private String mintToken(PollFixture poll) throws Exception {
+    return mintTokenRaw(poll).get("plaintext").asText();
+  }
+
+  private JsonNode mintTokenRaw(PollFixture poll) throws Exception {
+    MockHttpSession session = loginAsAlice();
+    MvcResult mint =
+        mvc.perform(
+                post("/api/admin/polls/" + poll.pollId() + "/deck-tokens")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper.readTree(mint.getResponse().getContentAsString());
+  }
+
+  private PollFixture createPoll(String slug) throws Exception {
+    MockHttpSession session = loginAsAlice();
+    String body =
+        String.format(
+            """
+            {
+              "title": "Deck fixture",
+              "slug": "%s",
+              "questions": [
+                {"prompt":"Q1?","options":[{"label":"A"},{"label":"B"}]},
+                {"prompt":"Q2?","options":[{"label":"X"},{"label":"Y"}]}
+              ]
+            }
+            """,
+            slug);
+    MvcResult created =
+        mvc.perform(
+                post("/api/admin/polls")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+    JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
+    UUID pollId = UUID.fromString(poll.get("id").asText());
+    UUID q1 = UUID.fromString(poll.get("questions").get(0).get("id").asText());
+    UUID q2 = UUID.fromString(poll.get("questions").get(1).get("id").asText());
+    return new PollFixture(pollId, q1, q2);
+  }
+
+  private MockHttpSession loginAsAlice() throws Exception {
+    MvcResult login =
+        mvc.perform(
+                post("/api/admin/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}"))
+            .andExpect(status().isNoContent())
+            .andReturn();
+    MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+    if (session == null) {
+      throw new IllegalStateException("login did not establish a session");
+    }
+    return session;
+  }
+
+  private record PollFixture(UUID pollId, UUID q1, UUID q2) {}
+}
