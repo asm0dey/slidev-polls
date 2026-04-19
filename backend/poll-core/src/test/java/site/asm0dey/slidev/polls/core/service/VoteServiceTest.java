@@ -29,8 +29,8 @@ import site.asm0dey.slidev.polls.core.event.VoteCastEvent;
  * Pure-Java unit coverage for {@link VoteService}. In-file fakes for {@link PollRepository} and
  * {@link VoteRepository} let every branch of the voting path — missing active question, option not
  * in question, duplicate voter, concurrent close, event publication — be exercised without Spring
- * or a live Postgres. The Gherkin scenarios enumerated in the method docs are the assertion
- * anchors per Principle VII.
+ * or a live Postgres. The Gherkin scenarios enumerated in the method docs are the assertion anchors
+ * per Principle VII.
  */
 class VoteServiceTest {
 
@@ -197,8 +197,7 @@ class VoteServiceTest {
             PollStatus.DRAFT,
             Map.of(),
             null,
-            List.of(
-                new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, q1Options, null, null)),
+            List.of(new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, q1Options, null, null)),
             Instant.now(),
             Instant.now());
     polls.insert(poll);
@@ -279,8 +278,7 @@ class VoteServiceTest {
     @Override
     public Vote insert(Vote vote) {
       if (closedQuestions.contains(vote.questionId())) {
-        throw new QuestionNotActiveException(
-            "question " + vote.questionId() + " is not ACTIVE");
+        throw new QuestionNotActiveException("question " + vote.questionId() + " is not ACTIVE");
       }
       boolean duplicate =
           rows.stream()
@@ -289,8 +287,7 @@ class VoteServiceTest {
                       r.questionId().equals(vote.questionId())
                           && r.voterToken().equals(vote.voterToken()));
       if (duplicate) {
-        throw new AlreadyVotedException(
-            "vote already recorded for question " + vote.questionId());
+        throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
       }
       rows.add(vote);
       return vote;

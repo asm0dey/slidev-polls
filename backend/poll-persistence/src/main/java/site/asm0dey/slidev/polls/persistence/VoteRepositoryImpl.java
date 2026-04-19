@@ -25,8 +25,8 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * the status flip and produces zero inserted rows — which this method translates into {@link
  * QuestionNotActiveException}, matching the FR-010 / {@code @TS-025} contract. Unique-constraint
  * violations on {@code (question_id, voter_token)} are translated to {@link AlreadyVotedException}
- * in the same way {@link PollRepositoryImpl} handles the partial activation index ({@code
- * @TS-023}, {@code @TS-024}).
+ * in the same way {@link PollRepositoryImpl} handles the partial activation index ({@code @TS-023},
+ * {@code @TS-024}).
  */
 @Repository
 public class VoteRepositoryImpl implements VoteRepository {
@@ -70,12 +70,10 @@ public class VoteRepositoryImpl implements VoteRepository {
                               .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))))
               .execute();
     } catch (IntegrityConstraintViolationException | DataIntegrityViolationException e) {
-      throw new AlreadyVotedException(
-          "vote already recorded for question " + vote.questionId());
+      throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
     }
     if (inserted == 0) {
-      throw new QuestionNotActiveException(
-          "question " + vote.questionId() + " is not ACTIVE");
+      throw new QuestionNotActiveException("question " + vote.questionId() + " is not ACTIVE");
     }
     return new Vote(
         vote.id(),

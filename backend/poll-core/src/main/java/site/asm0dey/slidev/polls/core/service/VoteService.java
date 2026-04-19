@@ -51,16 +51,14 @@ public class VoteService {
    */
   @Transactional
   public Vote recordVote(String slug, UUID optionId, String voterToken) {
-    Poll poll =
-        pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
+    Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
     UUID activeQuestionId = poll.activeQuestionId();
     if (activeQuestionId == null) {
       // Early-exit before the wasted round-trip to VoteRepository.insert. The repo-level
       // INSERT ... SELECT would also return zero rows and throw QuestionNotActiveException,
       // but catching the trivial case here keeps error classification cheap and avoids a
       // misleading stack trace from a query that never had a chance to succeed.
-      throw new QuestionNotActiveException(
-          "poll " + slug + " has no active question");
+      throw new QuestionNotActiveException("poll " + slug + " has no active question");
     }
     Question activeQuestion =
         poll.questions().stream()
@@ -79,16 +77,10 @@ public class VoteService {
 
     Vote pending =
         new Vote(
-            UUID.randomUUID(),
-            poll.id(),
-            activeQuestionId,
-            optionId,
-            voterToken,
-            Instant.now());
+            UUID.randomUUID(), poll.id(), activeQuestionId, optionId, voterToken, Instant.now());
     Vote stored = voteRepository.insert(pending);
 
-    long newCount =
-        voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
+    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
     events.publishEvent(
         new VoteCastEvent(poll.id(), activeQuestionId, optionId, newCount, stored.createdAt()));
     return stored;
