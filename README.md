@@ -13,6 +13,8 @@ renders live results on-slide.
 
 ## Quickstart
 
+### Single-JAR production run
+
 ```bash
 docker compose up -d postgres
 ./scripts/build-frontends.sh    # bun install + build, copy dist → backend static
@@ -20,7 +22,26 @@ docker compose up -d postgres
 ```
 
 Open `http://localhost:8080/` (voter) or `http://localhost:8080/admin/`
-(backoffice).
+(backoffice). Sign in as `alice` / `correct-horse`, create a poll, copy the
+join link, and have an audience load it on their phones.
+
+### Inner-loop dev
+
+```bash
+./scripts/dev.sh
+```
+
+Starts Postgres, runs the backend on `:8080`, and spins up the two Vite dev
+servers (voter on `:5173`, backoffice on `:5174`). Ctrl-C tears everything
+down.
+
+### Slidev deck integration
+
+The Slidev addon at `frontends/slidev-component` is consumed as a local
+workspace dep. Embed `<PollResults slug="my-talk" />` on a slide. Supply
+`questionId`, `deckToken`, and `pollId` together to have the slide
+auto-activate its question on mount — mint the token under *Deck tokens* on
+the backoffice poll-edit page.
 
 See [`specs/001-polling-foundation/`](specs/001-polling-foundation/) for the
 full feature specification, plan, data model, and HTTP contract.

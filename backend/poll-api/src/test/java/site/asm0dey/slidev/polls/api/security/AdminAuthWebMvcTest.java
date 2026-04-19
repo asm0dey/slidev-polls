@@ -34,6 +34,7 @@ import site.asm0dey.slidev.polls.api.logging.CorrelationIdFilter;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
+import site.asm0dey.slidev.polls.core.service.DeckTokenService;
 import site.asm0dey.slidev.polls.core.service.PollService;
 
 /**
@@ -68,6 +69,11 @@ class AdminAuthWebMvcTest {
   @Autowired private MockMvc mvc;
 
   @MockitoBean private PollService pollService;
+
+  // DeckTokenAuthenticationFilter is a @Component scanned through SecurityConfig's dependency
+  // wiring. The slice itself doesn't exercise the /api/deck/** surface, but the filter's
+  // constructor needs a DeckTokenService bean to satisfy autowiring — mock it away.
+  @MockitoBean private DeckTokenService deckTokenService;
 
   // @TS-001 — GET on the list endpoint without a session yields 401 with AUTH_REQUIRED.
   @Test

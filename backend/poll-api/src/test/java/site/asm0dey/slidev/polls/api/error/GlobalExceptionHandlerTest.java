@@ -20,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +38,7 @@ import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
+import site.asm0dey.slidev.polls.core.service.DeckTokenService;
 
 /**
  * Mirrors @TS-042 (cross-cutting.feature): every Problem code enumerated in the OpenAPI Problem
@@ -72,6 +74,11 @@ class GlobalExceptionHandlerTest {
   }
 
   @Autowired private MockMvc mvc;
+
+  // The @WebMvcTest slice still scans @Component-annotated security beans including
+  // DeckTokenAuthenticationFilter; its constructor needs a DeckTokenService that the slice
+  // otherwise wouldn't supply. Mock it away so the handler chain exercise stays focused.
+  @MockitoBean private DeckTokenService deckTokenService;
 
   // @TS-042 — a representative request for each Problem code must surface the
   // matching HTTP status and code, with a correlationId accompanying every
