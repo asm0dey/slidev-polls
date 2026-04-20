@@ -147,7 +147,7 @@ Verified end-to-end 2026-04-21 from a clean host: `rm .task-e2e-backend-started 
 
 **Reported**: 2026-04-21
 **Severity**: medium
-**Status**: reported
+**Status**: fixed
 **GitHub Issue**: _(pending outbound creation)_
 
 **Description**: `go-task test:e2e:slidev` fails at fixture setup with `expect(create.status()).toBe(201)` receiving `403` because `frontends/slidev-component/e2e/slidev-results.spec.ts` calls the CSRF-protected admin surface (`POST /api/admin/polls`, `POST /open`, `DELETE`) without echoing the `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` — the same class of failure BUG-004 fixed in `AdminApiClient` and BUG-006 fixed in the voter e2e spec.
@@ -159,6 +159,6 @@ Verified end-to-end 2026-04-21 from a clean host: `rm .task-e2e-backend-started 
 4. Observe the spec fails: `Error: create poll — Expected: 201, Received: 403` at `frontends/slidev-component/e2e/slidev-results.spec.ts:46`, followed by a cascading `TypeError: Cannot read properties of undefined (reading 'pollId')` in `afterAll` because `fixture` was never assigned.
 5. Expected: the spec seeds the poll, runs the SSE smoke assertions, and tears down — mirroring how `frontends/voter/e2e/voter-happy-path.spec.ts` already does it after BUG-006.
 
-**Root Cause**: _(empty until investigation)_
+**Root Cause**: `SecurityConfig` enables `CookieCsrfTokenRepository.withHttpOnlyFalse()` across `/api/admin/**` minus `/login`; Spring's `CsrfFilter` requires state-changing calls to echo the `XSRF-TOKEN` cookie back as an `X-XSRF-TOKEN` request header. The SPA's `AdminApiClient` does this (BUG-004, T-B007) and the voter e2e spec does it too (BUG-006, T-B011), but `frontends/slidev-component/e2e/slidev-results.spec.ts` still drove the admin surface via a raw `APIRequestContext` without ever reading the cookie. `seedPoll`'s `POST /api/admin/polls` therefore tripped `InvalidCsrfTokenException` → `AccessDeniedException` → `ProblemAccessDeniedHandler` → HTTP 403 `{"code":"FORBIDDEN","message":"access denied"}` before `PollController#create` was reached; `beforeAll` threw on the `expect(create.status()).toBe(201)` assertion, `fixture` was left undefined, and `afterAll`'s `deletePoll(request, fixture.pollId)` cascaded into `TypeError: Cannot read properties of undefined (reading 'pollId')`. The SSE snapshot / tally assertions were never reached. No production code was implicated — only the spec's CSRF handling.
 
-**Fix Reference**: _(empty until implementation)_
+**Fix Reference**: T-B013 in `tasks.md`. Mirrored the BUG-006 remediation from `voter-happy-path.spec.ts` into `slidev-results.spec.ts`: added `xsrfHeaders(request, baseURL)` that pulls `XSRF-TOKEN` out of `request.storageState().cookies` (matching the cookie domain against `new URL(baseURL).hostname` with optional leading-dot) and returns `{ "X-XSRF-TOKEN": decodeURIComponent(cookie.value) }`; merged the headers into every state-changing admin call (`POST /api/admin/polls` in `seedPoll`, `POST /api/admin/polls/{id}/open` in `seedPoll`, `DELETE /api/admin/polls/{id}` in `deletePoll`). `seedPoll` / `deletePoll` signatures gained a `baseURL` parameter and `beforeAll` / `afterAll` thread `baseURL!` through. No production code changes. Verified via T-B014: `go-task test:e2e:slidev` from a clean host exits 0, `1 passed (4.5s)` on the SSE smoke, no 403 in the log, backend torn down on exit.

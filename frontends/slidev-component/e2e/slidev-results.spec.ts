@@ -23,6 +23,22 @@ type Fixture = {
   firstOptionId: string;
 };
 
+// Admin surface is CSRF-protected (see BUG-004 / BUG-006): raw APIRequestContext has to echo the
+// XSRF-TOKEN cookie as X-XSRF-TOKEN on state-changing calls or CsrfFilter returns 403.
+async function xsrfHeaders(
+  request: APIRequestContext,
+  baseURL: string
+): Promise<Record<string, string>> {
+  const state = await request.storageState();
+  const origin = new URL(baseURL);
+  const cookie = state.cookies.find(
+    (c) =>
+      c.name === "XSRF-TOKEN" &&
+      (c.domain === origin.hostname || c.domain === `.${origin.hostname}`)
+  );
+  return cookie ? { "X-XSRF-TOKEN": decodeURIComponent(cookie.value) } : {};
+}
+
 async function loginAsAlice(request: APIRequestContext) {
   const res = await request.post("/api/admin/login", {
     data: { username: "alice", password: "correct-horse" },
@@ -31,10 +47,13 @@ async function loginAsAlice(request: APIRequestContext) {
   expect(res.status(), "alice login").toBeLessThan(300);
 }
 
-async function seedPoll(request: APIRequestContext): Promise<Fixture> {
+async function seedPoll(request: APIRequestContext, baseURL: string): Promise<Fixture> {
   const slug = `e2e-slidev-${Date.now().toString(36)}`;
   const create = await request.post("/api/admin/polls", {
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(await xsrfHeaders(request, baseURL))
+    },
     data: {
       title: `E2E slidev ${slug}`,
       slug,
@@ -52,15 +71,20 @@ async function seedPoll(request: APIRequestContext): Promise<Fixture> {
   const questionId = body.questions[0].id;
   const firstOptionId = body.questions[0].options[0].id;
   const open = await request.post(`/api/admin/polls/${body.id}/open`, {
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(await xsrfHeaders(request, baseURL))
+    },
     data: { questionId }
   });
   expect(open.status(), "activate question").toBe(200);
   return { slug: body.slug, pollId: body.id, questionId, firstOptionId };
 }
 
-async function deletePoll(request: APIRequestContext, pollId: string) {
-  await request.delete(`/api/admin/polls/${pollId}`);
+async function deletePoll(request: APIRequestContext, baseURL: string, pollId: string) {
+  await request.delete(`/api/admin/polls/${pollId}`, {
+    headers: await xsrfHeaders(request, baseURL)
+  });
 }
 
 test.describe("slidev addon sse smoke", () => {
@@ -69,14 +93,14 @@ test.describe("slidev addon sse smoke", () => {
   test.beforeAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
     await loginAsAlice(request);
-    fixture = await seedPoll(request);
+    fixture = await seedPoll(request, baseURL!);
     await request.dispose();
   });
 
   test.afterAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
     await loginAsAlice(request);
-    await deletePoll(request, fixture.pollId);
+    await deletePoll(request, baseURL!, fixture.pollId);
     await request.dispose();
   });
 
