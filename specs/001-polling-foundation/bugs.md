@@ -140,3 +140,25 @@ Verified end-to-end against `compose.dev.yml`: `GET http://localhost:8080/bug-00
 2. `frontends/voter/e2e/voter-happy-path.spec.ts` — added an `xsrfHeaders(request, baseURL)` helper that pulls `XSRF-TOKEN` out of `request.storageState().cookies` (URL-decoding the value) and returns `{ "X-XSRF-TOKEN": … }`. Every state-changing admin call (`POST /api/admin/polls`, `POST /api/admin/polls/{id}/open`, `DELETE /api/admin/polls/{id}`) now merges those headers in. The header is absent before login (no cookie yet) and present after — matching what the SPA's `AdminApiClient` does. Updated the header-comment to point at `task test:e2e:voter` as the canonical entrypoint instead of the obsolete `scripts/dev.sh` mention.
 
 Verified end-to-end 2026-04-21 from a clean host: `rm .task-e2e-backend-started ; go-task test:e2e:voter` exited 0. Run log showed `[e2e] no backend at http://localhost:8080; bringing up compose.dev.yml`, `codegen` ran once (no postgres:up race), `docker compose up --build -d` completed, `[e2e] backend ready at http://localhost:8080` landed, the Playwright voter spec passed `1 passed (4.7s)`, and `[e2e] tearing down compose.dev.yml (started by this run)` fired through the `defer` — `docker ps --filter name=slidev-polls` returned empty afterwards, the marker file was removed, and no `ECONNREFUSED` appeared anywhere in output.
+
+---
+
+## BUG-007
+
+**Reported**: 2026-04-21
+**Severity**: medium
+**Status**: reported
+**GitHub Issue**: _(pending outbound creation)_
+
+**Description**: `go-task test:e2e:slidev` fails at fixture setup with `expect(create.status()).toBe(201)` receiving `403` because `frontends/slidev-component/e2e/slidev-results.spec.ts` calls the CSRF-protected admin surface (`POST /api/admin/polls`, `POST /open`, `DELETE`) without echoing the `XSRF-TOKEN` cookie as `X-XSRF-TOKEN` — the same class of failure BUG-004 fixed in `AdminApiClient` and BUG-006 fixed in the voter e2e spec.
+
+**Reproduction Steps**:
+1. From the repo root, run `go-task test:e2e:slidev`.
+2. The task provisions the backend via `compose.dev.yml` (BUG-006 orchestration is working) and Playwright starts.
+3. `test.beforeAll` logs in as alice and calls `seedPoll`, which POSTs `/api/admin/polls`.
+4. Observe the spec fails: `Error: create poll — Expected: 201, Received: 403` at `frontends/slidev-component/e2e/slidev-results.spec.ts:46`, followed by a cascading `TypeError: Cannot read properties of undefined (reading 'pollId')` in `afterAll` because `fixture` was never assigned.
+5. Expected: the spec seeds the poll, runs the SSE smoke assertions, and tears down — mirroring how `frontends/voter/e2e/voter-happy-path.spec.ts` already does it after BUG-006.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
