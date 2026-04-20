@@ -1,8 +1,8 @@
 {
   "testify": {
-    "assertion_hash": "fb4b6dbde749b0ad331217bf7cb7d5b78c48200f9292c499956697498a41a416",
-    "generated_at": "2026-04-20T08:06:51Z",
+    "assertion_hash": "aa534173470a902c2732ae7768bd793e424cb6363d680d82821204f7eb9c192f",
+    "generated_at": "2026-04-20T08:20:34Z",
     "features_dir": "specs/001-polling-foundation/tests/features",
-    "file_count": 9
+    "file_count": 10
   }
 }

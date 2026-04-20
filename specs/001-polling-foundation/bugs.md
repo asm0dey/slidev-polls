@@ -60,3 +60,25 @@
 **Root Cause**: _(empty until investigation)_
 
 **Fix Reference**: _(empty until implementation)_
+
+---
+
+## BUG-004
+
+**Reported**: 2026-04-20
+**Severity**: high
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: Submitting the "create poll" form in the backoffice SPA fails with the user-facing error "You don't own this poll." — a fresh admin cannot create any poll.
+
+**Reproduction Steps**:
+1. From the repo root, run `task up` (or `docker compose -f compose.dev.yml up -d --build`).
+2. Wait for `slidev-polls-postgres` to be healthy and `slidev-polls-backend` to bind to `:8080`.
+3. Open `http://localhost:8080/admin/` in a browser and log in as `alice` / `correct-horse` (fresh admin, no pre-existing polls for this session).
+4. Navigate to the "new poll" flow and fill in a title, one question with at least two options, and submit.
+5. Expected: the poll is created and the UI navigates to the editor/detail view for the new poll. Observed: the form shows the error "You don't own this poll." and the poll is not usable (inline `describeError` branch for `err.code === "FORBIDDEN"` in `frontends/backoffice/src/pages/PollEditorPage.vue:118-119`). The backend `POST /api/admin/polls` either returns HTTP 403 on the create itself, or the follow-up read-after-create call returns 403 — investigation must determine which call is emitting `FORBIDDEN` since `PollController#create` does not perform an ownership check against an existing poll and should not reject the authenticated creator.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
