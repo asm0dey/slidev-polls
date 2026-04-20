@@ -11,6 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import site.asm0dey.slidev.polls.api.logging.CorrelationIdFilter;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
@@ -101,6 +102,14 @@ public class GlobalExceptionHandler {
   ResponseEntity<Problem> handleValidation(Exception ex) {
     return respond(
         HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, "request body is invalid");
+  }
+
+  // A missing static resource (e.g. /admin/assets/foo.js when no such file was packaged) is a
+  // 404, not a transport fault. Without this handler the catch-all {@link Exception} branch
+  // below maps it to 500 and the browser sees a JSON Problem envelope in place of the asset.
+  @ExceptionHandler(NoResourceFoundException.class)
+  ResponseEntity<Problem> handleResourceMissing(NoResourceFoundException ex) {
+    return respond(HttpStatus.NOT_FOUND, ProblemCode.NOT_FOUND, "resource not found");
   }
 
   @ExceptionHandler(Exception.class)
