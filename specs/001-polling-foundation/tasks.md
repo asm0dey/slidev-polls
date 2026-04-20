@@ -290,3 +290,9 @@ T001 → T002 → T013 → T014 → T015 → T018 → T052 → T053 → T058 →
 - Test spec IDs are enumerated explicitly (e.g., `[TS-010, TS-011, TS-012, TS-013, TS-014, TS-015]`) — no prose ranges.
 - Gherkin scenarios in `tests/features/*.feature` are mirrored as comments above the corresponding JUnit / Vitest assertions per Principle VII; there is no BDD runner.
 - Auto-commit after each task per `/iikit-07-implement` conventions.
+
+
+## Bug Fix Tasks
+
+- [ ] T-B001 [BUG-001] Implement fix for BUG-001 referencing test spec specs/001-polling-foundation/tests/features/bugfix_BUG-001.feature: Flyway V3 migration cannot resolve gen_salt('bf', 10) when applied against the compose.dev.yml Postgres, blocking backend startup.
+- [ ] T-B002 [BUG-001] Verify fix passes the BUG-001 scenarios in specs/001-polling-foundation/tests/features/bugfix_BUG-001.feature: `docker compose -f compose.dev.yml up -d` completes migrations and the backend reaches healthy state.
