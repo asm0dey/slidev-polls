@@ -134,16 +134,70 @@ tasks:
       - bun run test
 
   test:e2e:voter:
-    desc: Run Playwright voter happy-path (needs a backend at PW_BASE_URL, default :8080)
+    desc: Run Playwright voter happy-path (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
     dir: frontends/voter
     cmds:
+      - task: e2e:backend-up
+      - defer: { task: e2e:backend-down }
       - bun run e2e
 
   test:e2e:slidev:
-    desc: Run Playwright slidev SSE smoke (needs a backend at PW_BASE_URL)
+    desc: Run Playwright slidev SSE smoke (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
     dir: frontends/slidev-component
     cmds:
+      - task: e2e:backend-up
+      - defer: { task: e2e:backend-down }
       - bun run e2e
+
+  e2e:backend-up:
+    desc: (internal) Bring up compose.dev.yml iff nothing is already listening on PW_BASE_URL
+    internal: true
+    vars:
+      E2E_BASE_URL: '{{.PW_BASE_URL | default "http://localhost:8080"}}'
+      E2E_MARKER: '{{.TASKFILE_DIR}}/.task-e2e-backend-started'
+    cmds:
+      - |
+        if curl -sf --max-time 2 "{{.E2E_BASE_URL}}/" >/dev/null 2>&1; then
+          echo "[e2e] backend already reachable at {{.E2E_BASE_URL}} — reusing (no teardown)"
+          rm -f {{.E2E_MARKER}}
+          exit 0
+        fi
+        echo "[e2e] no backend at {{.E2E_BASE_URL}}; bringing up compose.dev.yml"
+        touch {{.E2E_MARKER}}
+      # Invoke codegen + compose build sequentially rather than `up:detached`
+      # so Postgres is brought up once (up:detached lists postgres:up twice
+      # across its parallel dep graph, which races `docker compose up -d
+      # postgres` with itself and fails on container-name conflict).
+      - |
+        if [ -f {{.E2E_MARKER}} ]; then
+          {{.TASK_EXE}} codegen
+          docker compose -f {{.COMPOSE_DEV}} up --build -d
+          for _ in $(seq 1 300); do
+            if curl -sf --max-time 2 "{{.E2E_BASE_URL}}/" >/dev/null 2>&1; then
+              echo "[e2e] backend ready at {{.E2E_BASE_URL}}"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "[e2e] backend did not become ready within 300s" >&2
+          docker compose -f {{.COMPOSE_DEV}} logs --tail=200 backend >&2 || true
+          exit 1
+        fi
+
+  e2e:backend-down:
+    desc: (internal) Tear down compose.dev.yml iff this run brought it up
+    internal: true
+    vars:
+      E2E_MARKER: '{{.TASKFILE_DIR}}/.task-e2e-backend-started'
+    cmds:
+      - |
+        if [ -f {{.E2E_MARKER}} ]; then
+          echo "[e2e] tearing down compose.dev.yml (started by this run)"
+          docker compose -f {{.COMPOSE_DEV}} down
+          rm -f {{.E2E_MARKER}}
+        else
+          echo "[e2e] backend was pre-existing; skipping teardown"
+        fi
 
   # ---------- Hygiene ------------------------------------------------------
 

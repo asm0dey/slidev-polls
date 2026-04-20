@@ -6,8 +6,8 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 // real browser, then delete the poll on teardown.
 //
 // The test is gated on a running backend listening at PW_BASE_URL (defaults to
-// http://localhost:8080). CI wires this up by booting the Spring Boot JAR plus Postgres before
-// invoking `bun --cwd frontends/voter run e2e`; locally, `scripts/dev.sh` does the same.
+// http://localhost:8080). `task test:e2e:voter` auto-provisions that backend via compose.dev.yml
+// when :8080 is idle and tears it down on exit.
 
 type Fixture = {
   slug: string;
@@ -15,6 +15,23 @@ type Fixture = {
   questionId: string;
   firstOptionLabel: string;
 };
+
+// The admin surface is CSRF-protected (`CookieCsrfTokenRepository.withHttpOnlyFalse()` over
+// `/api/admin/**` minus `/login`). Spring writes the `XSRF-TOKEN` cookie on every response; the
+// client has to echo it back as `X-XSRF-TOKEN` on state-changing calls (see BUG-004). The SPA's
+// `AdminApiClient` does this; the raw Playwright request context does not, so helpers here pull
+// the cookie out of the context and attach the header by hand.
+async function xsrfHeaders(
+  request: APIRequestContext,
+  baseURL: string
+): Promise<Record<string, string>> {
+  const state = await request.storageState();
+  const origin = new URL(baseURL);
+  const cookie = state.cookies.find(
+    (c) => c.name === "XSRF-TOKEN" && (c.domain === origin.hostname || c.domain === `.${origin.hostname}`)
+  );
+  return cookie ? { "X-XSRF-TOKEN": decodeURIComponent(cookie.value) } : {};
+}
 
 async function loginAsAlice(request: APIRequestContext) {
   const res = await request.post("/api/admin/login", {
@@ -24,11 +41,12 @@ async function loginAsAlice(request: APIRequestContext) {
   expect(res.status(), "alice login").toBeLessThan(300);
 }
 
-async function seedPoll(request: APIRequestContext): Promise<Fixture> {
+async function seedPoll(request: APIRequestContext, baseURL: string): Promise<Fixture> {
   // A unique slug per run avoids collisions across re-runs against the same DB.
   const slug = `e2e-voter-${Date.now().toString(36)}`;
+  const csrf = await xsrfHeaders(request, baseURL);
   const create = await request.post("/api/admin/polls", {
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...csrf },
     data: {
       title: `E2E voter ${slug}`,
       slug,
@@ -50,7 +68,7 @@ async function seedPoll(request: APIRequestContext): Promise<Fixture> {
   const firstOptionLabel = body.questions[0].options[0].label;
 
   const open = await request.post(`/api/admin/polls/${body.id}/open`, {
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await xsrfHeaders(request, baseURL)) },
     data: { questionId }
   });
   expect(open.status(), "activate question").toBe(200);
@@ -58,8 +76,10 @@ async function seedPoll(request: APIRequestContext): Promise<Fixture> {
   return { slug: body.slug, pollId: body.id, questionId, firstOptionLabel };
 }
 
-async function deletePoll(request: APIRequestContext, pollId: string) {
-  await request.delete(`/api/admin/polls/${pollId}`);
+async function deletePoll(request: APIRequestContext, baseURL: string, pollId: string) {
+  await request.delete(`/api/admin/polls/${pollId}`, {
+    headers: await xsrfHeaders(request, baseURL)
+  });
 }
 
 test.describe("voter happy path", () => {
@@ -68,14 +88,14 @@ test.describe("voter happy path", () => {
   test.beforeAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
     await loginAsAlice(request);
-    fixture = await seedPoll(request);
+    fixture = await seedPoll(request, baseURL!);
     await request.dispose();
   });
 
   test.afterAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
     await loginAsAlice(request);
-    await deletePoll(request, fixture.pollId);
+    await deletePoll(request, baseURL!, fixture.pollId);
     await request.dispose();
   });
 

@@ -23,3 +23,6 @@ backend/poll-api/src/main/resources/static/
 # Local env
 .env
 .env.local
+
+# go-task e2e orchestration marker (tracks whether `task test:e2e:*` started the stack)
+.task-e2e-backend-started

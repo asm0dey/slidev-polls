@@ -4,6 +4,10 @@ import { defineConfig, devices } from "@playwright/test";
 // smokes (tests are added in T075 and T106). Each SPA keeps its specs
 // in its own `e2e/` folder; a project per package keeps failures
 // attributable and lets CI run them in parallel.
+//
+// Backend provisioning is handled by the Taskfile (`task test:e2e:voter`,
+// `task test:e2e:slidev`) — it brings up `compose.dev.yml` if :8080 is idle
+// and tears it down after the spec exits.
 export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
