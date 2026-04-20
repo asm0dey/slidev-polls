@@ -37,7 +37,13 @@ export class ApiClient {
 
   constructor(opts: ApiClientOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? "").replace(/\/$/, "");
-    this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Browsers require window.fetch to be called with `this === window`. When we
+    // store the global `fetch` on an instance and later invoke it as
+    // `this.fetchImpl(…)`, the receiver becomes the ApiClient and Chrome rejects
+    // the call with "Failed to execute 'fetch' on 'Window': Illegal invocation"
+    // (surfaced by BUG-005). Binding to globalThis keeps the call site simple
+    // while preserving the test injection hook.
+    this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
   }
 
   async publicPoll(slug: string): Promise<PublicPollView> {

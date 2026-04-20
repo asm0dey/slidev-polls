@@ -89,7 +89,7 @@
 
 **Reported**: 2026-04-20
 **Severity**: high
-**Status**: reported
+**Status**: fixed
 **GitHub Issue**: _(none)_
 
 **Description**: Opening the voter-facing page for a created poll (e.g. `http://localhost:8080/bug-004-regression-e2e`) renders an empty shell — no poll content is shown. The URL is taken directly from the polls list in the backoffice SPA, so a link the admin UI advertises as valid leads to a blank page for voters.
@@ -103,6 +103,14 @@
 6. Open that URL in a fresh browser tab (no admin session assumed).
 7. Expected: the voter SPA renders the poll (question, options, vote controls) for the slug. Observed: the shell loads but the page is empty — no poll content is rendered, and the user has no way to vote.
 
-**Root Cause**: _(empty until investigation)_
+**Root Cause**: Two stacked faults kept the voter SPA from rendering any content for `/{slug}` in production.
 
-**Fix Reference**: _(empty until implementation)_
+1. Vue Router could not build its matcher for the poll route. The route was declared `/:slug([a-z0-9]+(-[a-z0-9]+)*)`, but vue-router's path parser does not support nested capture groups combined with a `*` quantifier — it synthesised the broken regex `/^/((?:[a-z0-9]+(-[a-z0-9]+)(?:/(?:[a-z0-9]+(-[a-z0-9]+))*)?\)/?$/i` (note the unbalanced parentheses) and the browser threw `SyntaxError: Invalid regular expression … Unterminated group` at app boot. `createApp(App).use(router).mount("#app")` rejected before any view rendered, so the browser kept `<div id="app"></div>` as-is — the "empty shell" the bug report described. The component tests in `PollView.test.ts` and `LandingPage.test.ts` mount each page directly, bypassing the router wiring, so they did not catch the parse failure.
+2. Once the router parse was fixed, the next render failed with `TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation`. `ApiClient` captured the global `fetch` as `this.fetchImpl = opts.fetchImpl ?? fetch` and later invoked it as `this.fetchImpl(…)`. Browsers require `window.fetch` to be called with `this === window` (or `undefined`); storing the function on an instance shifted the receiver to the ApiClient and Chrome rejected the call. `AdminApiClient` had already learned this lesson (`fetch.bind(globalThis)`), but `ApiClient` in `@polls/shared` had not. Vitest injects a stub `fetchImpl` in every test so the prod-only path was invisible until now.
+
+**Fix Reference**: T-B009 in `tasks.md`. Two edits, both surgical:
+
+1. `frontends/voter/src/router/index.ts` — replaced the `:slug` regex with the same character-class-only form the server's `SpaForwardingConfig` uses, `[a-z0-9-]{3,40}`. Stricter shape checks (no leading/trailing hyphen, no `--`) stay server-side in `SlugValidator` where they already live; the backend returns 404 for any slug that makes it through the router but fails full validation, and `PollView` renders the existing "No poll with that link" copy for that case. Added `frontends/voter/src/router/router.test.ts` booting the real router so the regression surfaces at the path-parse layer a component test could not reach.
+2. `frontends/shared/src/api-client.ts` — `ApiClient` now captures `fetch.bind(globalThis)` as its default, matching the existing `AdminApiClient` pattern and eliminating the `Illegal invocation` when the voter SPA runs in a real browser.
+
+Verified end-to-end against `compose.dev.yml`: `GET http://localhost:8080/bug-004-regression-e2e` now renders the poll title + WAITING copy for a freshly-created poll, and after activating the question shows the prompt + both option buttons (`data-testid="poll-active"`, `option-{id}`). Full test suite green — backend `./mvnw verify -pl backend/poll-api -am` (all 53 api ITs), `frontends/shared` `bun test` (6/6), `frontends/voter` vitest (20/20 — was 17, +3 new router cases), `frontends/backoffice` vitest (50/50), `frontends/slidev-component` vitest (9/9).
