@@ -114,3 +114,24 @@
 2. `frontends/shared/src/api-client.ts` — `ApiClient` now captures `fetch.bind(globalThis)` as its default, matching the existing `AdminApiClient` pattern and eliminating the `Illegal invocation` when the voter SPA runs in a real browser.
 
 Verified end-to-end against `compose.dev.yml`: `GET http://localhost:8080/bug-004-regression-e2e` now renders the poll title + WAITING copy for a freshly-created poll, and after activating the question shows the prompt + both option buttons (`data-testid="poll-active"`, `option-{id}`). Full test suite green — backend `./mvnw verify -pl backend/poll-api -am` (all 53 api ITs), `frontends/shared` `bun test` (6/6), `frontends/voter` vitest (20/20 — was 17, +3 new router cases), `frontends/backoffice` vitest (50/50), `frontends/slidev-component` vitest (9/9).
+
+---
+
+## BUG-006
+
+**Reported**: 2026-04-21
+**Severity**: medium
+**Status**: reported
+**GitHub Issue**: _(pending outbound creation)_
+
+**Description**: `go-task test:e2e:voter` fails with `ECONNREFUSED ::1:8080` because the Taskfile target assumes a running backend at `PW_BASE_URL` (default `http://localhost:8080`) but does not start one. A developer running the canonical e2e command from a clean checkout hits an opaque socket error instead of a green suite.
+
+**Reproduction Steps**:
+1. From the repo root, on a host with no backend listening on port 8080 and no `compose.dev.yml` stack up.
+2. Run `go-task test:e2e:voter`.
+3. Observe Playwright fails the single voter spec at `frontends/voter/e2e/voter-happy-path.spec.ts:82:3` with `apiRequestContext.post: connect ECONNREFUSED ::1:8080` on the first `POST http://localhost:8080/api/admin/login` inside `loginAsAlice`.
+4. Expected: the task provisions (or launches) a backend on the configured `PW_BASE_URL` for the duration of the spec, runs the voter happy-path against it, and tears it down — mirroring how `test:e2e:slidev` and CI wire the stack.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
