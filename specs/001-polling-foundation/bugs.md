@@ -39,3 +39,24 @@
 **Root Cause**: `SpaForwardingConfig` used `@GetMapping("/admin/{*sub}")` to forward every `/admin/**` request to the shell at `/admin/index.html`. Spring's `forward:` prefix re-dispatches through the DispatcherServlet, so the forwarded URL matched the same `{*sub}` pattern (with `sub=index.html`) and forwarded again ad infinitum, exhausting the stack in `ServletRequestWrapper.getRemoteAddr`. Spring's `PathPattern` has no way to exclude dotted segments from a `{*name}` multi-segment capture, so no pattern tweak could stop the loop while keeping the controller shape. The voter half at `/` looked broken as a side-effect because the admin shell never rendered — the voter SPA itself already has a `LandingPage` route for `/` and was fine.
 
 **Fix Reference**: T-B003 in `tasks.md`. Replaced the `/admin/{*sub}` controller mapping with a `WebMvcConfigurer` resource handler under `classpath:/static/admin/` whose `PathResourceResolver` serves the real file when it exists (shell, hashed assets) and falls back to `index.html` for dot-less deep links (e.g. `/admin/polls/42`). Dotted missing paths (e.g. `/admin/assets/gone.js`) now surface a 404 so the browser never tries to execute HTML as JavaScript; a new `NoResourceFoundException` handler in `GlobalExceptionHandler` maps that to a proper 404 Problem envelope instead of the generic 500 catch-all. Added `/admin` (no trailing slash) → `/admin/` redirect so Vue Router's base resolves correctly. `SpaCatchAllIT` was extended with five new assertions locking the new direct-serve behaviour (shell body contents, shell content-type, literal `/admin/index.html`, missing-asset 404, trailing-slash redirect).
+
+---
+
+## BUG-003
+
+**Reported**: 2026-04-20
+**Severity**: high
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: Admin SPA renders an "unauthenticated" state without a login form, leaving users no way to authenticate.
+
+**Reproduction Steps**:
+1. From the repo root, run `task up` (or `docker compose -f compose.dev.yml up -d --build`).
+2. Wait for `slidev-polls-postgres` to report healthy and `slidev-polls-backend` to finish migrations and bind to `:8080`.
+3. With no existing admin session, open `http://localhost:8080/admin/` in a browser.
+4. Expected: a login form is rendered so the user can authenticate. Observed: the admin shell reports the user is not authenticated but shows no login form — there is no way to sign in from the UI.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
