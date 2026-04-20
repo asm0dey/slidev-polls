@@ -34,7 +34,13 @@ export interface AdminApiOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   onUnauthorized?: () => void;
+  /** Returns the cookie string used to extract the CSRF token. Defaults to `document.cookie`. */
+  cookieReader?: () => string;
 }
+
+const CSRF_COOKIE = "XSRF-TOKEN";
+const CSRF_HEADER = "X-XSRF-TOKEN";
+const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
 
 /**
  * Thin wrapper for the /api/admin/** surface. All calls send credentials so
@@ -43,12 +49,16 @@ export interface AdminApiOptions {
 export class AdminApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly cookieReader: () => string;
   private onUnauthorized?: () => void;
 
   constructor(opts: AdminApiOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? "").replace(/\/$/, "");
     this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
     this.onUnauthorized = opts.onUnauthorized;
+    this.cookieReader =
+      opts.cookieReader ??
+      (() => (typeof document !== "undefined" ? document.cookie : ""));
   }
 
   setOnUnauthorized(handler: (() => void) | undefined): void {
@@ -149,10 +159,20 @@ export class AdminApiClient {
     body?: unknown,
     expectJson = true
   ): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    // CSRF: SecurityConfig protects /api/admin/** (except /login) with CookieCsrfTokenRepository.
+    // The backend sets XSRF-TOKEN on every response; we must echo it as X-XSRF-TOKEN on every
+    // state-changing call or Spring's CsrfFilter rejects with AccessDeniedException, which the
+    // ProblemAccessDeniedHandler maps to HTTP 403 + code FORBIDDEN.
+    if (!CSRF_SAFE_METHODS.has(method.toUpperCase()) && path !== "/api/admin/login") {
+      const token = readCookie(this.cookieReader(), CSRF_COOKIE);
+      if (token) headers[CSRF_HEADER] = token;
+    }
     const init: RequestInit = {
       method,
       credentials: "same-origin",
-      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined
     };
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, init);
@@ -168,6 +188,19 @@ export class AdminApiClient {
     }
     return (await res.json()) as T;
   }
+}
+
+function readCookie(cookieString: string, name: string): string | null {
+  if (!cookieString) return null;
+  for (const part of cookieString.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const k = part.slice(0, eq).trim();
+    if (k === name) {
+      return decodeURIComponent(part.slice(eq + 1).trim());
+    }
+  }
+  return null;
 }
 
 /**

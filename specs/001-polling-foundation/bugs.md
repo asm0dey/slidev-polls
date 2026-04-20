@@ -67,7 +67,7 @@
 
 **Reported**: 2026-04-20
 **Severity**: high
-**Status**: reported
+**Status**: fixed
 **GitHub Issue**: _(none)_
 
 **Description**: Submitting the "create poll" form in the backoffice SPA fails with the user-facing error "You don't own this poll." — a fresh admin cannot create any poll.
@@ -79,6 +79,6 @@
 4. Navigate to the "new poll" flow and fill in a title, one question with at least two options, and submit.
 5. Expected: the poll is created and the UI navigates to the editor/detail view for the new poll. Observed: the form shows the error "You don't own this poll." and the poll is not usable (inline `describeError` branch for `err.code === "FORBIDDEN"` in `frontends/backoffice/src/pages/PollEditorPage.vue:118-119`). The backend `POST /api/admin/polls` either returns HTTP 403 on the create itself, or the follow-up read-after-create call returns 403 — investigation must determine which call is emitting `FORBIDDEN` since `PollController#create` does not perform an ownership check against an existing poll and should not reject the authenticated creator.
 
-**Root Cause**: _(empty until investigation)_
+**Root Cause**: `POST /api/admin/polls` is CSRF-protected (`SecurityConfig` enables `CookieCsrfTokenRepository` for everything under `/api/admin/**` except `/api/admin/login`), but `AdminApiClient.send` never reads the `XSRF-TOKEN` cookie nor attaches an `X-XSRF-TOKEN` request header on state-changing methods. Spring's `CsrfFilter` therefore rejects the create call with `AccessDeniedException` from `InvalidCsrfTokenException`; `ProblemAccessDeniedHandler` translates that to HTTP 403 with body `{"code":"FORBIDDEN","message":"access denied"}`, and `describeError` in `PollEditorPage.vue` maps `err.code === "FORBIDDEN"` to "You don't own this poll." — the misleading text since the same code is also used for legitimate ownership rejections elsewhere. The 403 originated from the create POST itself, not from any follow-up call. `PollController#create` is never reached, so no ownership logic was involved.
 
-**Fix Reference**: _(empty until implementation)_
+**Fix Reference**: T-B007 in `tasks.md`. Taught `AdminApiClient.send` to look up the `XSRF-TOKEN` cookie via `document.cookie` and attach `X-XSRF-TOKEN` on every state-changing call to `/api/admin/**` except `/api/admin/login`. Spring's `CookieCsrfTokenRepository.withHttpOnlyFalse()` plus `CsrfTokenRequestAttributeHandler.setCsrfRequestAttributeName(null)` already eagerly writes the cookie on every response (including the 401 the SPA gets before login and the 204 from the login endpoint), so the cookie is always present when the SPA needs to echo it. `AdminApiClient` is now wired with a `cookieReader` option (defaulting to `() => document.cookie`) so unit tests can supply a deterministic cookie string when exercising the CSRF header path.
