@@ -33,6 +33,7 @@ export class AdminApiError extends Error {
 export interface AdminApiOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  onUnauthorized?: () => void;
 }
 
 /**
@@ -42,10 +43,16 @@ export interface AdminApiOptions {
 export class AdminApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private onUnauthorized?: () => void;
 
   constructor(opts: AdminApiOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? "").replace(/\/$/, "");
     this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
+    this.onUnauthorized = opts.onUnauthorized;
+  }
+
+  setOnUnauthorized(handler: (() => void) | undefined): void {
+    this.onUnauthorized = handler;
   }
 
   async login(body: LoginRequest): Promise<void> {
@@ -150,7 +157,11 @@ export class AdminApiClient {
     };
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, init);
     if (!res.ok) {
-      throw await toAdminError(res);
+      const err = await toAdminError(res);
+      if (res.status === 401 && path !== "/api/admin/login" && this.onUnauthorized) {
+        this.onUnauthorized();
+      }
+      throw err;
     }
     if (!expectJson || res.status === 204) {
       return undefined as T;
