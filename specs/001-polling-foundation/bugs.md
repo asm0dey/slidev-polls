@@ -82,3 +82,27 @@
 **Root Cause**: `POST /api/admin/polls` is CSRF-protected (`SecurityConfig` enables `CookieCsrfTokenRepository` for everything under `/api/admin/**` except `/api/admin/login`), but `AdminApiClient.send` never reads the `XSRF-TOKEN` cookie nor attaches an `X-XSRF-TOKEN` request header on state-changing methods. Spring's `CsrfFilter` therefore rejects the create call with `AccessDeniedException` from `InvalidCsrfTokenException`; `ProblemAccessDeniedHandler` translates that to HTTP 403 with body `{"code":"FORBIDDEN","message":"access denied"}`, and `describeError` in `PollEditorPage.vue` maps `err.code === "FORBIDDEN"` to "You don't own this poll." — the misleading text since the same code is also used for legitimate ownership rejections elsewhere. The 403 originated from the create POST itself, not from any follow-up call. `PollController#create` is never reached, so no ownership logic was involved.
 
 **Fix Reference**: T-B007 in `tasks.md`. Taught `AdminApiClient.send` to look up the `XSRF-TOKEN` cookie via `document.cookie` and attach `X-XSRF-TOKEN` on every state-changing call to `/api/admin/**` except `/api/admin/login`. Spring's `CookieCsrfTokenRepository.withHttpOnlyFalse()` plus `CsrfTokenRequestAttributeHandler.setCsrfRequestAttributeName(null)` already eagerly writes the cookie on every response (including the 401 the SPA gets before login and the 204 from the login endpoint), so the cookie is always present when the SPA needs to echo it. `AdminApiClient` is now wired with a `cookieReader` option (defaulting to `() => document.cookie`) so unit tests can supply a deterministic cookie string when exercising the CSRF header path.
+
+---
+
+## BUG-005
+
+**Reported**: 2026-04-20
+**Severity**: high
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: Opening the voter-facing page for a created poll (e.g. `http://localhost:8080/bug-004-regression-e2e`) renders an empty shell — no poll content is shown. The URL is taken directly from the polls list in the backoffice SPA, so a link the admin UI advertises as valid leads to a blank page for voters.
+
+**Reproduction Steps**:
+1. From the repo root, run `task up` (or `docker compose -f compose.dev.yml up -d --build`).
+2. Wait for `slidev-polls-postgres` to be healthy and `slidev-polls-backend` to bind to `:8080`.
+3. Open `http://localhost:8080/admin/` and log in as `alice` / `correct-horse`.
+4. Create at least one poll (or reuse an existing one such as the BUG-004 regression poll with slug `bug-004-regression-e2e`).
+5. From the admin polls view, copy the voter link surfaced for that poll — e.g. `http://localhost:8080/bug-004-regression-e2e`.
+6. Open that URL in a fresh browser tab (no admin session assumed).
+7. Expected: the voter SPA renders the poll (question, options, vote controls) for the slug. Observed: the shell loads but the page is empty — no poll content is rendered, and the user has no way to vote.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
