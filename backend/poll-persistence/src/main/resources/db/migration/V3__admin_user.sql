@@ -17,10 +17,10 @@ ALTER TABLE polls
 
 -- Seed a known presenter so the quickstart and the TS-001-family scenarios
 -- in backoffice-authoring.feature can log in without an admin CLI.
--- pgcrypto's crypt(..., gen_salt('bf', 10)) produces a BCrypt-compatible
--- hash; Spring Security's BCryptPasswordEncoder validates regardless of the
--- per-install salt, so the literal password "correct-horse" keeps working.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
+-- Spring Security's BCryptPasswordEncoder validates any BCrypt hash regardless
+-- of per-install salt, so a precomputed hash for "correct-horse" is safe to
+-- check in. This avoids depending on the pgcrypto contrib extension at
+-- migration time (BUG-001: some Postgres environments failed to resolve
+-- gen_salt(...) even after CREATE EXTENSION succeeded).
 INSERT INTO admin_user (username, display_name, bcrypt_hash) VALUES
-    ('alice', 'Alice Presenter', crypt('correct-horse', gen_salt('bf', 10)));
+    ('alice', 'Alice Presenter', '$2a$10$9CvgAtcz7/XAUwDSz/7Uuu7K85lbQAGe8EqYH8Wvh4auT.ZO1Siai');
