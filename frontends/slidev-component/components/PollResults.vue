@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, useAttrs } from "vue";
 import {
   openPollStream,
   type QuestionClosedEvent,
@@ -8,26 +8,42 @@ import {
 } from "@polls/shared";
 import PollBar from "./PollBar.vue";
 import PollHeader from "./PollHeader.vue";
+import { useDeckAuth } from "../composables/useDeckAuth";
 
-/**
- * Props:
- *   - {@code slug}     — the poll's slug; drives the SSE subscription URL.
- *   - {@code server}   — optional base URL; defaults to same-origin ("").
- *   - {@code questionId} / {@code deckToken} / {@code pollId} — when all three are supplied,
- *     mounting the component requests deck-driven activation of {@code questionId} via
- *     {@code POST /api/deck/polls/{pollId}/activate}.
- *
- * Live-reliability (Principle IV): any failure of the activation or the SSE subscription
- * surfaces a "live updates paused" badge and leaves the deck navigable. No error state can crash
- * the slide.
- */
+// Props:
+//   - slug          → drives the SSE subscription URL.
+//   - server        → optional base URL; defaults to same-origin.
+//   - questionId    → the slide's question; drives the activation payload.
+//   - pollId        → the poll id; drives the activation URL.
+//
+// Feature 002 removed the `deckToken` prop: the bearer now comes from the in-deck auth
+// control via `useDeckAuth()`, and the deck token is never embedded in slide markdown
+// again (plan.md §Constraints). A dev-only console.warn below catches slides still
+// passing :deckToken so the author sees the regression immediately.
+//
+// Live-reliability (Principle IV): any failure of the activation or the SSE subscription
+// surfaces a "live updates paused" badge and leaves the deck navigable. A 401
+// DECK_TOKEN_INVALID on the activation POST flips the composable to "revoked" so the auth
+// control reverts to the not-signed-in visual (FR-008).
 const props = defineProps<{
   slug: string;
   server?: string;
   questionId?: string;
-  deckToken?: string;
   pollId?: string;
 }>();
+
+const auth = useDeckAuth();
+
+// Slides passing a stale :deckToken="..." land here as an untyped attr; warn in dev so the
+// author notices the regression before a production run (research.md D-005).
+const attrs = useAttrs();
+const isDev = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+if (isDev && "deckToken" in attrs) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[slidev-polls] `deckToken` prop removed in 002; sign in via the in-deck auth control."
+  );
+}
 
 const snapshot = ref<SnapshotEvent | null>(null);
 const paused = ref(false);
@@ -40,22 +56,39 @@ const total = computed(() => {
 });
 
 async function activateFromDeck(base: string) {
-  // All three props are required — partial activation surfaces just ignore the call rather than
-  // crash the mount path (Principle IV).
-  if (!props.questionId || !props.deckToken || !props.pollId) return;
+  // FR-007: zero activation calls unless the composable is currently signed-in.
+  if (auth.status.value !== "signed-in") return;
+  if (!props.questionId || !props.pollId) return;
+  const token = auth.state.value.token;
+  if (!token) return;
+
   const url = `${base.replace(/\/$/, "")}/api/deck/polls/${encodeURIComponent(props.pollId)}/activate`;
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Deck-Token": props.deckToken
+        "X-Deck-Token": token
       },
       body: JSON.stringify({ questionId: props.questionId })
     });
+    if (res.status === 401) {
+      // Classify by Problem envelope code (plan.md §Constraints). Only DECK_TOKEN_INVALID
+      // triggers a local revocation flip; other 401 shapes are treated as transient (kept
+      // signed-in so the next navigation re-tries) per Principle IV.
+      try {
+        const body = (await res.clone().json()) as { code?: string };
+        if (body.code === "DECK_TOKEN_INVALID") {
+          auth.markRevoked();
+        }
+      } catch {
+        // No parseable body — do nothing; the next activation will re-try.
+      }
+    }
   } catch {
-    // Swallowed: the public stream will still deliver whatever state the backend already holds;
-    // a transient activation error MUST NOT block the slide from rendering.
+    // Transport failures are swallowed here (Principle IV) — the SSE stream still
+    // delivers whatever state the backend already holds. The paused badge and the
+    // auth control's `couldn't reach server` messages cover the user-facing surface.
   }
 }
 
@@ -77,8 +110,6 @@ onMounted(async () => {
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
-      // Render a soft "just closed" notice until the next snapshot arrives — the backend will
-      // follow with a fresh snapshot the moment a new question becomes active.
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         closedNotice.value = snapshot.value.activeQuestion.prompt;
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
