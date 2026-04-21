@@ -97,6 +97,14 @@ onMounted(async () => {
   await activateFromDeck(base);
   stop = openPollStream(base, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
+      // @TS-144 — when the slide declares its own questionId, a snapshot for a different
+      // active question (the presenter moved on elsewhere) MUST NOT swap the viewer's
+      // local slide content. The slide stays focused on its own question; the SSE stream
+      // keeps delivering tally updates for that questionId.
+      if (props.questionId && ev.activeQuestion?.id !== props.questionId) {
+        paused.value = false;
+        return;
+      }
       snapshot.value = ev;
       paused.value = false;
       closedNotice.value = null;

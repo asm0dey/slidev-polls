@@ -331,6 +331,123 @@ describe("PollResults", () => {
     expect(wrapper.get("[data-testid='poll-waiting']").text()).toMatch(/waiting/i);
   });
 
+  // @TS-140 — anonymous mount renders live results visualisation and NO "set active"
+  // affordance (FR-012). The slide is viewer-grade; presenter controls live outside it.
+  it("TS-140: anonymous mount renders live results and no activation affordance", async () => {
+    authStub = makeAuthStub({ status: "anonymous" });
+    const wrapper = mountResults({ slug: "my-talk", questionId: "q-1", pollId: "p-1" });
+    await flushPromises();
+    capturedHandlers!.onSnapshot(
+      snapshot("q-1", [
+        { id: "opt-a", label: "A", position: 0 },
+        { id: "opt-b", label: "B", position: 1 }
+      ])
+    );
+    await flushPromises();
+    expect(wrapper.find("[data-testid='poll-bar-opt-a']").exists()).toBe(true);
+    // No element that would let a viewer flip the active question.
+    expect(wrapper.find("[data-testid='set-active']").exists()).toBe(false);
+    expect(wrapper.find("button.activate").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='deck-activate']").exists()).toBe(false);
+  });
+
+  // @TS-141 — a TallyDeltaEvent arriving at t=0 is reflected in the DOM at t ≤ 2000 ms.
+  it("TS-141: tally update reflected within the 2s live-update budget", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountResults({ slug: "my-talk" });
+      await flushPromises();
+      capturedHandlers!.onSnapshot(
+        snapshot("q-1", [
+          { id: "opt-a", label: "A", position: 0 },
+          { id: "opt-b", label: "B", position: 1 }
+        ])
+      );
+      await flushPromises();
+      capturedHandlers!.onTally({
+        pollId: "p-1",
+        questionId: "q-1",
+        optionId: "opt-a",
+        count: 7,
+        emittedAt: new Date().toISOString()
+      });
+      vi.advanceTimersByTime(2000);
+      await flushPromises();
+      expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("7");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // @TS-142 — SSE drop shows "live updates paused"; unmount stays clean.
+  it("TS-142: SSE drop shows paused indicator, unmount stays responsive", async () => {
+    const wrapper = mountResults({ slug: "my-talk" });
+    await flushPromises();
+    capturedHandlers!.onConnectionStateChange?.("paused");
+    await flushPromises();
+    expect(wrapper.get("[data-testid='poll-paused']").text()).toMatch(/live updates paused/i);
+    wrapper.unmount();
+    expect(unsubscribeCalls).toBe(1);
+  });
+
+  // @TS-143 — reconnect clears the paused indicator and resumes rendering live snapshots.
+  it("TS-143: SSE reconnect clears paused and resumes updates", async () => {
+    const wrapper = mountResults({ slug: "my-talk" });
+    await flushPromises();
+    capturedHandlers!.onConnectionStateChange?.("paused");
+    await flushPromises();
+    expect(wrapper.find("[data-testid='poll-paused']").exists()).toBe(true);
+    capturedHandlers!.onConnectionStateChange?.("open");
+    capturedHandlers!.onSnapshot(
+      snapshot("q-2", [
+        { id: "opt-x", label: "X", position: 0 },
+        { id: "opt-y", label: "Y", position: 1 }
+      ])
+    );
+    await flushPromises();
+    expect(wrapper.find("[data-testid='poll-paused']").exists()).toBe(false);
+    expect(wrapper.get("[data-testid='poll-bar-opt-x']").text()).toContain("X");
+  });
+
+  // @TS-144 — a slide mounted with questionId=Q1 keeps showing Q1's results even when a
+  // Q2 activation snapshot arrives for the same poll. The local props.questionId wins.
+  it("TS-144: local questionId is independent of a remote Q2 activation", async () => {
+    const wrapper = mountResults({ slug: "my-talk", questionId: "q-1", pollId: "p-1" });
+    await flushPromises();
+    capturedHandlers!.onSnapshot(
+      snapshot(
+        "q-1",
+        [
+          { id: "opt-a", label: "Alpha", position: 0 },
+          { id: "opt-b", label: "Bravo", position: 1 }
+        ],
+        { "opt-a": 2, "opt-b": 3 }
+      )
+    );
+    await flushPromises();
+    // Presenter activates Q2 elsewhere — backend emits a Q2-scoped snapshot.
+    capturedHandlers!.onSnapshot(
+      snapshot("q-2", [
+        { id: "opt-c", label: "Charlie", position: 0 },
+        { id: "opt-d", label: "Delta", position: 1 }
+      ])
+    );
+    await flushPromises();
+    // The Q1 slide continues to render Q1's options — a Q2 option MUST NOT appear.
+    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("Alpha");
+    expect(wrapper.find("[data-testid='poll-bar-opt-c']").exists()).toBe(false);
+    // Tallies for Q1 still land on the Q1 view.
+    capturedHandlers!.onTally({
+      pollId: "p-1",
+      questionId: "q-1",
+      optionId: "opt-a",
+      count: 9,
+      emittedAt: new Date().toISOString()
+    });
+    await flushPromises();
+    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("9");
+  });
+
   // Unmounting releases the SSE subscription.
   it("stops the stream on unmount", async () => {
     const wrapper = mountResults();
