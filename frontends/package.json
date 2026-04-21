@@ -6,7 +6,8 @@
     "shared",
     "voter",
     "backoffice",
-    "slidev-component"
+    "slidev-component",
+    "slidev-demo"
   ],
   "scripts": {
     "lint": "eslint .",

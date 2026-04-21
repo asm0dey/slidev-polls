@@ -135,6 +135,13 @@ tasks:
     cmds:
       - bun run test
 
+  slidev:demo:
+    desc: Seed a demo poll on the running backend and launch the Slidev demo deck
+    dir: frontends/slidev-demo
+    cmds:
+      - bun run seed
+      - bun run slidev
+
   test:e2e:voter:
     desc: Run Playwright voter happy-path (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
     dir: frontends/voter
