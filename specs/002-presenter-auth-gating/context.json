@@ -1,0 +1,8 @@
+{
+  "testify": {
+    "assertion_hash": "4c49deb1aac25d8602248b7d3604a90a8f1ea807ef3e4d068050f55ba6813dab",
+    "generated_at": "2026-04-21T12:04:27Z",
+    "features_dir": "specs/002-presenter-auth-gating/tests/features",
+    "file_count": 3
+  }
+}
