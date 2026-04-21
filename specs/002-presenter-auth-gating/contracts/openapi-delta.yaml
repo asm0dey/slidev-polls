@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Slidev Polls — Presenter Auth Gating Delta
+  version: 0.3.0
+  description: >
+    Delta against feature 001's `contracts/openapi.yaml`. Adds the
+    deck-token-authenticated self-inspection endpoint that the Slidev
+    addon's in-deck auth control uses to verify a freshly-pasted
+    token and to re-validate on page reload (FR-002, FR-003, FR-005,
+    FR-008, SC-002, SC-003, SC-005). No other endpoints change. No
+    existing schemas change.
+
+servers:
+  - url: http://localhost:8080
+
+tags:
+  - name: deck-auth
+    description: Self-inspection of the deck-token credential.
+
+paths:
+  /api/deck/auth/me:
+    get:
+      tags: [deck-auth]
+      summary: >
+        Validate the caller's deck token and return its scope.
+        Side-effect-free (idempotent GET) — used by the addon's
+        auth control to transition to the "signed in" visual
+        without relying on the next activation POST as a probe.
+      description: >
+        Authenticated by the same `X-Deck-Token` header bearer
+        matching flow as `/api/deck/polls/{pollId}/activate`
+        (001 DeckTokenAuthenticationFilter). An absent, unknown,
+        or revoked bearer produces the standard
+        `Problem{code: DECK_TOKEN_INVALID}` 401 envelope via
+        `ProblemAuthenticationEntryPoint`. No poll-scope check
+        applies here: the endpoint does not name a poll.
+      security: [{ deckToken: [] }]
+      responses:
+        '200':
+          description: Token is valid and not revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeckPrincipalView' }
+        '401':
+          description: Missing, unknown, or revoked deck token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+  securitySchemes:
+    deckToken:
+      type: apiKey
+      in: header
+      name: X-Deck-Token
+
+  schemas:
+    # Reused verbatim from 001; reproduced here so the delta is self-
+    # contained for review.
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - AUTH_REQUIRED
+            - FORBIDDEN
+            - NOT_FOUND
+            - VALIDATION_FAILED
+            - ALREADY_VOTED
+            - QUESTION_NOT_ACTIVE
+            - ACTIVATION_REJECTED
+            - SLUG_TAKEN
+            - SLUG_INVALID
+            - SLUG_RESERVED
+            - DECK_TOKEN_INVALID
+            - DECK_TOKEN_POLL_MISMATCH
+            - TRANSPORT_FAILURE
+        message: { type: string }
+        correlationId: { type: string }
+
+    DeckPrincipalView:
+      type: object
+      required: [tokenId, pollId]
+      properties:
+        tokenId: { type: string, format: uuid }
+        pollId:  { type: string, format: uuid }
+        label:
+          type: string
+          nullable: true
+          description: Optional human label set at mint time (maxLength 120 in 001).

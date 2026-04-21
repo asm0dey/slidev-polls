@@ -2,14 +2,18 @@
   "tdd_determination": "mandatory",
   "planview": {
     "nodeClassifications": {
-      "Voter SPA (bun+Vite)": "client",
-      "Backoffice SPA (bun+Vite)": "client",
-      "Slidev Addon (Vue component)": "client",
+      "Slidev Deck (addon)": "client",
+      "DeckAuthControl + useDeckAuth": "client",
+      "PollResults (SSE consumer)": "client",
+      "Voter SPA": "client",
+      "Backoffice SPA": "client",
       "poll-api (Spring Boot)": "server",
-      "poll-core": "server",
-      "poll-persistence (jOOQ)": "server",
-      "poll-realtime (SseHub)": "server",
-      "PostgreSQL 16": "storage"
+      "DeckTokenAuthenticationFilter": "server",
+      "DeckAuthController": "server",
+      "DeckActivationController": "server",
+      "DeckTokenService": "server",
+      "PostgreSQL (deck_tokens)": "storage",
+      "Browser localStorage": "storage"
     }
   }
 }
