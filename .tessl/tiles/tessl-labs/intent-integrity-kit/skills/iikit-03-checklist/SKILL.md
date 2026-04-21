@@ -5,7 +5,7 @@ description: >-
   Use when reviewing a spec for gaps, doing a requirements review, verifying PRD quality, auditing user stories and acceptance criteria, or gating before implementation.
 license: MIT
 metadata:
-  version: "2.9.7"
+  version: "2.9.12"
 ---
 
 # Intent Integrity Kit Checklist

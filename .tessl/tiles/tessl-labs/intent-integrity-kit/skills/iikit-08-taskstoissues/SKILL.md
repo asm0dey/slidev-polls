@@ -5,7 +5,7 @@ description: >-
   Use when exporting work items to GitHub, setting up project boards, or assigning tasks to team members.
 license: MIT
 metadata:
-  version: "2.9.7"
+  version: "2.9.12"
 ---
 
 # Intent Integrity Kit Tasks to Issues

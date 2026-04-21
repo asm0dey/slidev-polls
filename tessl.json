@@ -3,7 +3,7 @@
   "mode": "vendored",
   "dependencies": {
     "tessl-labs/intent-integrity-kit": {
-      "version": "2.9.8"
+      "version": "2.9.14"
     }
   }
 }

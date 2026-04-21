@@ -115,8 +115,21 @@ if [[ -n "$STAGED_CODE_FILES" ]]; then
 
         # ── Gate 1: Step definitions directory must exist with at least one file ──
         # Warning only — agent may not have created step_definitions yet
+        # Check both working tree AND staging area (files may be staged but not yet on disk during /iikit-07-implement)
         STEP_DEFS_DIR="$feat_dir/tests/step_definitions"
-        if [[ ! -d "$STEP_DEFS_DIR" ]] || [[ -z "$(ls -A "$STEP_DEFS_DIR" 2>/dev/null)" ]]; then
+        STEP_DEFS_FOUND=false
+        if [[ -d "$STEP_DEFS_DIR" ]] && [[ -n "$(ls -A "$STEP_DEFS_DIR" 2>/dev/null)" ]]; then
+            STEP_DEFS_FOUND=true
+        fi
+        if [[ "$STEP_DEFS_FOUND" == false ]]; then
+            # Check if step definition files are staged in the git index (exclude deletions)
+            FEAT_REL_PATH="specs/$FEAT_NAME"
+            STAGED_STEP_DEFS=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null | grep -F -- "$FEAT_REL_PATH/tests/step_definitions/") || true
+            if [[ -n "$STAGED_STEP_DEFS" ]]; then
+                STEP_DEFS_FOUND=true
+            fi
+        fi
+        if [[ "$STEP_DEFS_FOUND" == false ]]; then
             echo "[iikit] Warning: specs/$FEAT_NAME — missing step definitions" >&2
             echo "[iikit]   Expected: specs/$FEAT_NAME/tests/step_definitions/ with at least one file" >&2
             echo "[iikit]   Run /iikit-07-implement to generate step definitions." >&2
@@ -166,7 +179,7 @@ if [[ -n "$STAGED_CODE_FILES" ]]; then
         done
         echo "" >&2
         echo "[iikit] .feature files exist — code commits require proper BDD wiring." >&2
-        echo "[iikit] To bypass (NOT recommended): git commit --no-verify" >&2
+        echo "[iikit] Fix the BDD setup before committing. Do NOT use --no-verify." >&2
         echo "" >&2
         exit 1
     fi
@@ -439,7 +452,7 @@ if [[ "$BLOCKED" == true ]]; then
     done
     echo "" >&2
     echo "[iikit] To fix: Re-run /iikit-04-testify to regenerate test specs with valid hashes." >&2
-    echo "[iikit] To bypass (NOT recommended): git commit --no-verify" >&2
+    echo "[iikit] Do NOT use --no-verify to bypass this check." >&2
     echo "" >&2
     exit 1
 fi

@@ -103,6 +103,8 @@ tasks:
       - task: test:voter
       - task: test:backoffice
       - task: test:slidev
+      - task: test:e2e:voter
+      - task: test:e2e:slidev
 
   test:backend:
     desc: Run the Maven reactor tests (unit + integration)

@@ -1,6 +1,6 @@
 {
   "name": "tessl-labs/intent-integrity-kit",
-  "version": "2.9.8",
+  "version": "2.9.14",
   "summary": "Closing the intent-to-code chasm - specification-driven development with BDD verification chain",
   "private": false,
   "repository": "https://github.com/intent-integrity-chain/kit",
