@@ -141,6 +141,10 @@ tasks:
     cmds:
       - task: e2e:backend-up
       - defer: { task: e2e:backend-down }
+      # Ensure slidev CLI + addon are resolved for the workspace — cheap when
+      # already installed (bun reports "no changes"). Runs at the workspace
+      # root since workspace:* links only resolve from there.
+      - bun install --cwd ..
       - bun run seed
       - bun run slidev
 
