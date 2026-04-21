@@ -26,10 +26,10 @@
 
 **Purpose**: Create the empty files and overlay hookup that both stories will fill in. No behaviour yet; these establish the layout declared in `plan.md` §Project Structure.
 
-- [ ] T001 Create `frontends/slidev-component/composables/` directory and an empty placeholder `useDeckAuth.ts` (exports stub symbol) so downstream import paths resolve during red-phase test runs.
-- [ ] T002 [P] Add empty `frontends/slidev-component/global-top.vue` (template-only, mounts nothing yet) so Slidev's overlay slot is claimed by the addon build.
-- [ ] T003 [P] Add empty `frontends/slidev-component/components/DeckAuthControl.vue` (script+template shell, no behaviour) as the target for component tests.
-- [ ] T004 [P] Add empty `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/dto/` directory and placeholder `DeckPrincipalView.java` record with the three fields from `data-model.md` (no controller wired yet).
+- [x] T001 Create `frontends/slidev-component/composables/` directory and an empty placeholder `useDeckAuth.ts` (exports stub symbol) so downstream import paths resolve during red-phase test runs.
+- [x] T002 [P] Add empty `frontends/slidev-component/global-top.vue` (template-only, mounts nothing yet) so Slidev's overlay slot is claimed by the addon build.
+- [x] T003 [P] Add empty `frontends/slidev-component/components/DeckAuthControl.vue` (script+template shell, no behaviour) as the target for component tests.
+- [x] T004 [P] Add empty `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/dto/` directory and placeholder `DeckPrincipalView.java` record with the three fields from `data-model.md` (no controller wired yet).
 
 **Checkpoint**: Workspace compiles (`./mvnw -pl poll-api -am compile`, `bun --cwd frontends/slidev-component run build`). No behaviour added; no tests expected to pass or fail yet.
 
@@ -41,8 +41,8 @@
 
 **CRITICAL**: No user story implementation work can begin until this phase is complete.
 
-- [ ] T005 Define the `DeckAuthStatus` union (`"anonymous" | "signed-in-pending" | "signed-in" | "revoked"`) and the `DeckAuthState` / `UseDeckAuthReturn` TypeScript interfaces in `frontends/slidev-component/composables/useDeckAuth.ts` per `data-model.md` §DeckAuthState. Export types only; runtime functions throw `not-yet-implemented` so composable tests will fail red as required by Principle III.
-- [ ] T006 [P] Declare `DeckPrincipalView` fields (`tokenId: UUID`, `pollId: UUID`, `label: String?`) as an immutable Java record in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/dto/DeckPrincipalView.java` per `contracts/openapi-delta.yaml` and `data-model.md` §DeckPrincipalView. Controller wiring lands in T017.
+- [x] T005 Define the `DeckAuthStatus` union (`"anonymous" | "signed-in-pending" | "signed-in" | "revoked"`) and the `DeckAuthState` / `UseDeckAuthReturn` TypeScript interfaces in `frontends/slidev-component/composables/useDeckAuth.ts` per `data-model.md` §DeckAuthState. Export types only; runtime functions throw `not-yet-implemented` so composable tests will fail red as required by Principle III.
+- [x] T006 [P] Declare `DeckPrincipalView` fields (`tokenId: UUID`, `pollId: UUID`, `label: String?`) as an immutable Java record in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/dto/DeckPrincipalView.java` per `contracts/openapi-delta.yaml` and `data-model.md` §DeckPrincipalView. Controller wiring lands in T017.
 
 **Checkpoint**: Shared types resolvable by both TS and Java toolchains; no business logic yet.
 
@@ -58,27 +58,27 @@
 
 > **Write these FIRST and observe them fail before moving to implementation.**
 
-- [ ] T007 [P] [US1] `DeckAuthControllerTest.returns200WithScope_whenDeckTokenValid` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/DeckAuthControllerTest.java` — MockMvc call with `X-Deck-Token: <valid>` returns 200 and body fields `tokenId`, `pollId`, `label`. [TS-107]
-- [ ] T008 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenHeaderMissing` — no `X-Deck-Token` header → 401 Problem envelope code `DECK_TOKEN_INVALID`. [TS-108]
-- [ ] T009 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenBearerUnknown` — header present but token hash not in `deck_tokens` → 401 code `DECK_TOKEN_INVALID`. [TS-109]
-- [ ] T010 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenBearerRevoked` — token row present but marked revoked → 401 code `DECK_TOKEN_INVALID` (covers the cross-story prerequisite used later by TS-123).
-- [ ] T011 [P] [US1] `useDeckAuth.test.ts` in `frontends/slidev-component/composables/useDeckAuth.test.ts` — scenario: anonymous start → call `signIn(token)` → `fetch` returns 200 → status transitions `anonymous → signed-in-pending → signed-in`, `localStorage["slidev-polls:deck-auth"]` contains `{token, tokenId, pollId, label, verifiedAt}`. [TS-101]
-- [ ] T012 [P] [US1] `useDeckAuth.test.ts` — reload simulation: preload `localStorage` then call `useDeckAuth()`; status starts `signed-in-pending`; after a mocked 200 from `GET /api/deck/auth/me` status becomes `signed-in` with no user input. [TS-103]
-- [ ] T013 [P] [US1] `useDeckAuth.test.ts` — `signOut()` transitions back to `anonymous`, removes the `localStorage` key, and does NOT issue any backend request. [TS-104]
-- [ ] T014 [P] [US1] `useDeckAuth.test.ts` — `signIn` with a garbage token where the verify returns 401 `DECK_TOKEN_INVALID` keeps status `anonymous` and exposes the authentication-failure message `"credential not recognised"`. [TS-105]
-- [ ] T015 [P] [US1] `useDeckAuth.test.ts` — `signIn` where `fetch` rejects (network error) keeps status `anonymous` and exposes the distinct transport message `"couldn't reach server"`. [TS-106]
-- [ ] T016 [P] [US1] `DeckAuthControl.test.ts` in `frontends/slidev-component/components/DeckAuthControl.test.ts` — default render when `useDeckAuth()` status is `anonymous`: visible text/label reads "not signed in"; input field and submit button present. [TS-100]
-- [ ] T017 [P] [US1] `DeckAuthControl.test.ts` — signed-in render: when composable status is `signed-in` with `label: "Laptop"`, component shows a pill containing "Laptop" and a sign-out affordance. [TS-101]
-- [ ] T018 [P] [US1] `DeckAuthControl.test.ts` — activating sign-out affordance calls composable `signOut()` exactly once. [TS-104]
-- [ ] T019 [P] [US1] `DeckAuthControl.test.ts` — submitting garbage input surfaces `"credential not recognised"`; a network-failure variant surfaces `"couldn't reach server"`; both messages are rendered distinctly. [TS-105, TS-106]
-- [ ] T020 [P] [US1] `DeckAuthControl.test.ts` — across multiple mount/unmount cycles (simulating slide navigation) the component re-reads composable state without re-prompting; no hidden local state contradicts the composable. [TS-102]
+- [x] T007 [P] [US1] `DeckAuthControllerTest.returns200WithScope_whenDeckTokenValid` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/DeckAuthControllerTest.java` — MockMvc call with `X-Deck-Token: <valid>` returns 200 and body fields `tokenId`, `pollId`, `label`. [TS-107]
+- [x] T008 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenHeaderMissing` — no `X-Deck-Token` header → 401 Problem envelope code `DECK_TOKEN_INVALID`. [TS-108]
+- [x] T009 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenBearerUnknown` — header present but token hash not in `deck_tokens` → 401 code `DECK_TOKEN_INVALID`. [TS-109]
+- [x] T010 [P] [US1] `DeckAuthControllerTest.returns401DeckTokenInvalid_whenBearerRevoked` — token row present but marked revoked → 401 code `DECK_TOKEN_INVALID` (covers the cross-story prerequisite used later by TS-123).
+- [x] T011 [P] [US1] `useDeckAuth.test.ts` in `frontends/slidev-component/composables/useDeckAuth.test.ts` — scenario: anonymous start → call `signIn(token)` → `fetch` returns 200 → status transitions `anonymous → signed-in-pending → signed-in`, `localStorage["slidev-polls:deck-auth"]` contains `{token, tokenId, pollId, label, verifiedAt}`. [TS-101]
+- [x] T012 [P] [US1] `useDeckAuth.test.ts` — reload simulation: preload `localStorage` then call `useDeckAuth()`; status starts `signed-in-pending`; after a mocked 200 from `GET /api/deck/auth/me` status becomes `signed-in` with no user input. [TS-103]
+- [x] T013 [P] [US1] `useDeckAuth.test.ts` — `signOut()` transitions back to `anonymous`, removes the `localStorage` key, and does NOT issue any backend request. [TS-104]
+- [x] T014 [P] [US1] `useDeckAuth.test.ts` — `signIn` with a garbage token where the verify returns 401 `DECK_TOKEN_INVALID` keeps status `anonymous` and exposes the authentication-failure message `"credential not recognised"`. [TS-105]
+- [x] T015 [P] [US1] `useDeckAuth.test.ts` — `signIn` where `fetch` rejects (network error) keeps status `anonymous` and exposes the distinct transport message `"couldn't reach server"`. [TS-106]
+- [x] T016 [P] [US1] `DeckAuthControl.test.ts` in `frontends/slidev-component/components/DeckAuthControl.test.ts` — default render when `useDeckAuth()` status is `anonymous`: visible text/label reads "not signed in"; input field and submit button present. [TS-100]
+- [x] T017 [P] [US1] `DeckAuthControl.test.ts` — signed-in render: when composable status is `signed-in` with `label: "Laptop"`, component shows a pill containing "Laptop" and a sign-out affordance. [TS-101]
+- [x] T018 [P] [US1] `DeckAuthControl.test.ts` — activating sign-out affordance calls composable `signOut()` exactly once. [TS-104]
+- [x] T019 [P] [US1] `DeckAuthControl.test.ts` — submitting garbage input surfaces `"credential not recognised"`; a network-failure variant surfaces `"couldn't reach server"`; both messages are rendered distinctly. [TS-105, TS-106]
+- [x] T020 [P] [US1] `DeckAuthControl.test.ts` — across multiple mount/unmount cycles (simulating slide navigation) the component re-reads composable state without re-prompting; no hidden local state contradicts the composable. [TS-102]
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implement `DeckAuthController` (`GET /api/deck/auth/me`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/DeckAuthController.java`: resolves `DeckPrincipal` from Spring Security context (populated by existing `DeckTokenAuthenticationFilter`), loads row via `DeckTokenService.resolveLive(...)`, returns `DeckPrincipalView`. No new filter, no new auth surface (FR-009). Unblocks T007–T010.
-- [ ] T022 [US1] Implement the `useDeckAuth` composable body in `frontends/slidev-component/composables/useDeckAuth.ts`: reactive `status`, `state`, `signIn()`, `signOut()`, `markRevoked()` (stub — full revoked wiring lands in T028), and the reload-time background verify per `research.md` D-006. Uses `localStorage` key `slidev-polls:deck-auth`. Unblocks T011–T015.
-- [ ] T023 [US1] Implement `DeckAuthControl.vue` in `frontends/slidev-component/components/DeckAuthControl.vue`: three visible states (not signed in / pending / signed-in pill with label and sign-out); token input (trimmed, 20–512 printable-ASCII per `data-model.md`); three distinct status messages per FR-014. Unblocks T016–T020.
-- [ ] T024 [US1] Wire `DeckAuthControl` into `frontends/slidev-component/global-top.vue` so Slidev mounts it as an overlay on every slide per `research.md` D-001. Verify the overlay renders in both single-page and presenter-mode Slidev builds.
+- [x] T021 [US1] Implement `DeckAuthController` (`GET /api/deck/auth/me`) in `backend/poll-api/src/main/java/site/asm0dey/slidev/polls/api/deck/DeckAuthController.java`: resolves `DeckPrincipal` from Spring Security context (populated by existing `DeckTokenAuthenticationFilter`), loads row via `DeckTokenService.resolveLive(...)`, returns `DeckPrincipalView`. No new filter, no new auth surface (FR-009). Unblocks T007–T010.
+- [x] T022 [US1] Implement the `useDeckAuth` composable body in `frontends/slidev-component/composables/useDeckAuth.ts`: reactive `status`, `state`, `signIn()`, `signOut()`, `markRevoked()` (stub — full revoked wiring lands in T028), and the reload-time background verify per `research.md` D-006. Uses `localStorage` key `slidev-polls:deck-auth`. Unblocks T011–T015.
+- [x] T023 [US1] Implement `DeckAuthControl.vue` in `frontends/slidev-component/components/DeckAuthControl.vue`: three visible states (not signed in / pending / signed-in pill with label and sign-out); token input (trimmed, 20–512 printable-ASCII per `data-model.md`); three distinct status messages per FR-014. Unblocks T016–T020.
+- [x] T024 [US1] Wire `DeckAuthControl` into `frontends/slidev-component/global-top.vue` so Slidev mounts it as an overlay on every slide per `research.md` D-001. Verify the overlay renders in both single-page and presenter-mode Slidev builds.
 
 **Checkpoint**: US1 green. Presenter can sign in in-deck, state persists, sign-out works, reload rehydrates. `<PollResults>` is unchanged and still uses the old prop path — US2 cuts it over.
 
@@ -92,21 +92,21 @@
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Extend `PollResults.test.ts` in `frontends/slidev-component/components/PollResults.test.ts` with case `anonymous mount issues zero activation fetches`: mount with `useDeckAuth()` stub returning `{status: "anonymous"}` and `questionId`/`pollId` props supplied; assert `fetch` is NEVER called with any URL containing `/api/deck/polls/`. [TS-120, TS-121]
-- [ ] T026 [P] [US2] Extend `PollResults.test.ts` with case `signed-in mount issues exactly one activation POST with X-Deck-Token header`: composable stub `{status: "signed-in", token: "dtk-1", ...}`; assert one `fetch` call to the activate URL with method POST, header `X-Deck-Token: dtk-1`, body `{"questionId": "..."}`. [TS-122]
-- [ ] T027 [P] [US2] Extend `PollResults.test.ts` with case `activation 401 DECK_TOKEN_INVALID flips composable to revoked`: mocked `fetch` returns 401 with `Problem{code: DECK_TOKEN_INVALID}`; assert `useDeckAuth().markRevoked()` was invoked exactly once and composable status transitions to `"revoked"`; also assert the poll's local active-question pointer in the mounted component is not changed by the failed POST. [TS-123]
-- [ ] T028 [P] [US2] Rewrite pre-existing `PollResults.test.ts` scenarios `@TS-050`, `@TS-053`, `@TS-054`, `@TS-055` to drive the token through the `useDeckAuth()` stub instead of the deleted `deckToken` prop. Assertions preserved; the prop path goes away.
-- [ ] T029 [P] [US2] Add `DeckActivationIT.anonymousPostReturns401DeckTokenInvalid` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/DeckActivationIT.java` — POST `/api/deck/polls/{pollId}/activate` with no `X-Deck-Token` header and no session cookie returns 401 with code `DECK_TOKEN_INVALID`; poll's active-question pointer unchanged. [TS-124]
-- [ ] T030 [P] [US2] Add backend route-audit test `ActiveQuestionMutationRouteAuditTest` asserting that every controller method whose effect mutates `polls.active_question_id` is either under `/api/deck/**` (guarded by `DeckTokenAuthenticationFilter`) or `/api/backoffice/**` (guarded by session auth), and that each rejects anonymous calls with one of `AUTH_REQUIRED` / `DECK_TOKEN_INVALID` / `FORBIDDEN`. [TS-125, TS-126]
-- [ ] T031 [P] [US2] Extend `frontends/slidev-component/e2e/slidev-results.spec.ts` with scenario `anonymous browser issues zero activation traffic`: Playwright opens the deck page with empty storage, navigates across multiple poll slides, asserts no network request matched `**/api/deck/polls/*/activate`. [TS-120]
-- [ ] T032 [P] [US2] Extend `e2e/slidev-results.spec.ts` with scenario `signed-in browser issues activation on navigation`: test signs in via the in-deck control (DOM form), navigates, asserts exactly one `POST **/api/deck/polls/*/activate` with the `X-Deck-Token` header. [TS-122]
+- [x] T025 [P] [US2] Extend `PollResults.test.ts` in `frontends/slidev-component/components/PollResults.test.ts` with case `anonymous mount issues zero activation fetches`: mount with `useDeckAuth()` stub returning `{status: "anonymous"}` and `questionId`/`pollId` props supplied; assert `fetch` is NEVER called with any URL containing `/api/deck/polls/`. [TS-120, TS-121]
+- [x] T026 [P] [US2] Extend `PollResults.test.ts` with case `signed-in mount issues exactly one activation POST with X-Deck-Token header`: composable stub `{status: "signed-in", token: "dtk-1", ...}`; assert one `fetch` call to the activate URL with method POST, header `X-Deck-Token: dtk-1`, body `{"questionId": "..."}`. [TS-122]
+- [x] T027 [P] [US2] Extend `PollResults.test.ts` with case `activation 401 DECK_TOKEN_INVALID flips composable to revoked`: mocked `fetch` returns 401 with `Problem{code: DECK_TOKEN_INVALID}`; assert `useDeckAuth().markRevoked()` was invoked exactly once and composable status transitions to `"revoked"`; also assert the poll's local active-question pointer in the mounted component is not changed by the failed POST. [TS-123]
+- [x] T028 [P] [US2] Rewrite pre-existing `PollResults.test.ts` scenarios `@TS-050`, `@TS-053`, `@TS-054`, `@TS-055` to drive the token through the `useDeckAuth()` stub instead of the deleted `deckToken` prop. Assertions preserved; the prop path goes away.
+- [x] T029 [P] [US2] Add `DeckActivationIT.anonymousPostReturns401DeckTokenInvalid` in `backend/poll-api/src/test/java/site/asm0dey/slidev/polls/api/deck/DeckActivationIT.java` — POST `/api/deck/polls/{pollId}/activate` with no `X-Deck-Token` header and no session cookie returns 401 with code `DECK_TOKEN_INVALID`; poll's active-question pointer unchanged. [TS-124]
+- [x] T030 [P] [US2] Add backend route-audit test `ActiveQuestionMutationRouteAuditTest` asserting that every controller method whose effect mutates `polls.active_question_id` is either under `/api/deck/**` (guarded by `DeckTokenAuthenticationFilter`) or `/api/backoffice/**` (guarded by session auth), and that each rejects anonymous calls with one of `AUTH_REQUIRED` / `DECK_TOKEN_INVALID` / `FORBIDDEN`. [TS-125, TS-126]
+- [x] T031 [P] [US2] Extend `frontends/slidev-component/e2e/slidev-results.spec.ts` with scenario `anonymous browser issues zero activation traffic`: Playwright opens the deck page with empty storage, navigates across multiple poll slides, asserts no network request matched `**/api/deck/polls/*/activate`. [TS-120]
+- [x] T032 [P] [US2] Extend `e2e/slidev-results.spec.ts` with scenario `signed-in browser issues activation on navigation`: test signs in via the in-deck control (DOM form), navigates, asserts exactly one `POST **/api/deck/polls/*/activate` with the `X-Deck-Token` header. [TS-122]
 
 ### Implementation for User Story 2
 
-- [ ] T033 [US2] Modify `frontends/slidev-component/components/PollResults.vue`: delete the `deckToken` prop; import `useDeckAuth()`; in `activateFromDeck()` short-circuit when composable status is NOT `"signed-in"` (FR-007); read the bearer from `useDeckAuth().state.value.token`; on 401 with `Problem{code: DECK_TOKEN_INVALID}` call `useDeckAuth().markRevoked()` then swallow (Principle IV keeps the slide rendering).
-- [ ] T034 [US2] Extend `markRevoked()` in `composables/useDeckAuth.ts` to wipe `localStorage`, flip status to `"revoked"`, and expose the FR-014 authentication-failure message so `DeckAuthControl.vue` renders it on the next paint.
-- [ ] T035 [US2] Add a dev-only `console.warn("[slidev-polls] `deckToken` prop removed in 002; sign in via the in-deck auth control.")` at the top of `PollResults.vue`'s `setup` if `props.deckToken` is present, per `research.md` D-005. Production builds omit (guard on `import.meta.env.DEV`).
-- [ ] T036 [US2] Delete `deckToken` from the prop type union in `PollResults.vue` and from `index.ts` public-surface exports in `frontends/slidev-component/index.ts` (if re-exported). Slides that still pass `:deckToken` get a Vue unused-prop warning in dev — which is the signal.
+- [x] T033 [US2] Modify `frontends/slidev-component/components/PollResults.vue`: delete the `deckToken` prop; import `useDeckAuth()`; in `activateFromDeck()` short-circuit when composable status is NOT `"signed-in"` (FR-007); read the bearer from `useDeckAuth().state.value.token`; on 401 with `Problem{code: DECK_TOKEN_INVALID}` call `useDeckAuth().markRevoked()` then swallow (Principle IV keeps the slide rendering).
+- [x] T034 [US2] Extend `markRevoked()` in `composables/useDeckAuth.ts` to wipe `localStorage`, flip status to `"revoked"`, and expose the FR-014 authentication-failure message so `DeckAuthControl.vue` renders it on the next paint.
+- [x] T035 [US2] Add a dev-only `console.warn("[slidev-polls] `deckToken` prop removed in 002; sign in via the in-deck auth control.")` at the top of `PollResults.vue`'s `setup` if `props.deckToken` is present, per `research.md` D-005. Production builds omit (guard on `import.meta.env.DEV`).
+- [x] T036 [US2] Delete `deckToken` from the prop type union in `PollResults.vue` and from `index.ts` public-surface exports in `frontends/slidev-component/index.ts` (if re-exported). Slides that still pass `:deckToken` get a Vue unused-prop warning in dev — which is the signal.
 
 **Checkpoint**: US2 green. Anonymous deck emits zero activation traffic; signed-in deck activates normally; revocation is detected on the very next activation attempt. Backend refuses anonymous mutators on every route that can change the active-question pointer.
 
@@ -120,15 +120,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] In `PollResults.test.ts` add case `anonymous mount renders live results and no activation affordance`: mount with `status: "anonymous"`, feed a `SnapshotEvent`, assert results visualisation renders and no element with a "set active" affordance is in the DOM. [TS-140]
-- [ ] T038 [P] [US3] In `PollResults.test.ts` add case `tally updates within 2s on TallyDeltaEvent`: fake-timer-based assertion that a `TallyDeltaEvent` arriving at t=0 is reflected in rendered counts at t≤2000ms. [TS-141]
-- [ ] T039 [P] [US3] In `PollResults.test.ts` add case `SSE drop shows paused indicator, nav remains responsive`: stub `openPollStream` to emit `onConnectionStateChange("paused")`, assert the `[data-testid="poll-paused"]` element renders with text "live updates paused" and that unmount still works cleanly. [TS-142]
-- [ ] T040 [P] [US3] In `PollResults.test.ts` add case `SSE reconnect clears paused and resumes updates`: flip connection state back to live, emit a fresh snapshot, assert paused indicator disappears and new tallies render. [TS-143]
-- [ ] T041 [P] [US3] In `PollResults.test.ts` add case `local slide's question results are independent of presenter's stage activation`: component mounted with `questionId: Q1` and stream receiving Q1-scoped snapshots continues to render Q1's tally even when a simulated Q2 activation event arrives for the same poll; the local `questionId` prop wins. [TS-144]
+- [x] T037 [P] [US3] In `PollResults.test.ts` add case `anonymous mount renders live results and no activation affordance`: mount with `status: "anonymous"`, feed a `SnapshotEvent`, assert results visualisation renders and no element with a "set active" affordance is in the DOM. [TS-140]
+- [x] T038 [P] [US3] In `PollResults.test.ts` add case `tally updates within 2s on TallyDeltaEvent`: fake-timer-based assertion that a `TallyDeltaEvent` arriving at t=0 is reflected in rendered counts at t≤2000ms. [TS-141]
+- [x] T039 [P] [US3] In `PollResults.test.ts` add case `SSE drop shows paused indicator, nav remains responsive`: stub `openPollStream` to emit `onConnectionStateChange("paused")`, assert the `[data-testid="poll-paused"]` element renders with text "live updates paused" and that unmount still works cleanly. [TS-142]
+- [x] T040 [P] [US3] In `PollResults.test.ts` add case `SSE reconnect clears paused and resumes updates`: flip connection state back to live, emit a fresh snapshot, assert paused indicator disappears and new tallies render. [TS-143]
+- [x] T041 [P] [US3] In `PollResults.test.ts` add case `local slide's question results are independent of presenter's stage activation`: component mounted with `questionId: Q1` and stream receiving Q1-scoped snapshots continues to render Q1's tally even when a simulated Q2 activation event arrives for the same poll; the local `questionId` prop wins. [TS-144]
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Audit `PollResults.vue` and `DeckAuthControl.vue` for any template branch that renders presenter-only controls when `useDeckAuth().status !== "signed-in"`; verify v-if gating. Expected diff is zero — this is a conformance sweep, not a change — but confirms FR-012 holds after US2.
+- [x] T042 [US3] Audit `PollResults.vue` and `DeckAuthControl.vue` for any template branch that renders presenter-only controls when `useDeckAuth().status !== "signed-in"`; verify v-if gating. Expected diff is zero — this is a conformance sweep, not a change — but confirms FR-012 holds after US2.
 
 **Checkpoint**: US3 green. Anonymous read-only path unchanged in behaviour from 001; all of its observable properties asserted.
 
@@ -136,10 +136,10 @@
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Add a comment block to `global-top.vue` referencing `research.md` D-001 so future readers understand why the auth control lives in the Slidev overlay slot rather than inside a slide.
-- [ ] T044 [P] Update `quickstart.md` §"Automated coverage" table if any `TS-*` → test mapping shifted during implementation.
-- [ ] T045 Run `./mvnw verify` from the repo root (Principle XI). All new backend tests (T007–T010, T029, T030) must be green.
-- [ ] T046 Run `bun --cwd frontends/slidev-component test` and `bun --cwd frontends/slidev-component run build`. All new composable + component + PollResults tests must be green.
+- [x] T043 [P] Add a comment block to `global-top.vue` referencing `research.md` D-001 so future readers understand why the auth control lives in the Slidev overlay slot rather than inside a slide.
+- [x] T044 [P] Update `quickstart.md` §"Automated coverage" table if any `TS-*` → test mapping shifted during implementation.
+- [x] T045 Run `./mvnw verify` from the repo root (Principle XI). All new backend tests (T007–T010, T029, T030) must be green.
+- [x] T046 Run `bun --cwd frontends/slidev-component test` and `bun --cwd frontends/slidev-component run build`. All new composable + component + PollResults tests must be green.
 - [ ] T047 Run `bun --cwd frontends/slidev-component run e2e` — `slidev-results.spec.ts` auth scenarios (T031, T032) must be green.
 - [ ] T048 Run the `quickstart.md` walkthrough §1–§4 against a live dev stack; record any divergence between the manual steps and the automated coverage.
 
