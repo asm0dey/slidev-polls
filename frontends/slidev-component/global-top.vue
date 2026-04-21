@@ -1,8 +1,13 @@
+<script setup lang="ts">
+import DeckAuthControl from "./components/DeckAuthControl.vue";
+</script>
+
 <!--
-  Slidev addon global-top overlay. Placeholder: T024 mounts <DeckAuthControl/> here
-  so the presenter's in-deck auth affordance is visible above every slide
-  (research.md D-001). Today it claims the overlay slot without rendering anything.
+  Slidev's global-top.vue slot is auto-picked from an addon's root (research.md D-001) and
+  renders above every slide in both single-page and presenter-mode builds. Hosting the auth
+  control here satisfies FR-001 / FR-002 — the control is reachable from every slide without
+  the presenter having to drop it into slide markdown.
 -->
 <template>
-  <div class="slidev-polls-global-top" />
+  <DeckAuthControl />
 </template>
