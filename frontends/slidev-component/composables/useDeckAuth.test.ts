@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
-import { useDeckAuth } from "./useDeckAuth";
+import { __resetUseDeckAuthForTests, useDeckAuth } from "./useDeckAuth";
 
 // Tests mirror the scenarios from
 // specs/002-presenter-auth-gating/tests/features/deck-auth-signin.feature and
@@ -40,6 +40,7 @@ describe("useDeckAuth composable", () => {
       value: makeMemoryStorage(),
       configurable: true
     });
+    __resetUseDeckAuthForTests();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
