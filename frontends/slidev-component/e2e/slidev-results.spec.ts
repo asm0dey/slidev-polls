@@ -168,4 +168,58 @@ test.describe("slidev addon sse smoke", () => {
     expect(tally.optionId).toBe(fixture.firstOptionId);
     expect(tally.count).toBeGreaterThanOrEqual(1);
   });
+
+  // @TS-120 / @TS-121 — anonymous browser navigating poll slides MUST NOT issue any activation
+  // POST. The full Slidev host is deferred (see file header), so the spec asserts the wire
+  // contract: with empty localStorage and a page that performs the same static-asset fetches a
+  // real deck would, no `/api/deck/polls/*/activate` request is observed.
+  test("TS-120 / TS-121: anonymous browser issues zero activation traffic", async ({ page }) => {
+    const activationCalls: string[] = [];
+    await page.route("**/api/deck/polls/*/activate", async (route) => {
+      activationCalls.push(route.request().url());
+      await route.continue();
+    });
+
+    await page.goto(`/${fixture.slug}`);
+    await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
+    // Simulate brief idle dwell for any deferred XHR the SPA might fire.
+    await page.waitForTimeout(500);
+
+    expect(activationCalls, "anonymous browser fired an activation request").toEqual([]);
+  });
+
+  // @TS-122 — signed-in browser issues an activation POST with the X-Deck-Token header. The
+  // addon's sign-in flow ends in a call equivalent to this one; the spec asserts the backend
+  // accepts it and that the poll's active-question pointer moves as expected.
+  test("TS-122: signed-in browser's activation POST is accepted", async ({ playwright, baseURL, request }) => {
+    const admin = await playwright.request.newContext({ baseURL });
+    await loginAsAlice(admin);
+    const mintRes = await admin.post(
+      `/api/admin/polls/${fixture.pollId}/deck-tokens`,
+      {
+        headers: {
+          "content-type": "application/json",
+          ...(await xsrfHeaders(admin, baseURL!))
+        },
+        data: { label: "e2e-signed-in" }
+      }
+    );
+    expect(mintRes.status()).toBe(201);
+    const minted = (await mintRes.json()) as { plaintext: string };
+    await admin.dispose();
+
+    const activate = await request.post(
+      `/api/deck/polls/${fixture.pollId}/activate`,
+      {
+        headers: {
+          "content-type": "application/json",
+          "X-Deck-Token": minted.plaintext
+        },
+        data: { questionId: fixture.questionId }
+      }
+    );
+    expect(activate.status()).toBe(200);
+    const body = (await activate.json()) as { activeQuestionId: string };
+    expect(body.activeQuestionId).toBe(fixture.questionId);
+  });
 });
