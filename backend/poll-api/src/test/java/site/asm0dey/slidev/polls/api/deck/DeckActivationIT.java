@@ -118,6 +118,29 @@ class DeckActivationIT {
         .andExpect(jsonPath("$.code").value("DECK_TOKEN_INVALID"));
   }
 
+  // @TS-124 — anonymous POST /api/deck/polls/{pollId}/activate returns 401 with code
+  // DECK_TOKEN_INVALID and leaves the poll's active-question pointer unchanged. Covers
+  // the FR-007 backend half of US2's independent test.
+  @Test
+  void anonymousPostReturns401DeckTokenInvalid() throws Exception {
+    PollFixture poll = createPoll("deck-ts124");
+    // Seed the poll's active pointer to q1 via an authenticated route so we can assert the
+    // pointer is NOT changed by the anonymous attempt.
+    String plaintext = mintToken(poll);
+    activateViaDeck(poll.pollId(), plaintext, poll.q1());
+    var before = pollRepository.findById(poll.pollId()).orElseThrow().activeQuestionId();
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/activate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + poll.q2() + "\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("DECK_TOKEN_INVALID"));
+
+    var after = pollRepository.findById(poll.pollId()).orElseThrow().activeQuestionId();
+    assertThat(after).isEqualTo(before);
+  }
+
   // @TS-054 — a token minted for poll A can't activate on poll B.
   @Test
   void cross_poll_token_is_rejected_with_poll_mismatch() throws Exception {
