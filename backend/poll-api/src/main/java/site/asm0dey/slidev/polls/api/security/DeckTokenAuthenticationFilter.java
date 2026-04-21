@@ -45,7 +45,7 @@ public class DeckTokenAuthenticationFilter extends OncePerRequestFilter {
       Optional<DeckToken> match = service.resolveLive(header);
       if (match.isPresent()) {
         DeckToken token = match.get();
-        DeckPrincipal principal = new DeckPrincipal(token.id(), token.pollId());
+        DeckPrincipal principal = new DeckPrincipal(token.id(), token.pollId(), token.label());
         SecurityContextHolder.getContext()
             .setAuthentication(new DeckAuthenticationToken(principal));
       }
