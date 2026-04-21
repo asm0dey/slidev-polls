@@ -17,16 +17,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * @TS-125 / @TS-126 — every backend route that mutates a poll's active-question pointer MUST
- * reject anonymous callers with one of {@code AUTH_REQUIRED} / {@code DECK_TOKEN_INVALID} /
- * {@code FORBIDDEN}, and feature 002 MUST NOT introduce a new such route.
+ * @TS-125 / @TS-126 — every backend route that mutates a poll's active-question pointer MUST reject
+ * anonymous callers with one of {@code AUTH_REQUIRED} / {@code DECK_TOKEN_INVALID} / {@code
+ * FORBIDDEN}, and feature 002 MUST NOT introduce a new such route.
  *
  * <p>The audit is path-driven — the set of routes that can mutate {@code polls.active_question_id}
- * today is two: {@code POST /api/deck/polls/{pollId}/activate} (deck-token-guarded) and
- * {@code POST /api/admin/polls/{pollId}/open} (session-guarded). This test enumerates both and
- * asserts each rejects anonymous calls with an envelope the voter / presenter expect. Adding a
- * third route to the active-question-mutating set requires extending {@link #EXPECTED_ROUTES}
- * deliberately — that is how TS-126 is enforced in source rather than docs.
+ * today is two: {@code POST /api/deck/polls/{pollId}/activate} (deck-token-guarded) and {@code POST
+ * /api/admin/polls/{pollId}/open} (session-guarded). This test enumerates both and asserts each
+ * rejects anonymous calls with an envelope the voter / presenter expect. Adding a third route to
+ * the active-question-mutating set requires extending {@link #EXPECTED_ROUTES} deliberately — that
+ * is how TS-126 is enforced in source rather than docs.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -37,12 +37,9 @@ class ActiveQuestionMutationRouteAuditTest {
 
   private static final List<Route> EXPECTED_ROUTES =
       List.of(
+          new Route("POST", "/api/deck/polls/{pollId}/activate", List.of("DECK_TOKEN_INVALID")),
           new Route(
-              "POST", "/api/deck/polls/{pollId}/activate", List.of("DECK_TOKEN_INVALID")),
-          new Route(
-              "POST",
-              "/api/admin/polls/{pollId}/open",
-              List.of("AUTH_REQUIRED", "FORBIDDEN")));
+              "POST", "/api/admin/polls/{pollId}/open", List.of("AUTH_REQUIRED", "FORBIDDEN")));
 
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper objectMapper;
@@ -56,13 +53,9 @@ class ActiveQuestionMutationRouteAuditTest {
     for (Route r : EXPECTED_ROUTES) {
       String path = r.pathTemplate.replace("{pollId}", pollId.toString());
       MvcResult result =
-          mvc.perform(
-                  post(path).contentType(MediaType.APPLICATION_JSON).content(body))
-              .andReturn();
+          mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body)).andReturn();
       int status = result.getResponse().getStatus();
-      assertThat(status)
-          .as("status for anonymous %s %s", r.method, path)
-          .isIn(401, 403);
+      assertThat(status).as("status for anonymous %s %s", r.method, path).isIn(401, 403);
 
       String responseBody = result.getResponse().getContentAsString();
       JsonNode problem = objectMapper.readTree(responseBody);
