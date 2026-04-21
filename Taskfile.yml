@@ -136,9 +136,11 @@ tasks:
       - bun run test
 
   slidev:demo:
-    desc: Seed a demo poll on the running backend and launch the Slidev demo deck
+    desc: Seed a demo poll and launch the Slidev demo deck (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
     dir: frontends/slidev-demo
     cmds:
+      - task: e2e:backend-up
+      - defer: { task: e2e:backend-down }
       - bun run seed
       - bun run slidev
 
