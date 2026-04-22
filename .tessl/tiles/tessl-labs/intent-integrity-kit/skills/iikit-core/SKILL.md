@@ -5,7 +5,7 @@ description: >-
   Use when starting a new IIKit project, running IIKit init or setup, checking IIKit status, switching between IIKit features, looking up IIKit available commands and phases, or asking for help with the IIKit workflow.
 license: MIT
 metadata:
-  version: "2.9.12"
+  version: "2.10.0"
 ---
 
 # Intent Integrity Kit Core

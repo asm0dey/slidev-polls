@@ -5,7 +5,7 @@ description: >-
   Use when ready to build a feature from a tasks.md plan, start coding against an Intent Integrity Kit implementation plan, develop from the task list, resume a partially completed implementation, or run the implement phase of the iikit workflow.
 license: MIT
 metadata:
-  version: "2.9.12"
+  version: "2.10.0"
 ---
 
 # Intent Integrity Kit Implement

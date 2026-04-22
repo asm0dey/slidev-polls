@@ -202,3 +202,16 @@ The defect-closing MVP is **Phase 1 + Phase 2 + Phase 3 (US1) + Phase 4 (US2)**.
 - Principle VII: `.feature` scenarios are spec artefacts; the tests above are plain Vitest / JUnit assertions, with the Given/When/Then mirrored as comments above each assertion block.
 - Principle XI: all backend test / verify invocations are reactor-wide or `-pl poll-api -am`. No `install`.
 - Auto-commit after each task per the implement skill; the pre-commit hook enforces assertion-integrity hashes — do not bypass.
+
+## Bug Fix Tasks
+
+- [ ] T-B001 [BUG-001] Implement fix for BUG-001 referencing test spec bugfix_BUG-001.feature: register a `custom-nav-controls.vue` in `frontends/slidev-component/` that renders a "sign in" button opening a popover with the token input (signed-in pill + sign-out when authenticated); delete `global-top.vue` so no auth UI remains on the slide canvas
+- [ ] T-B002 [BUG-001] Verify fix passes test bugfix_BUG-001.feature for BUG-001: auth control renders inside Slidev's nav bar in both SPA and presenter modes, no auth input painted on the slide canvas, nav auto-hide during play is accepted (hover/focus reveals the control)
+
+## Clarifications
+
+### Session 2026-04-22
+
+- Q: Which Slidev slot hosts the auth control after the BUG-001 fix? -> A: `custom-nav-controls.vue` (Slidev nav bar, SPA + presenter) [T-B001, T-B002]
+- Q: Nav bar auto-hides during play mode — how resolve FR-001 "reachable from every slide"? -> A: Accept nav auto-hide; presenter signs in pre-show, hover reveals nav mid-play [T-B001, T-B002]
+- Q: In-toolbar affordance for sign-in? -> A: Button "sign in" opens small popover with token input [T-B001]

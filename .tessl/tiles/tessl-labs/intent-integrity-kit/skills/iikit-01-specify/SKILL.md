@@ -5,7 +5,7 @@ description: >-
   Use when starting a new feature, writing a PRD, defining user stories, capturing acceptance criteria, or documenting requirements for a product idea.
 license: MIT
 metadata:
-  version: "2.9.12"
+  version: "2.10.0"
 ---
 
 # Intent Integrity Kit Specify
