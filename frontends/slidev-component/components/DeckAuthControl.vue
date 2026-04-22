@@ -67,17 +67,9 @@ function onSignOut() {
 
 <style scoped>
 .deck-auth-control {
-  position: fixed;
-  top: 0.5rem;
-  right: 0.5rem;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 0.85rem;
-  padding: 0.35rem 0.6rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #d0d5da;
-  border-radius: 4px;
   color: #0e1622;
-  z-index: 9999;
 }
 .deck-auth-control__form {
   display: flex;

@@ -13,16 +13,19 @@ transition: slide-left
 
 In-deck auth control + deck-token activation — feature 002 demo.
 
-Run `bun run seed` first, then paste the printed deck token into the
-top-right auth control before navigating past this slide.
+Run `bun run seed` first, then click **sign in** in the Slidev nav bar
+and paste the printed deck token into the popover before navigating
+past this slide.
 
 ---
 
 ## How this deck is wired
 
-- The Slidev addon mounts a **global-top overlay** with a small auth
-  control on every slide. Pre-sign-in it reads *not signed in*.
-- Paste the deck token into that control; it flips to **signed in: demo-deck**.
+- The Slidev addon mounts a **sign-in button in the nav bar** (hover
+  the toolbar to reveal it during play). Pre-sign-in the button reads
+  *sign in*; click to open the token popover.
+- Paste the deck token into the popover; the toolbar button flips to
+  **signed in: demo-deck**.
 - Poll slides embed `<PollResults />` — on mount they POST
   `/api/deck/polls/{pollId}/activate` **only** if the composable is
   `signed-in`. Anonymous viewers never hijack the active question.
