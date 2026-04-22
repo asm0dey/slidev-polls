@@ -38,3 +38,45 @@
 **Root Cause**: _(empty until investigation)_
 
 **Fix Reference**: _(empty until implementation)_
+
+---
+
+## BUG-003
+
+**Reported**: 2026-04-22
+**Severity**: high
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: Deck auth popover is clipped below the viewport and unreachable. Slidev's `custom-nav-controls` slot sits at the bottom of the window; the popover opens downward from the trigger and so renders outside the visible area.
+
+**Reproduction Steps**:
+1. Run the slidev demo deck (`go-task slidev:demo`).
+2. Click the "sign in" button in the Slidev nav bar.
+3. Observe: popover content is hidden below the viewport edge — `frontends/slidev-component/components/CustomNavControls.vue` uses `position: absolute; top: calc(100% + 0.35rem)` which places the popover under the nav bar (and under the screen bottom).
+4. Expected: popover opens upward from the trigger (e.g. `bottom: calc(100% + …)`) so it is fully visible above the nav bar regardless of viewport height.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_
+
+---
+
+## BUG-004
+
+**Reported**: 2026-04-22
+**Severity**: medium
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: A table-of-contents-style list is rendered on top of the slide content in the slidev demo deck. No addon component should be painting a TOC on the slide canvas after BUG-001 removed `global-top.vue`; exact source is unknown and needs investigation (candidates: Slidev built-in side nav/drawer being shown by default, an auto-mounted slot like `global-top.vue` / `global-bottom.vue` still in the project, or a stray component leaking from the addon).
+
+**Reproduction Steps**:
+1. Run the slidev demo deck (`go-task slidev:demo`).
+2. Navigate to the first slide (SPA mode and/or presenter mode).
+3. Observe: a TOC-style list of slide titles/headings is visible overlaid on top of the slide content — it should not be there.
+4. Expected: no TOC overlay on the slide canvas. The slide renders only the authored content; any Slidev TOC remains collapsed behind its toggle unless explicitly opened.
+
+**Root Cause**: _(empty until investigation — confirm source component / Slidev slot first)_
+
+**Fix Reference**: _(empty until implementation)_
