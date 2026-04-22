@@ -205,8 +205,8 @@ The defect-closing MVP is **Phase 1 + Phase 2 + Phase 3 (US1) + Phase 4 (US2)**.
 
 ## Bug Fix Tasks
 
-- [ ] T-B001 [BUG-001] Implement fix for BUG-001 referencing test spec bugfix_BUG-001.feature: register a `custom-nav-controls.vue` in `frontends/slidev-component/` that renders a "sign in" button opening a popover with the token input (signed-in pill + sign-out when authenticated); delete `global-top.vue` so no auth UI remains on the slide canvas
-- [ ] T-B002 [BUG-001] Verify fix passes test bugfix_BUG-001.feature for BUG-001: auth control renders inside Slidev's nav bar in both SPA and presenter modes, no auth input painted on the slide canvas, nav auto-hide during play is accepted (hover/focus reveals the control)
+- [x] T-B001 [BUG-001] Implement fix for BUG-001 referencing test spec bugfix_BUG-001.feature: register a `custom-nav-controls.vue` in `frontends/slidev-component/` that renders a "sign in" button opening a popover with the token input (signed-in pill + sign-out when authenticated); delete `global-top.vue` so no auth UI remains on the slide canvas
+- [x] T-B002 [BUG-001] Verify fix passes test bugfix_BUG-001.feature for BUG-001: auth control renders inside Slidev's nav bar in both SPA and presenter modes, no auth input painted on the slide canvas, nav auto-hide during play is accepted (hover/focus reveals the control)
 
 ## Clarifications
 
