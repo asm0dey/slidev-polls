@@ -17,3 +17,24 @@
 **Root Cause**: The addon hosted `DeckAuthControl` inside `global-top.vue`, which Slidev auto-mounts as an overlay layer above every slide. The control's own stylesheet pinned it with `position: fixed; top/right` — painting the password input directly on the slide canvas. Slidev exposes a dedicated toolbar-integration slot (`custom-nav-controls.vue`, per sli.dev/features/global-layers) that was not used.
 
 **Fix Reference**: T-B001 / T-B002. New `frontends/slidev-component/custom-nav-controls.vue` (auto-picked by Slidev into the nav bar) wraps `components/CustomNavControls.vue`, which renders a single toolbar button ("sign in" when anonymous, label pill when signed-in) that toggles a popover containing the existing `DeckAuthControl`. `global-top.vue` deleted; `DeckAuthControl.vue` stripped of fixed-positioning styles so it flows inside the popover.
+
+---
+
+## BUG-002
+
+**Reported**: 2026-04-22
+**Severity**: high
+**Status**: reported
+**GitHub Issue**: _(none)_
+
+**Description**: Deck auth uses a single-token paste field instead of a login+password form matching the admin UI. Spec intent is parity with admin UI authentication (username + password), not opaque-token entry.
+
+**Reproduction Steps**:
+1. Run the slidev demo deck (`go-task slidev:demo`).
+2. Click the "sign in" button in the Slidev nav bar to open the auth popover.
+3. Observe: popover shows a single `type="password"` input labelled "deck token" (`frontends/slidev-component/components/DeckAuthControl.vue`).
+4. Expected: popover shows a login (username) field and a password field, submitting against the same credential flow used by the admin UI login page.
+
+**Root Cause**: _(empty until investigation)_
+
+**Fix Reference**: _(empty until implementation)_

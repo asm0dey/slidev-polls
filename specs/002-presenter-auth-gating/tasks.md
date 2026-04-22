@@ -207,6 +207,8 @@ The defect-closing MVP is **Phase 1 + Phase 2 + Phase 3 (US1) + Phase 4 (US2)**.
 
 - [x] T-B001 [BUG-001] Implement fix for BUG-001 referencing test spec bugfix_BUG-001.feature: register a `custom-nav-controls.vue` in `frontends/slidev-component/` that renders a "sign in" button opening a popover with the token input (signed-in pill + sign-out when authenticated); delete `global-top.vue` so no auth UI remains on the slide canvas
 - [x] T-B002 [BUG-001] Verify fix passes test bugfix_BUG-001.feature for BUG-001: auth control renders inside Slidev's nav bar in both SPA and presenter modes, no auth input painted on the slide canvas, nav auto-hide during play is accepted (hover/focus reveals the control)
+- [ ] T-B003 [BUG-002] Implement fix for BUG-002 referencing test spec bugfix_BUG-002.feature: replace the single-token input in `frontends/slidev-component/components/DeckAuthControl.vue` with a login+password form; wire `useDeckAuth` / the deck auth API to the admin UI credential flow so deck sign-in uses the same username+password mechanism as `/admin`
+- [ ] T-B004 [BUG-002] Verify fix passes test bugfix_BUG-002.feature for BUG-002: deck auth popover renders login and password inputs, valid admin-equivalent credentials authenticate the deck, no opaque "deck token" input remains
 
 ## Clarifications
 
