@@ -60,9 +60,11 @@ function pctOf(id: string): number {
         :data-leader="leaderId === opt.id ? '' : undefined"
         :data-empty="total === 0 ? '' : undefined"
         data-testid="rp-row"
+        :data-option-id="opt.id"
       >
         <span class="sp-rp__fill" :style="{ width: pctOf(opt.id) + '%' }" />
         <span class="sp-rp__label">{{ opt.label }}</span>
+        <span class="sp-rp__count" aria-hidden="true">{{ countOf(opt.id) }}</span>
         <span class="sp-rp__pct">{{ total === 0 ? "—" : pctOf(opt.id) + "%" }}</span>
       </li>
     </ol>
@@ -156,6 +158,12 @@ function pctOf(id: string): number {
 .sp-rp__row[data-leader] .sp-rp__label,
 .sp-rp__row[data-leader] .sp-rp__pct { font-weight: 600; }
 
-.sp-rp__label, .sp-rp__pct { position: relative; }
+.sp-rp__label, .sp-rp__pct, .sp-rp__count { position: relative; }
 .sp-rp__pct { font-variant-numeric: tabular-nums; }
+.sp-rp__count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  opacity: 0.6;
+  padding-right: 6px;
+}
 </style>

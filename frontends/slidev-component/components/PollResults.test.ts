@@ -133,8 +133,8 @@ describe("PollResults", () => {
     );
     await flushPromises();
     expect(wrapper.html()).toContain("Question q-1");
-    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("OpenJDK");
-    expect(wrapper.get("[data-testid='poll-bar-opt-b']").text()).toContain("GraalVM");
+    expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("OpenJDK");
+    expect(wrapper.get("[data-option-id='opt-b']").text()).toContain("GraalVM");
   });
 
   // @TS-030 / @TS-031 — a tally event rotates the count for the matching option.
@@ -156,7 +156,7 @@ describe("PollResults", () => {
       emittedAt: new Date().toISOString()
     } satisfies TallyDeltaEvent);
     await flushPromises();
-    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("3");
+    expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("3");
   });
 
   // @TS-032 — a stray tally (wrong questionId) is ignored; the prior view is preserved.
@@ -182,8 +182,8 @@ describe("PollResults", () => {
       emittedAt: new Date().toISOString()
     });
     await flushPromises();
-    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("5");
-    expect(wrapper.get("[data-testid='poll-bar-opt-b']").text()).toContain("7");
+    expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("5");
+    expect(wrapper.get("[data-option-id='opt-b']").text()).toContain("7");
   });
 
   // @TS-033 — connection loss surfaces the paused badge; the component must not throw.
@@ -345,7 +345,7 @@ describe("PollResults", () => {
       ])
     );
     await flushPromises();
-    expect(wrapper.find("[data-testid='poll-bar-opt-a']").exists()).toBe(true);
+    expect(wrapper.find("[data-option-id='opt-a']").exists()).toBe(true);
     // No element that would let a viewer flip the active question.
     expect(wrapper.find("[data-testid='set-active']").exists()).toBe(false);
     expect(wrapper.find("button.activate").exists()).toBe(false);
@@ -374,7 +374,7 @@ describe("PollResults", () => {
       });
       vi.advanceTimersByTime(2000);
       await flushPromises();
-      expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("7");
+      expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("7");
     } finally {
       vi.useRealTimers();
     }
@@ -407,7 +407,7 @@ describe("PollResults", () => {
     );
     await flushPromises();
     expect(wrapper.find("[data-testid='poll-paused']").exists()).toBe(false);
-    expect(wrapper.get("[data-testid='poll-bar-opt-x']").text()).toContain("X");
+    expect(wrapper.get("[data-option-id='opt-x']").text()).toContain("X");
   });
 
   // @TS-144 — a slide mounted with questionId=Q1 keeps showing Q1's results even when a
@@ -435,8 +435,8 @@ describe("PollResults", () => {
     );
     await flushPromises();
     // The Q1 slide continues to render Q1's options — a Q2 option MUST NOT appear.
-    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("Alpha");
-    expect(wrapper.find("[data-testid='poll-bar-opt-c']").exists()).toBe(false);
+    expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("Alpha");
+    expect(wrapper.find("[data-option-id='opt-c']").exists()).toBe(false);
     // Tallies for Q1 still land on the Q1 view.
     capturedHandlers!.onTally({
       pollId: "p-1",
@@ -446,7 +446,7 @@ describe("PollResults", () => {
       emittedAt: new Date().toISOString()
     });
     await flushPromises();
-    expect(wrapper.get("[data-testid='poll-bar-opt-a']").text()).toContain("9");
+    expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("9");
   });
 
   // Unmounting releases the SSE subscription.
