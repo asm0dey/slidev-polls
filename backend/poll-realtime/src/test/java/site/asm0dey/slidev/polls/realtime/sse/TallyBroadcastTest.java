@@ -355,6 +355,11 @@ class TallyBroadcastTest {
     public Poll closeActiveQuestion(UUID pollId) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   private static final class InMemoryVoteRepository implements VoteRepository {

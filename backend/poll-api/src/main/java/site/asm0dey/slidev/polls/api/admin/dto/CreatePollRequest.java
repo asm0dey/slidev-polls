@@ -26,7 +26,8 @@ public record CreatePollRequest(
     // leak short/long slugs out as 400 VALIDATION_FAILED, which is the wrong wire contract.
     String slug,
     PollStyleDto style,
-    @Valid @Size(min = 1) List<CreateQuestionRequest> questions) {
+    @Valid @Size(min = 1) List<CreateQuestionRequest> questions,
+    @Size(max = 32) List<String> allowedOrigins) {
 
   public CreatePollCommand toCommand() {
     List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>();
@@ -35,6 +36,7 @@ public record CreatePollRequest(
         drafts.add(q.toDraft());
       }
     }
-    return new CreatePollCommand(title, slug, style == null ? null : style.toMap(), drafts, null);
+    return new CreatePollCommand(
+        title, slug, style == null ? null : style.toMap(), drafts, allowedOrigins);
   }
 }

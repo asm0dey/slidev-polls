@@ -17,7 +17,8 @@ public record UpdatePollRequest(
     // See CreatePollRequest: slug validation lives in PollService so every 409 carries a
     // slug-specific ProblemCode. A @Size here would leak out as 400 VALIDATION_FAILED.
     String slug,
-    @Valid List<CreateQuestionRequest> questions) {
+    @Valid List<CreateQuestionRequest> questions,
+    @Size(max = 32) List<String> allowedOrigins) {
 
   public UpdatePollCommand toCommand() {
     List<CreatePollCommand.QuestionDraft> drafts = null;
@@ -27,6 +28,6 @@ public record UpdatePollRequest(
         drafts.add(q.toDraft());
       }
     }
-    return new UpdatePollCommand(title, slug, drafts, null);
+    return new UpdatePollCommand(title, slug, drafts, allowedOrigins);
   }
 }
