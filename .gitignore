@@ -33,3 +33,20 @@ backend/poll-api/src/main/resources/static/
 # values do not collide.
 frontends/slidev-demo/data.ts
 .superpowers/
+
+# AI tooling (local-only, not tracked)
+.tessl/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.agents/
+.github/skills/
+.github/prompts/
+specs/
+openspec/
+AGENTS.md
+CLAUDE.md
+CONSTITUTION.md
+PREMISE.md
+tessl.json
