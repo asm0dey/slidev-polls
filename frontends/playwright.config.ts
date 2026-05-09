@@ -1,4 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Shared Playwright config for the voter SPA and the Slidev addon e2e
 // smokes (tests are added in T075 and T106). Each SPA keeps its specs
@@ -8,6 +12,10 @@ import { defineConfig, devices } from "@playwright/test";
 // Backend provisioning is handled by the Taskfile (`task test:e2e:voter`,
 // `task test:e2e:slidev`) — it brings up `compose.dev.yml` if :8080 is idle
 // and tears it down after the spec exits.
+//
+// The Slidev dev server for cross-origin e2e is managed here via webServer so
+// Playwright waits for :3030 to be ready before running the slidev-chromium
+// project specs.
 export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -16,6 +24,13 @@ export default defineConfig({
   use: {
     baseURL: process.env.PW_BASE_URL ?? "http://localhost:8080",
     trace: "on-first-retry"
+  },
+  webServer: {
+    command: "bun run dev",
+    cwd: path.resolve(__dirname, "slidev-demo"),
+    url: "http://localhost:3030",
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000
   },
   projects: [
     {
