@@ -62,7 +62,7 @@ function toggle() {
 }
 .deck-auth-nav__popover {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  bottom: calc(100% + 0.35rem);
   right: 0;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid #d0d5da;
