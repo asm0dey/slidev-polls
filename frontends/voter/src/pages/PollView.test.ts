@@ -117,7 +117,7 @@ describe("PollView", () => {
     );
     expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
     // The alreadyVoted cache is now populated so a reload would skip the active UI.
-    expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk")).toBe("1");
+    expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk:q1")).toBe("1");
   });
 
   // @TS-023 — duplicate submission surfaces as ALREADY_VOTED from the server; the PollView
@@ -141,7 +141,7 @@ describe("PollView", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
-    expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk")).toBe("1");
+    expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk:q1")).toBe("1");
   });
 
   // @TS-025 — QUESTION_NOT_ACTIVE is Principle IV territory: the presenter closed the question
@@ -179,7 +179,7 @@ describe("PollView", () => {
   // UX on the next visit, even before the alreadyVoted hint lands in the response. This is the
   // offline-UX argument for keeping a localStorage flag alongside the server cookie.
   it("shows the voted state when the localStorage cache says so", async () => {
-    window.localStorage.setItem("slidev-polls:already-voted:my-talk", "1");
+    window.localStorage.setItem("slidev-polls:already-voted:my-talk:q1", "1");
     const client = makeClient();
     const wrapper = await mountView(client);
 

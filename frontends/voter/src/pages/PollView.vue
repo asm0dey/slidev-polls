@@ -54,8 +54,9 @@ async function load() {
 
 function applyServerView(view: PublicPollView) {
   if (view.state === "ACTIVE" && view.activeQuestion) {
-    if (view.alreadyVoted || hasAlreadyVoted(props.slug)) {
-      markAlreadyVoted(props.slug);
+    const qid = view.activeQuestion.id;
+    if (view.alreadyVoted || hasAlreadyVoted(props.slug, qid)) {
+      markAlreadyVoted(props.slug, qid);
       status.value = "voted";
       ensureStream();
       return;
@@ -63,6 +64,8 @@ function applyServerView(view: PublicPollView) {
     status.value = "active";
     return;
   }
+  // No active question — drop any cached flags for this slug so the next
+  // activate (possibly a re-opened earlier question) starts clean.
   clearAlreadyVoted(props.slug);
   status.value = "waiting";
 }
@@ -89,6 +92,8 @@ function ensureStream() {
 
 async function submit() {
   if (!selectedOptionId.value || submitting.value) return;
+  const qid = poll.value?.activeQuestion?.id;
+  if (!qid) return;
   submitting.value = true;
   errorMessage.value = null;
   try {
@@ -96,12 +101,12 @@ async function submit() {
       optionId: selectedOptionId.value,
       voterToken: ""
     });
-    markAlreadyVoted(props.slug);
+    markAlreadyVoted(props.slug, qid);
     status.value = "voted";
     ensureStream();
   } catch (err) {
     if (err instanceof ApiError && err.code === "ALREADY_VOTED") {
-      markAlreadyVoted(props.slug);
+      markAlreadyVoted(props.slug, qid);
       status.value = "voted";
       ensureStream();
       return;
