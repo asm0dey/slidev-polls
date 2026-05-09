@@ -191,9 +191,11 @@ onUnmounted(() => {
 <style scoped>
 .sp-pollpanel {
   position: relative;
-  width: 80vw;
-  max-width: 1200px;
-  min-width: min(85vw, 700px);
+  /* Size relative to the slide container, not the browser viewport — slidev
+     scales the slide canvas (default 980px) so a vw-based width would
+     overflow the slide on wide monitors. */
+  width: 100%;
+  max-width: min(100%, 960px);
   margin: 0 auto;
   font-family: var(--sp-font-sans);
 }
