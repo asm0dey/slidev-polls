@@ -136,7 +136,7 @@ tasks:
       - bun run test
 
   slidev:demo:
-    desc: Seed a demo poll and launch the Slidev demo deck (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
+    desc: Launch the Slidev demo deck (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started). Sign into the backoffice yourself, create a poll, and use "Copy snippet" to paste <PollResults> tags into slides.md.
     dir: frontends/slidev-demo
     cmds:
       - task: e2e:backend-up
@@ -145,7 +145,6 @@ tasks:
       # already installed (bun reports "no changes"). Runs at the workspace
       # root since workspace:* links only resolve from there.
       - bun install --cwd ..
-      - bun run seed
       - bun run slidev
 
   test:e2e:voter:

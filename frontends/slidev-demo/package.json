@@ -5,7 +5,6 @@
   "type": "module",
   "description": "Hand-runnable Slidev deck that demonstrates the feature 002 in-deck auth control and deck-token activation against a running backend.",
   "scripts": {
-    "seed": "bash ./scripts/seed.sh",
     "slidev": "slidev slides.md --open",
     "dev": "slidev slides.md",
     "build": "slidev build slides.md"
