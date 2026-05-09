@@ -31,14 +31,23 @@
 
     <div v-if="justMinted" class="dt__minted" data-testid="minted-banner">
       <p>New token (copy now — it will not be shown again):</p>
-      <pre class="dt__code dt__code--big" data-testid="minted-plaintext">{{ justMinted.plaintext }}</pre>
-      <button type="button" class="dt__minted-copy" @click="copyPlaintext" data-testid="minted-copy">
+      <pre class="dt__code dt__code--big" data-testid="minted-plaintext">{{
+        justMinted.plaintext
+      }}</pre>
+      <button
+        type="button"
+        class="dt__minted-copy"
+        @click="copyPlaintext"
+        data-testid="minted-copy"
+      >
         {{ copied ? "Copied" : "Copy" }}
       </button>
       <button type="button" class="dt__minted-dismiss" @click="justMinted = null">Dismiss</button>
     </div>
 
-    <p v-if="errorMessage" class="dt__error" role="alert" data-testid="deck-tokens-error">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="dt__error" role="alert" data-testid="deck-tokens-error">
+      {{ errorMessage }}
+    </p>
 
     <div v-if="loading" data-testid="loading">Loading tokens…</div>
     <template v-else>
@@ -72,7 +81,8 @@
             :disabled="revokingId === token.id"
             :data-testid="`revoke-${token.id}`"
             @click="onRevoke(token.id)"
-          >{{ revokingId === token.id ? "Revoking…" : "×" }}</Button>
+            >{{ revokingId === token.id ? "Revoking…" : "×" }}</Button
+          >
         </div>
       </div>
     </template>

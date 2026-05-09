@@ -2,8 +2,14 @@
 import { computed } from "vue";
 import LiveDot from "./LiveDot.vue";
 
-interface OptionLite { id: string; label: string }
-interface TallyLite { optionId: string; count: number }
+interface OptionLite {
+  id: string;
+  label: string;
+}
+interface TallyLite {
+  optionId: string;
+  count: number;
+}
 interface QuestionLite {
   prompt: string;
   options: OptionLite[];
@@ -19,16 +25,14 @@ const props = withDefaults(
   { mode: "flat", showLive: true }
 );
 
-const total = computed(() =>
-  props.question.tally.reduce((s, t) => s + t.count, 0)
-);
+const total = computed(() => props.question.tally.reduce((s, t) => s + t.count, 0));
 
 const leaderId = computed(() => {
   if (total.value === 0) return null;
   let best: { id: string; count: number } | null = null;
   let tied = false;
   for (const o of props.question.options) {
-    const c = props.question.tally.find(t => t.optionId === o.id)?.count ?? 0;
+    const c = props.question.tally.find((t) => t.optionId === o.id)?.count ?? 0;
     if (!best || c > best.count) {
       best = { id: o.id, count: c };
       tied = false;
@@ -43,7 +47,7 @@ const leaderId = computed(() => {
 });
 
 function countOf(id: string): number {
-  return props.question.tally.find(t => t.optionId === id)?.count ?? 0;
+  return props.question.tally.find((t) => t.optionId === id)?.count ?? 0;
 }
 
 function pctOf(id: string): number {
@@ -111,51 +115,73 @@ function pctOf(id: string): number {
 }
 
 .sp-rp__head {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   margin-bottom: 14px;
 }
 .sp-rp__prompt {
-  font-size: 18px; font-weight: 600;
-  letter-spacing: -0.01em; margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 .sp-rp__meta {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: inherit; opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: inherit;
+  opacity: 0.75;
 }
 
-.sp-rp__rows { list-style: none; margin: 0; padding: 0;
-  display: flex; flex-direction: column; gap: 8px; }
+.sp-rp__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 .sp-rp__row {
-  position: relative; overflow: hidden;
+  position: relative;
+  overflow: hidden;
   border-radius: var(--sp-radius-lg);
   background: var(--sp-bg-subtle);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  padding: 12px 16px; font-size: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
 }
-.sp-rp[data-mode="scrim-dark"] .sp-rp__row { background: rgba(255,255,255,0.08); }
-.sp-rp[data-mode="scrim-light"] .sp-rp__row { background: rgba(0,0,0,0.06); }
+.sp-rp[data-mode="scrim-dark"] .sp-rp__row {
+  background: rgba(255, 255, 255, 0.08);
+}
+.sp-rp[data-mode="scrim-light"] .sp-rp__row {
+  background: rgba(0, 0, 0, 0.06);
+}
 
 .sp-rp__row[data-empty] {
   background: transparent;
   border: 1px solid var(--sp-border);
 }
 .sp-rp[data-mode="scrim-dark"] .sp-rp__row[data-empty] {
-  border-color: rgba(255,255,255,0.16);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .sp-rp__fill {
-  position: absolute; inset: 0; width: 0;
+  position: absolute;
+  inset: 0;
+  width: 0;
   background: var(--sp-accent-soft);
   transition: width var(--sp-dur) var(--sp-ease);
 }
 .sp-rp[data-mode="scrim-dark"] .sp-rp__fill {
-  background: rgba(255,255,255,0.18);
+  background: rgba(255, 255, 255, 0.18);
 }
 .sp-rp[data-mode="scrim-light"] .sp-rp__fill {
-  background: rgba(0,0,0,0.12);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .sp-rp__row[data-leader] .sp-rp__fill {
@@ -164,18 +190,34 @@ function pctOf(id: string): number {
 .sp-rp__row[data-leader] {
   color: var(--sp-accent-fg);
 }
-.sp-rp[data-mode="scrim-dark"] .sp-rp__row[data-leader] { color: #fff; }
-.sp-rp[data-mode="scrim-light"] .sp-rp__row[data-leader] { color: #fff; }
+.sp-rp[data-mode="scrim-dark"] .sp-rp__row[data-leader] {
+  color: #fff;
+}
+.sp-rp[data-mode="scrim-light"] .sp-rp__row[data-leader] {
+  color: #fff;
+}
 .sp-rp__row[data-leader] .sp-rp__label,
-.sp-rp__row[data-leader] .sp-rp__pct { font-weight: 600; }
+.sp-rp__row[data-leader] .sp-rp__pct {
+  font-weight: 600;
+}
 
-.sp-rp__label, .sp-rp__pct, .sp-rp__count { position: relative; }
-.sp-rp__pct { font-variant-numeric: tabular-nums; }
+.sp-rp__label,
+.sp-rp__pct,
+.sp-rp__count {
+  position: relative;
+}
+.sp-rp__pct {
+  font-variant-numeric: tabular-nums;
+}
 .sp-rp__count {
   position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0,0,0,0);
-  white-space: nowrap; border: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

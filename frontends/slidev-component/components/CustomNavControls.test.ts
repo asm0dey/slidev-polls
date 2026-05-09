@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import type {
-  DeckAuthState,
-  DeckAuthStatus,
-  UseDeckAuthReturn
-} from "../composables/useDeckAuth";
+import type { DeckAuthState, DeckAuthStatus, UseDeckAuthReturn } from "../composables/useDeckAuth";
 import CustomNavControls from "./CustomNavControls.vue";
 
 // Tests mirror bugfix_BUG-001.feature — auth control rendered inside Slidev's nav slot,
@@ -126,8 +122,8 @@ describe("CustomNavControls", () => {
     expect(wrapper.get("[data-testid='deck-auth-nav-trigger']").text()).toContain("Laptop");
     stub.status.value = "revoked";
     await nextTick();
-    expect(
-      wrapper.get("[data-testid='deck-auth-nav-trigger']").text().toLowerCase()
-    ).toContain("sign in");
+    expect(wrapper.get("[data-testid='deck-auth-nav-trigger']").text().toLowerCase()).toContain(
+      "sign in"
+    );
   });
 });

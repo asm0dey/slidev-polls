@@ -53,23 +53,18 @@ function describeError(err: unknown): string {
       <h1 class="login__title">Sign in</h1>
       <p class="login__sub">Run polls in your decks.</p>
       <form data-testid="login-form" @submit.prevent="onSubmit">
-        <Input
-          v-model="username"
-          type="text"
-          placeholder="username"
-          data-testid="login-username"
-        />
+        <Input v-model="username" type="text" placeholder="username" data-testid="login-username" />
         <Input
           v-model="password"
           type="password"
           placeholder="Password"
           data-testid="login-password"
-          style="margin-top: 10px;"
+          style="margin-top: 10px"
         />
         <Button
           type="submit"
           :disabled="submitting"
-          style="margin-top: 12px; width: 100%;"
+          style="margin-top: 12px; width: 100%"
           data-testid="login-submit"
         >
           {{ submitting ? "Signing in…" : "Continue →" }}
@@ -83,8 +78,8 @@ function describeError(err: unknown): string {
       <div class="login__brandpanel-inner">
         <div class="login__eyebrow">Live polls in markdown</div>
         <p class="login__pitch">
-          Embed polls next to your code blocks. Audience answers from any phone.
-          Results animate on the slide.
+          Embed polls next to your code blocks. Audience answers from any phone. Results animate on
+          the slide.
         </p>
       </div>
     </aside>
@@ -93,46 +88,84 @@ function describeError(err: unknown): string {
 
 <style scoped>
 .login {
-  display: grid; grid-template-columns: 1fr 1fr;
-  min-height: 100vh; background: var(--sp-bg);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  background: var(--sp-bg);
 }
 .login__form {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 32px;
 }
-.login__form > * { width: 320px; max-width: 100%; }
+.login__form > * {
+  width: 320px;
+  max-width: 100%;
+}
 .login__brand {
-  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
-  margin-bottom: 32px; color: var(--sp-fg);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 32px;
+  color: var(--sp-fg);
 }
 .login__title {
-  font-size: 22px; font-weight: 600; margin: 0 0 6px;
-  letter-spacing: -0.02em; color: var(--sp-fg);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+  color: var(--sp-fg);
 }
-.login__sub { font-size: 13px; color: var(--sp-fg-subtle); margin: 0 0 24px; }
+.login__sub {
+  font-size: 13px;
+  color: var(--sp-fg-subtle);
+  margin: 0 0 24px;
+}
 .login__error {
-  background: var(--sp-danger-bg); color: var(--sp-danger-fg);
-  border: 1px solid var(--sp-danger); border-radius: var(--sp-radius-sm);
-  padding: 8px 10px; font-size: 12px; margin-top: 10px;
+  background: var(--sp-danger-bg);
+  color: var(--sp-danger-fg);
+  border: 1px solid var(--sp-danger);
+  border-radius: var(--sp-radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-top: 10px;
 }
 .login__brandpanel {
   background: linear-gradient(135deg, #7c3aed 0%, #4338ca 100%);
-  color: #fff; display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 32px;
 }
 [data-theme="dark"] .login__brandpanel {
   background: radial-gradient(ellipse at top right, #7c3aed 0%, #4338ca 50%, #1e1b4b 100%);
 }
-.login__brandpanel-inner { max-width: 280px; }
-.login__eyebrow {
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  opacity: 0.7; margin-bottom: 10px;
+.login__brandpanel-inner {
+  max-width: 280px;
 }
-.login__pitch { font-size: 14px; line-height: 1.5; margin: 0; opacity: 0.92; }
+.login__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+.login__pitch {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.92;
+}
 
 @media (max-width: 768px) {
-  .login { grid-template-columns: 1fr; }
-  .login__brandpanel { display: none; }
+  .login {
+    grid-template-columns: 1fr;
+  }
+  .login__brandpanel {
+    display: none;
+  }
 }
 </style>

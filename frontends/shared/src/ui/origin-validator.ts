@@ -1,6 +1,4 @@
-export type OriginValidation =
-  | { ok: true; normalized: string }
-  | { ok: false; message: string };
+export type OriginValidation = { ok: true; normalized: string } | { ok: false; message: string };
 
 export function validateOrigin(input: string): OriginValidation {
   const v = input.trim();

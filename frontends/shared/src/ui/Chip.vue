@@ -19,25 +19,39 @@ defineEmits<{ remove: [] }>();
 
 <style scoped>
 .sp-chip {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 4px 4px 10px;
   background: var(--sp-bg-muted);
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius-sm);
-  font-size: 12px; font-family: var(--sp-font-sans);
+  font-size: 12px;
+  font-family: var(--sp-font-sans);
   color: var(--sp-fg);
 }
-.sp-chip[data-mono] { font-family: var(--sp-font-mono); }
+.sp-chip[data-mono] {
+  font-family: var(--sp-font-mono);
+}
 .sp-chip[data-invalid] {
   background: var(--sp-danger-bg);
   border-color: var(--sp-danger);
   color: var(--sp-danger-fg);
 }
 .sp-chip__remove {
-  border: 0; background: transparent;
-  color: var(--sp-fg-faint); font-size: 14px; line-height: 1;
-  padding: 2px 6px; cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--sp-fg-faint);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
 }
-.sp-chip[data-invalid] .sp-chip__remove { color: var(--sp-danger-fg); }
-.sp-chip__remove:focus-visible { outline: 2px solid var(--sp-accent-ring); border-radius: 4px; }
+.sp-chip[data-invalid] .sp-chip__remove {
+  color: var(--sp-danger-fg);
+}
+.sp-chip__remove:focus-visible {
+  outline: 2px solid var(--sp-accent-ring);
+  border-radius: 4px;
+}
 </style>

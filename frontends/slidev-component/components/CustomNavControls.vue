@@ -37,11 +37,7 @@ function toggle() {
         <span class="sr-only">sign in</span>
       </template>
     </button>
-    <div
-      v-if="open"
-      class="deck-auth-nav__popover"
-      data-testid="deck-auth-nav-popover"
-    >
+    <div v-if="open" class="deck-auth-nav__popover" data-testid="deck-auth-nav-popover">
       <DeckAuthControl />
     </div>
   </div>

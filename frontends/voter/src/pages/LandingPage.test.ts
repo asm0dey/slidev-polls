@@ -25,10 +25,7 @@ async function mountLanding() {
   return { wrapper, router };
 }
 
-async function fillAndSubmit(
-  wrapper: ReturnType<typeof mount>,
-  slug: string
-) {
+async function fillAndSubmit(wrapper: ReturnType<typeof mount>, slug: string) {
   await wrapper.find('[data-testid="landing-slug"]').setValue(slug);
   await wrapper.find('[data-testid="landing-form"]').trigger("submit.prevent");
 }

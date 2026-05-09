@@ -9,17 +9,14 @@ function setMatchMedia(matchesDark: boolean) {
     value: (q: string) => ({
       matches: q.includes("dark") ? matchesDark : false,
       media: q,
-      addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) =>
-        listeners.push(cb),
+      addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => listeners.push(cb),
       removeEventListener: vi.fn(),
       addListener: vi.fn(),
       removeListener: vi.fn(),
       dispatchEvent: vi.fn(),
       onchange: null,
       __fire: (m: boolean) =>
-        listeners.forEach(l =>
-          l({ matches: m, media: q } as MediaQueryListEvent)
-        )
+        listeners.forEach((l) => l({ matches: m, media: q } as MediaQueryListEvent))
     })
   });
 }

@@ -8,20 +8,10 @@ import type {
   PollDetail,
   UpdatePollRequest
 } from "@slidev-polls/shared";
-import {
-  AdminApiClient,
-  AdminApiError,
-  defaultAdminClient
-} from "../lib/admin-api";
+import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import SlugField from "../components/SlugField.vue";
 import { checkSlug } from "../lib/slug-rules";
-import {
-  AllowedOriginsField,
-  Button,
-  Input,
-  Pill,
-  IconChevronDown
-} from "@slidev-polls/shared/ui";
+import { AllowedOriginsField, Button, Input, Pill, IconChevronDown } from "@slidev-polls/shared/ui";
 
 type Mode = "create" | "edit";
 
@@ -76,15 +66,17 @@ function questionsFromDetail(d: PollDetail): DraftQuestion[] {
   return d.questions
     .slice()
     .sort((a, b) => a.ordinal - b.ordinal)
-    .map((q): DraftQuestion => ({
-      id: q.id,
-      prompt: q.prompt,
-      status: q.status,
-      options: q.options
-        .slice()
-        .sort((a, b) => a.position - b.position)
-        .map((o): DraftOption => ({ id: o.id, label: o.label }))
-    }));
+    .map(
+      (q): DraftQuestion => ({
+        id: q.id,
+        prompt: q.prompt,
+        status: q.status,
+        options: q.options
+          .slice()
+          .sort((a, b) => a.position - b.position)
+          .map((o): DraftOption => ({ id: o.id, label: o.label }))
+      })
+    );
 }
 
 function loadFromDetail(d: PollDetail) {
@@ -314,7 +306,9 @@ onMounted(() => {
           <div class="pe__crumb">{{ mode === "create" ? "New poll" : "Poll" }}</div>
           <h1 class="pe__title">{{ title || "Untitled" }}</h1>
           <p v-if="detail" class="pe__sub">
-            Code <code class="pe__code">{{ detail.slug }}</code> · {{ questions.length }} question{{ questions.length === 1 ? "" : "s" }}
+            Code <code class="pe__code">{{ detail.slug }}</code> · {{ questions.length }} question{{
+              questions.length === 1 ? "" : "s"
+            }}
           </p>
         </div>
         <div class="pe__header-actions">
@@ -336,13 +330,15 @@ onMounted(() => {
             Delete poll
           </button>
           <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
-            {{ submitting ? "Saving…" : (mode === "create" ? "Create" : "Save changes") }}
+            {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
           </Button>
         </div>
       </header>
 
       <!-- inline error after a submit failure -->
-      <div v-if="formError" role="alert" data-testid="poll-form-error" class="pe__error">{{ formError }}</div>
+      <div v-if="formError" role="alert" data-testid="poll-form-error" class="pe__error">
+        {{ formError }}
+      </div>
 
       <details open class="pe__settings">
         <summary class="pe__summary">
@@ -359,7 +355,11 @@ onMounted(() => {
 
           <div class="pe__field">
             <label class="pe__label">Slug</label>
-            <SlugField v-model="slug" :mode="mode" @update:valid="(v: boolean) => slugValid = v" />
+            <SlugField
+              v-model="slug"
+              :mode="mode"
+              @update:valid="(v: boolean) => (slugValid = v)"
+            />
             <input type="hidden" data-testid="poll-slug" :value="slug" />
           </div>
 
@@ -369,13 +369,18 @@ onMounted(() => {
               <span class="pe__hint-inline">applies to entire poll</span>
             </div>
             <AllowedOriginsField v-model="allowedOrigins" />
-            <p class="pe__hint">Browsers from these origins can vote &amp; subscribe to live results. Use <code>*</code> for any origin.</p>
+            <p class="pe__hint">
+              Browsers from these origins can vote &amp; subscribe to live results. Use
+              <code>*</code> for any origin.
+            </p>
           </div>
         </div>
       </details>
 
       <div class="pe__qhead">
-        <span class="pe__qhead-label">Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span>
+        <span class="pe__qhead-label"
+          >Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span
+        >
         <Button data-testid="add-question" @click="addQuestion">+ Add question</Button>
       </div>
       <div class="pe__qlist">
@@ -388,11 +393,15 @@ onMounted(() => {
           :data-testid="`poll-editor-question-${i}`"
         >
           <!-- legacy testid for tests that use question-block -->
-          <span style="display:none" data-testid="question-block" />
+          <span style="display: none" data-testid="question-block" />
           <div class="pe__qhdr">
             <span class="pe__qhdr-meta">
               {{ i + 1 }} · multi-choice
-              <Pill v-if="q.status" :tone="q.status === 'ACTIVE' ? 'success' : 'neutral'" :withDot="q.status === 'ACTIVE'">
+              <Pill
+                v-if="q.status"
+                :tone="q.status === 'ACTIVE' ? 'success' : 'neutral'"
+                :withDot="q.status === 'ACTIVE'"
+              >
                 {{ q.status.toLowerCase() }}
               </Pill>
             </span>
@@ -432,23 +441,46 @@ onMounted(() => {
               >
                 Copied!
               </span>
-              <Button v-if="i !== expandedIndex" variant="ghost" size="sm" @click="expandedIndex = i">Edit</Button>
-              <Button v-if="questions.length > 1" variant="ghost" size="sm" data-testid="question-remove" @click="removeQuestion(i)">×</Button>
+              <Button
+                v-if="i !== expandedIndex"
+                variant="ghost"
+                size="sm"
+                @click="expandedIndex = i"
+                >Edit</Button
+              >
+              <Button
+                v-if="questions.length > 1"
+                variant="ghost"
+                size="sm"
+                data-testid="question-remove"
+                @click="removeQuestion(i)"
+                >×</Button
+              >
             </div>
           </div>
           <template v-if="i === expandedIndex">
-            <Input
-              v-model="q.prompt"
-              placeholder="Question prompt"
-              data-testid="question-prompt"
-            />
+            <Input v-model="q.prompt" placeholder="Question prompt" data-testid="question-prompt" />
             <div class="pe__opts">
               <div v-for="(o, oi) in q.options" :key="oi" class="pe__opt" data-testid="option-row">
                 <span class="pe__handle">⋮⋮</span>
                 <Input v-model="o.label" data-testid="option-label" />
-                <Button v-if="q.options.length > 2" variant="ghost" size="sm" data-testid="option-remove" @click="removeOption(i, oi)">×</Button>
+                <Button
+                  v-if="q.options.length > 2"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="option-remove"
+                  @click="removeOption(i, oi)"
+                  >×</Button
+                >
               </div>
-              <button class="pe__add-opt" type="button" data-testid="add-option" @click="addOption(i)">+ Add option</button>
+              <button
+                class="pe__add-opt"
+                type="button"
+                data-testid="add-option"
+                @click="addOption(i)"
+              >
+                + Add option
+              </button>
             </div>
           </template>
         </div>
@@ -459,20 +491,43 @@ onMounted(() => {
 
 <style scoped>
 .pe__header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 24px; gap: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 16px;
 }
 .pe__crumb {
-  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--sp-fg-subtle); font-weight: 500; margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sp-fg-subtle);
+  font-weight: 500;
+  margin-bottom: 4px;
 }
-.pe__title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
-.pe__sub { font-size: 12px; color: var(--sp-fg-subtle); margin: 4px 0 0; }
+.pe__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.pe__sub {
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  margin: 4px 0 0;
+}
 .pe__code {
-  font-family: var(--sp-font-mono); font-size: 11px;
-  background: var(--sp-bg-muted); padding: 1px 6px; border-radius: 4px;
+  font-family: var(--sp-font-mono);
+  font-size: 11px;
+  background: var(--sp-bg-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
-.pe__header-actions { display: flex; gap: 8px; align-items: center; }
+.pe__header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
 .pe__delete {
   background: #fdecea;
@@ -484,44 +539,92 @@ onMounted(() => {
 }
 
 .pe__error {
-  background: var(--sp-danger-bg, #fdecea); color: var(--sp-danger-fg, #b71c1c);
-  border: 1px solid var(--sp-danger, #f5c6cb); border-radius: var(--sp-radius-sm, 4px);
-  padding: 10px; font-size: 13px;
+  background: var(--sp-danger-bg, #fdecea);
+  color: var(--sp-danger-fg, #b71c1c);
+  border: 1px solid var(--sp-danger, #f5c6cb);
+  border-radius: var(--sp-radius-sm, 4px);
+  padding: 10px;
+  font-size: 13px;
   margin-bottom: 16px;
 }
 
-.pe__settings { margin-bottom: 22px; }
+.pe__settings {
+  margin-bottom: 22px;
+}
 .pe__summary {
-  cursor: pointer; padding-bottom: 10px;
+  cursor: pointer;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--sp-border);
   margin-bottom: 14px;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   list-style: none;
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-  font-weight: 600; color: var(--sp-fg);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--sp-fg);
 }
-.pe__summary::-webkit-details-marker { display: none; }
-.pe__settings-body { display: flex; flex-direction: column; gap: 14px; }
-.pe__field { display: flex; flex-direction: column; gap: 5px; }
-.pe__row { display: flex; justify-content: space-between; align-items: baseline; }
+.pe__summary::-webkit-details-marker {
+  display: none;
+}
+.pe__settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pe__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pe__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
 .pe__label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--sp-fg-subtle); font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sp-fg-subtle);
+  font-weight: 500;
 }
-.pe__hint-inline { font-size: 11px; color: var(--sp-fg-faint); }
-.pe__hint { font-size: 11px; color: var(--sp-fg-subtle); margin: 0; }
+.pe__hint-inline {
+  font-size: 11px;
+  color: var(--sp-fg-faint);
+}
+.pe__hint {
+  font-size: 11px;
+  color: var(--sp-fg-subtle);
+  margin: 0;
+}
 
 .pe__qhead {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin: 28px 0 12px;
 }
 .pe__qhead-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--sp-fg); font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sp-fg);
+  font-weight: 600;
 }
-.pe__qhead-count { color: var(--sp-fg-faint); font-weight: 400; letter-spacing: 0; }
+.pe__qhead-count {
+  color: var(--sp-fg-faint);
+  font-weight: 400;
+  letter-spacing: 0;
+}
 
-.pe__qlist { display: flex; flex-direction: column; gap: 8px; }
+.pe__qlist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .pe__qrow {
   border: 1px solid var(--sp-border, #ddd);
   border-radius: var(--sp-radius-lg, 8px);
@@ -531,19 +634,55 @@ onMounted(() => {
   border-color: var(--sp-accent);
   background: var(--sp-accent-soft);
 }
-.pe__qhdr { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.pe__qhdr-meta { font-size: 12px; color: var(--sp-fg-subtle); display: inline-flex; align-items: center; gap: 8px; }
-.pe__qhdr-actions { display: flex; gap: 4px; align-items: center; }
-.pe__opts { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
-.pe__opt { display: flex; gap: 6px; align-items: center; }
-.pe__handle { color: var(--sp-fg-faint); font-size: 11px; width: 14px; cursor: grab; }
+.pe__qhdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pe__qhdr-meta {
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pe__qhdr-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.pe__opts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+.pe__opt {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.pe__handle {
+  color: var(--sp-fg-faint);
+  font-size: 11px;
+  width: 14px;
+  cursor: grab;
+}
 .pe__add-opt {
-  padding: 8px; border: 1px dashed var(--sp-border-strong, #bbb);
-  background: transparent; border-radius: var(--sp-radius-sm, 4px);
-  font-size: 12px; color: var(--sp-fg-subtle); font-family: var(--sp-font-sans);
+  padding: 8px;
+  border: 1px dashed var(--sp-border-strong, #bbb);
+  background: transparent;
+  border-radius: var(--sp-radius-sm, 4px);
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  font-family: var(--sp-font-sans);
   cursor: pointer;
 }
-.pe__add-opt:hover { background: var(--sp-bg-muted); }
+.pe__add-opt:hover {
+  background: var(--sp-bg-muted);
+}
 
 .btn-link {
   display: inline-flex;
@@ -558,7 +697,9 @@ onMounted(() => {
   text-decoration: none;
   transition: background var(--sp-dur) var(--sp-ease);
 }
-.btn-link:hover { background: var(--sp-bg-muted); }
+.btn-link:hover {
+  background: var(--sp-bg-muted);
+}
 
 .pe__copied {
   font-size: 11px;

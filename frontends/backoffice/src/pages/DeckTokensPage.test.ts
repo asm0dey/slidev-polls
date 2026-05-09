@@ -11,10 +11,7 @@ import { AdminApiError } from "../lib/admin-api";
 // table rows render only label/date/status, never the plaintext.
 // @TS-057 — revoke path is present and lands a DELETE call; feedback is rendered to the presenter.
 
-type FakeClient = Pick<
-  AdminApiClient,
-  "listDeckTokens" | "mintDeckToken" | "revokeDeckToken"
->;
+type FakeClient = Pick<AdminApiClient, "listDeckTokens" | "mintDeckToken" | "revokeDeckToken">;
 
 function makeFake(overrides: Partial<FakeClient> = {}): AdminApiClient {
   const base: FakeClient = {

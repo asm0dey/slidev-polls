@@ -191,33 +191,31 @@ test.describe("slidev addon sse smoke", () => {
   // @TS-122 — signed-in browser issues an activation POST with the X-Deck-Token header. The
   // addon's sign-in flow ends in a call equivalent to this one; the spec asserts the backend
   // accepts it and that the poll's active-question pointer moves as expected.
-  test("TS-122: signed-in browser's activation POST is accepted", async ({ playwright, baseURL, request }) => {
+  test("TS-122: signed-in browser's activation POST is accepted", async ({
+    playwright,
+    baseURL,
+    request
+  }) => {
     const admin = await playwright.request.newContext({ baseURL });
     await loginAsAlice(admin);
-    const mintRes = await admin.post(
-      `/api/admin/polls/${fixture.pollId}/deck-tokens`,
-      {
-        headers: {
-          "content-type": "application/json",
-          ...(await xsrfHeaders(admin, baseURL!))
-        },
-        data: { label: "e2e-signed-in" }
-      }
-    );
+    const mintRes = await admin.post(`/api/admin/polls/${fixture.pollId}/deck-tokens`, {
+      headers: {
+        "content-type": "application/json",
+        ...(await xsrfHeaders(admin, baseURL!))
+      },
+      data: { label: "e2e-signed-in" }
+    });
     expect(mintRes.status()).toBe(201);
     const minted = (await mintRes.json()) as { plaintext: string };
     await admin.dispose();
 
-    const activate = await request.post(
-      `/api/deck/polls/${fixture.pollId}/activate`,
-      {
-        headers: {
-          "content-type": "application/json",
-          "X-Deck-Token": minted.plaintext
-        },
-        data: { questionId: fixture.questionId }
-      }
-    );
+    const activate = await request.post(`/api/deck/polls/${fixture.pollId}/activate`, {
+      headers: {
+        "content-type": "application/json",
+        "X-Deck-Token": minted.plaintext
+      },
+      data: { questionId: fixture.questionId }
+    });
     expect(activate.status()).toBe(200);
     const body = (await activate.json()) as { activeQuestionId: string };
     expect(body.activeQuestionId).toBe(fixture.questionId);

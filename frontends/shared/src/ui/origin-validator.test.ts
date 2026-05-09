@@ -2,14 +2,12 @@ import { describe, it, expect } from "vitest";
 import { validateOrigin } from "./origin-validator";
 
 describe("validateOrigin", () => {
-  it.each([
-    "https://example.com",
-    "http://localhost:3030",
-    "https://slides.example.com:8443",
-    "*"
-  ])("accepts %s", input => {
-    expect(validateOrigin(input)).toEqual({ ok: true, normalized: input });
-  });
+  it.each(["https://example.com", "http://localhost:3030", "https://slides.example.com:8443", "*"])(
+    "accepts %s",
+    (input) => {
+      expect(validateOrigin(input)).toEqual({ ok: true, normalized: input });
+    }
+  );
 
   it("strips trailing slash", () => {
     expect(validateOrigin("https://example.com/")).toEqual({

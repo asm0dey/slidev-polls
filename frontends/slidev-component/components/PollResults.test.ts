@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
-import type { QuestionClosedEvent, SnapshotEvent, StreamHandlers, TallyDeltaEvent } from "@slidev-polls/shared";
 import type {
-  DeckAuthState,
-  DeckAuthStatus,
-  UseDeckAuthReturn
-} from "../composables/useDeckAuth";
+  QuestionClosedEvent,
+  SnapshotEvent,
+  StreamHandlers,
+  TallyDeltaEvent
+} from "@slidev-polls/shared";
+import type { DeckAuthState, DeckAuthStatus, UseDeckAuthReturn } from "../composables/useDeckAuth";
 import PollResults from "./PollResults.vue";
 
 // Tests mirror the live-results + activation-gating scenarios:
@@ -27,11 +28,7 @@ vi.mock("@slidev-polls/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@slidev-polls/shared")>();
   return {
     ...actual,
-    openPollStream: (
-      _baseUrl: string,
-      _slug: string,
-      handlers: StreamHandlers
-    ): (() => void) => {
+    openPollStream: (_baseUrl: string, _slug: string, handlers: StreamHandlers): (() => void) => {
       capturedHandlers = handlers;
       return () => {
         unsubscribeCalls++;

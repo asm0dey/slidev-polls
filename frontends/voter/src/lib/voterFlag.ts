@@ -72,7 +72,7 @@ export function clearAlreadyVoted(slug: string, questionId?: string): void {
       const k = store.key(i);
       if (k && k.startsWith(prefix)) drop.push(k);
     }
-    drop.forEach(k => store.removeItem(k));
+    drop.forEach((k) => store.removeItem(k));
   } catch {
     // Same degradation stance as markAlreadyVoted.
   }

@@ -54,7 +54,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root, [data-theme="dark"] {
+  :root,
+  [data-theme="dark"] {
     --sp-dur: 0ms;
   }
 }

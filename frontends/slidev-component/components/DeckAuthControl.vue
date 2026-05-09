@@ -30,7 +30,9 @@ function detectTheme() {
   const bg = getComputedStyle(document.body).backgroundColor;
   const m = bg.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
   if (!m) return;
-  const r = Number(m[1]), g = Number(m[2]), b = Number(m[3]);
+  const r = Number(m[1]),
+    g = Number(m[2]),
+    b = Number(m[3]);
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   themeMode.value = lum > 0.6 ? "light" : "dark";
 }
@@ -64,7 +66,9 @@ function onSignOut() {
 <template>
   <div ref="root" class="deck-auth-control" data-testid="deck-auth-control" :data-theme="themeMode">
     <div v-if="isSignedIn" class="deck-auth-control__pill">
-      <span class="deck-auth-control__label">signed in: {{ auth.state.value.label ?? "deck" }}</span>
+      <span class="deck-auth-control__label"
+        >signed in: {{ auth.state.value.label ?? "deck" }}</span
+      >
       <button
         type="button"
         data-testid="deck-auth-signout"

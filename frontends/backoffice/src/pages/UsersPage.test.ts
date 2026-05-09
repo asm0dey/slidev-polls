@@ -4,11 +4,15 @@ import UsersPage from "./UsersPage.vue";
 
 function makeClient(over = {}) {
   return {
-    listUsers: vi.fn().mockResolvedValue([
-      { username: "alice", displayName: "Alice", createdAt: "2026-05-09T00:00:00Z" }
-    ]),
+    listUsers: vi
+      .fn()
+      .mockResolvedValue([
+        { username: "alice", displayName: "Alice", createdAt: "2026-05-09T00:00:00Z" }
+      ]),
     createUser: vi.fn().mockResolvedValue({
-      username: "bob", displayName: "Bob", createdAt: "2026-05-09T00:00:00Z"
+      username: "bob",
+      displayName: "Bob",
+      createdAt: "2026-05-09T00:00:00Z"
     }),
     ...over
   } as any;
@@ -45,13 +49,15 @@ describe("UsersPage", () => {
   it("surfaces USERNAME_TAKEN error", async () => {
     const { AdminApiError } = await import("../lib/admin-api");
     const apiClient = makeClient({
-      createUser: vi.fn().mockRejectedValue(
-        new AdminApiError(
-          409,
-          { code: "USERNAME_TAKEN", message: "username already taken: alice" } as any,
-          "username already taken: alice"
+      createUser: vi
+        .fn()
+        .mockRejectedValue(
+          new AdminApiError(
+            409,
+            { code: "USERNAME_TAKEN", message: "username already taken: alice" } as any,
+            "username already taken: alice"
+          )
         )
-      )
     });
     const wrapper = mount(UsersPage, { props: { apiClient } });
     await flushPromises();

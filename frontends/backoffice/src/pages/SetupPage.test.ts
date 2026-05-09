@@ -57,13 +57,15 @@ describe("SetupPage", () => {
   it("surfaces server validation errors", async () => {
     const { AdminApiError } = await import("../lib/admin-api");
     const apiClient = makeClient({
-      runSetup: vi.fn().mockRejectedValue(
-        new AdminApiError(
-          400,
-          { code: "VALIDATION_FAILED", message: "password too short" } as any,
-          "password too short"
+      runSetup: vi
+        .fn()
+        .mockRejectedValue(
+          new AdminApiError(
+            400,
+            { code: "VALIDATION_FAILED", message: "password too short" } as any,
+            "password too short"
+          )
         )
-      )
     });
     const router = makeRouter();
     await router.push("/setup");

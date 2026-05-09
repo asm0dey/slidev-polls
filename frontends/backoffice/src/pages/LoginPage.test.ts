@@ -58,13 +58,15 @@ describe("LoginPage", () => {
   });
 
   it("surfaces an actionable error when authentication fails", async () => {
-    const login = vi.fn().mockRejectedValue(
-      new AdminApiError(
-        401,
-        { code: "AUTH_REQUIRED", message: "Bad credentials" },
-        "Bad credentials"
-      )
-    );
+    const login = vi
+      .fn()
+      .mockRejectedValue(
+        new AdminApiError(
+          401,
+          { code: "AUTH_REQUIRED", message: "Bad credentials" },
+          "Bad credentials"
+        )
+      );
     const client = makeFake({ login });
     const { wrapper, router } = await mountLogin(client);
 

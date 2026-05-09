@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 import { __resetUseDeckAuthForTests, useDeckAuth } from "./useDeckAuth";
 import {
   configureDeckAuthBackend,
-  __resetConfiguredBackendForTests,
+  __resetConfiguredBackendForTests
 } from "./configureDeckAuthBackend";
 
 // Tests mirror the scenarios from
@@ -146,9 +146,9 @@ describe("useDeckAuth composable", () => {
   // @TS-105 — Given garbage token, When verify returns 401 DECK_TOKEN_INVALID, Then status
   // stays anonymous and message is "credential not recognised".
   it("TS-105: signIn with garbage keeps anonymous + authentication-failure message", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      asResponse(401, { code: "DECK_TOKEN_INVALID", message: "invalid" })
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(asResponse(401, { code: "DECK_TOKEN_INVALID", message: "invalid" }));
     vi.stubGlobal("fetch", fetchMock);
 
     const auth = useDeckAuth();
@@ -195,9 +195,11 @@ describe("useDeckAuth composable", () => {
 
   // @BUG-002 — Invalid credentials → 401 → anonymous + "credential not recognised".
   it("BUG-002: signInWithCredentials on 401 stays anonymous with auth-failure message", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      asResponse(401, { code: "AUTH_REQUIRED", message: "authentication required" })
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        asResponse(401, { code: "AUTH_REQUIRED", message: "authentication required" })
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const auth = useDeckAuth();
@@ -236,9 +238,15 @@ describe("dynamic backend URL", () => {
     configureDeckAuthBackend("http://localhost:8080");
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({
-        token: "T".repeat(40), tokenId: "id", pollId: "pid", label: "demo",
-      }), { status: 200, headers: { "content-type": "application/json" } })
+      new Response(
+        JSON.stringify({
+          token: "T".repeat(40),
+          tokenId: "id",
+          pollId: "pid",
+          label: "demo"
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
     );
 
     await auth.signInWithCredentials("alice", "p");

@@ -15,14 +15,7 @@ const alt = computed(() => (props.slug ? `Join QR for ${props.slug}` : "Poll joi
 </script>
 
 <template>
-  <img
-    class="qr-preview"
-    :src="src"
-    :alt="alt"
-    :width="size"
-    :height="size"
-    loading="lazy"
-  />
+  <img class="qr-preview" :src="src" :alt="alt" :width="size" :height="size" loading="lazy" />
 </template>
 
 <style scoped>

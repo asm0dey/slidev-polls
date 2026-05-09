@@ -43,7 +43,7 @@ describe("ResultsPanel", () => {
     });
     expect(w.text()).toContain("0 votes");
     const rows = w.findAll("[data-testid='rp-row']");
-    rows.forEach(r => {
+    rows.forEach((r) => {
       expect(r.attributes("data-empty")).toBeDefined();
       expect(r.text()).toContain("—");
     });

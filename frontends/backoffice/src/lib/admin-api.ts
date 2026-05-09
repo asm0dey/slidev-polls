@@ -83,8 +83,7 @@ export class AdminApiClient {
     this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
     this.onUnauthorized = opts.onUnauthorized;
     this.cookieReader =
-      opts.cookieReader ??
-      (() => (typeof document !== "undefined" ? document.cookie : ""));
+      opts.cookieReader ?? (() => (typeof document !== "undefined" ? document.cookie : ""));
   }
 
   setOnUnauthorized(handler: (() => void) | undefined): void {
@@ -112,11 +111,7 @@ export class AdminApiClient {
   }
 
   updatePoll(pollId: string, body: UpdatePollRequest): Promise<PollDetail> {
-    return this.send<PollDetail>(
-      "PATCH",
-      `/api/admin/polls/${encodeURIComponent(pollId)}`,
-      body
-    );
+    return this.send<PollDetail>("PATCH", `/api/admin/polls/${encodeURIComponent(pollId)}`, body);
   }
 
   deletePoll(pollId: string): Promise<void> {
@@ -137,10 +132,7 @@ export class AdminApiClient {
   }
 
   closeActiveQuestion(pollId: string): Promise<PollDetail> {
-    return this.send<PollDetail>(
-      "POST",
-      `/api/admin/polls/${encodeURIComponent(pollId)}/close`
-    );
+    return this.send<PollDetail>("POST", `/api/admin/polls/${encodeURIComponent(pollId)}/close`);
   }
 
   updateStyle(pollId: string, body: PollStyle): Promise<PollDetail> {

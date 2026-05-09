@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
-import type {
-  DeckAuthState,
-  DeckAuthStatus,
-  UseDeckAuthReturn
-} from "../composables/useDeckAuth";
+import type { DeckAuthState, DeckAuthStatus, UseDeckAuthReturn } from "../composables/useDeckAuth";
 import DeckAuthControl from "./DeckAuthControl.vue";
 
 // Tests mirror deck-auth-signin.feature — Gherkin G/W/T echoed as comments per Principle VII.

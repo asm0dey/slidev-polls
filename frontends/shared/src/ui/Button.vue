@@ -22,31 +22,44 @@ withDefaults(
   border-radius: var(--sp-radius);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background var(--sp-dur) var(--sp-ease),
-              border-color var(--sp-dur) var(--sp-ease);
+  transition:
+    background var(--sp-dur) var(--sp-ease),
+    border-color var(--sp-dur) var(--sp-ease);
   white-space: nowrap;
 }
-.sp-btn[data-size="md"] { padding: 11px 14px; font-size: 14px; }
-.sp-btn[data-size="sm"] { padding: 7px 12px; font-size: 12px; }
+.sp-btn[data-size="md"] {
+  padding: 11px 14px;
+  font-size: 14px;
+}
+.sp-btn[data-size="sm"] {
+  padding: 7px 12px;
+  font-size: 12px;
+}
 
 .sp-btn[data-variant="primary"] {
   background: var(--sp-fg);
   color: var(--sp-bg);
 }
-.sp-btn[data-variant="primary"]:hover { opacity: 0.9; }
+.sp-btn[data-variant="primary"]:hover {
+  opacity: 0.9;
+}
 
 .sp-btn[data-variant="secondary"] {
   background: var(--sp-bg);
   color: var(--sp-fg);
   border-color: var(--sp-border);
 }
-.sp-btn[data-variant="secondary"]:hover { background: var(--sp-bg-muted); }
+.sp-btn[data-variant="secondary"]:hover {
+  background: var(--sp-bg-muted);
+}
 
 .sp-btn[data-variant="ghost"] {
   background: transparent;
   color: var(--sp-fg-muted);
 }
-.sp-btn[data-variant="ghost"]:hover { background: var(--sp-bg-muted); }
+.sp-btn[data-variant="ghost"]:hover {
+  background: var(--sp-bg-muted);
+}
 
 .sp-btn[data-variant="danger"] {
   background: var(--sp-danger);
@@ -57,5 +70,8 @@ withDefaults(
   outline: 2px solid var(--sp-accent-ring);
   outline-offset: 2px;
 }
-.sp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>

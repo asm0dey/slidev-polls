@@ -15,7 +15,7 @@ function parseRgb(s: string): [number, number, number] | null {
 }
 
 function relativeLuminance(rgb: [number, number, number]): number {
-  const [r, g, b] = rgb.map(v => {
+  const [r, g, b] = rgb.map((v) => {
     const c = v / 255;
     return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   });
@@ -27,7 +27,8 @@ function hasImageBackground(el: HTMLElement): boolean {
   if (inlineVar.length > 0) return true;
   const cs = getComputedStyle(el);
   if (cs.getPropertyValue("--slidev-bg-image").trim().length > 0) return true;
-  if (cs.backgroundImage && cs.backgroundImage !== "none" && /url\(/i.test(cs.backgroundImage)) return true;
+  if (cs.backgroundImage && cs.backgroundImage !== "none" && /url\(/i.test(cs.backgroundImage))
+    return true;
   if (el.querySelector(":scope > img")) return true;
   return false;
 }

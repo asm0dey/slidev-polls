@@ -27,25 +27,25 @@ To run this deck:
    `<PollResults />` tags into Q1 / Q2 slides below (replacing the stubs).
 4. Mint a deck token on the **Deck tokens** page; copy the plaintext token.
 5. Click **sign in** in the Slidev nav bar and paste the token. The button
-   flips to *signed in: &lt;label&gt;*.
+   flips to _signed in: &lt;label&gt;_.
 
 ---
 
 ## How this deck is wired
 
 - The addon mounts a **sign-in button in the nav bar** (hover the toolbar to
-  reveal it during play). Pre-sign-in the button reads *sign in*; click to
+  reveal it during play). Pre-sign-in the button reads _sign in_; click to
   open the token popover.
 - Paste the deck token; the toolbar flips to **signed in: &lt;label&gt;**.
 - Poll slides embed `<PollResults />` — on mount they POST
   `/api/deck/polls/{pollId}/activate` **only** if the composable is
   `signed-in`. Anonymous viewers never hijack the active question.
 - Revoke the token from the backoffice → next navigation flips the control
-  back to *not signed in* with *credential not recognised*.
+  back to _not signed in_ with _credential not recognised_.
 
 ---
-layout: center
----
+
+## layout: center
 
 ## Q1 — paste your snippet here
 
@@ -76,8 +76,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 -->
 
 ---
-layout: center
----
+
+## layout: center
 
 ## Q2 — paste your second snippet here
 
@@ -92,7 +92,7 @@ layout: center
 ## Vote against either question
 
 | URL                                      | What it is           |
-|------------------------------------------|----------------------|
+| ---------------------------------------- | -------------------- |
 | `http://localhost:8080/<slug>`           | voter SPA slug route |
 | network panel → `/api/polls/…/stream`    | live SSE feed        |
 | network panel → `/api/deck/.../activate` | presenter-only POST  |
@@ -101,17 +101,17 @@ layout: center
 
 ## What to look for
 
-| Observable                              | Where                          |
-|-----------------------------------------|--------------------------------|
-| auth control flips to *signed in: label*| top-right overlay              |
-| activation POST with `X-Deck-Token`     | browser devtools network panel |
-| anonymous viewer fires zero POSTs       | second browser profile         |
-| revocation → *credential not recognised*| first browser after DELETE     |
-| *live updates paused* on SSE drop       | kill the SSE from devtools     |
+| Observable                               | Where                          |
+| ---------------------------------------- | ------------------------------ |
+| auth control flips to _signed in: label_ | top-right overlay              |
+| activation POST with `X-Deck-Token`      | browser devtools network panel |
+| anonymous viewer fires zero POSTs        | second browser profile         |
+| revocation → _credential not recognised_ | first browser after DELETE     |
+| _live updates paused_ on SSE drop        | kill the SSE from devtools     |
 
 ---
-layout: end
----
+
+## layout: end
 
 # Done.
 

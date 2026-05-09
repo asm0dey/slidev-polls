@@ -42,15 +42,15 @@ You provision the demo poll yourself via the backoffice:
 6. Vote from any browser at `http://localhost:8080/{slug}`. Tallies on the
    slide update within ~2 s.
 7. Revoke the token from the backoffice (`DELETE
-   /api/admin/polls/{pollId}/deck-tokens/{tokenId}`, session-authenticated).
+/api/admin/polls/{pollId}/deck-tokens/{tokenId}`, session-authenticated).
    Navigate to another poll slide in the signed-in browser — the auth
-   control reverts to *not signed in* with *credential not recognised*;
+   control reverts to _not signed in_ with _credential not recognised_;
    the poll's active question is unchanged.
 
 ## Files
 
-| File              | Role                                                    |
-|-------------------|---------------------------------------------------------|
-| `slides.md`       | Deck markdown; imports poll config from `./data.ts`.    |
-| `data.ts`         | Local-only config stub for slug / pollId / questionIds. |
-| `package.json`    | Workspace member; depends on `@slidev-polls/component`.     |
+| File           | Role                                                    |
+| -------------- | ------------------------------------------------------- |
+| `slides.md`    | Deck markdown; imports poll config from `./data.ts`.    |
+| `data.ts`      | Local-only config stub for slug / pollId / questionIds. |
+| `package.json` | Workspace member; depends on `@slidev-polls/component`. |

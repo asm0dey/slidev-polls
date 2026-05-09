@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { resolveSlidevTheme } from "./useSlidevTheme";
 
-function makeSlide(opts: {
-  bg?: string;
-  bgImage?: string;
-  hasImgChild?: boolean;
-}): HTMLElement {
+function makeSlide(opts: { bg?: string; bgImage?: string; hasImgChild?: boolean }): HTMLElement {
   const el = document.createElement("div");
   el.className = "slidev-page";
   if (opts.bg) el.style.background = opts.bg;

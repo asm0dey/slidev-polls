@@ -8,10 +8,7 @@ import {
 } from "../lib/admin-api";
 import { Button, Input } from "@slidev-polls/shared/ui";
 
-const props = withDefaults(
-  defineProps<{ apiClient?: AdminApiClient }>(),
-  { apiClient: undefined }
-);
+const props = withDefaults(defineProps<{ apiClient?: AdminApiClient }>(), { apiClient: undefined });
 const client = props.apiClient ?? defaultAdminClient;
 
 const users = ref<AdminUserView[]>([]);
@@ -97,12 +94,7 @@ function describeError(err: unknown): string {
       <Button type="submit" :disabled="submitting" data-testid="users-submit">
         {{ submitting ? "Creating…" : "Add presenter" }}
       </Button>
-      <p
-        v-if="errorMessage"
-        role="alert"
-        data-testid="users-error"
-        class="users-page__error"
-      >
+      <p v-if="errorMessage" role="alert" data-testid="users-error" class="users-page__error">
         {{ errorMessage }}
       </p>
     </form>
@@ -110,10 +102,24 @@ function describeError(err: unknown): string {
 </template>
 
 <style scoped>
-.users-page { max-width: 720px; }
-.users-page__title { font-size: 18px; font-weight: 600; margin: 0 0 14px; }
-.users-page__subtitle { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
-.users-page__table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+.users-page {
+  max-width: 720px;
+}
+.users-page__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.users-page__subtitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+.users-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 32px;
+}
 .users-page__table th {
   text-align: left;
   font-size: 12px;

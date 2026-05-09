@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@slidev-polls/shared", async () => {
-  const actual = await vi.importActual<typeof import("@slidev-polls/shared")>("@slidev-polls/shared");
+  const actual =
+    await vi.importActual<typeof import("@slidev-polls/shared")>("@slidev-polls/shared");
   return { ...actual, openPollStream: vi.fn(() => () => {}) };
 });
 
@@ -46,10 +47,12 @@ function makeWaitingView(): PublicPollView {
   };
 }
 
-function makeClient(overrides: {
-  publicPoll?: (slug: string) => Promise<PublicPollView>;
-  submitVote?: (slug: string, body: unknown) => Promise<VoteAccepted | null>;
-} = {}): ApiClient {
+function makeClient(
+  overrides: {
+    publicPoll?: (slug: string) => Promise<PublicPollView>;
+    submitVote?: (slug: string, body: unknown) => Promise<VoteAccepted | null>;
+  } = {}
+): ApiClient {
   const accepted: VoteAccepted = { voteId: "vote-uuid", recordedAt: "2026-04-19T12:00:00Z" };
   return {
     publicPoll: vi.fn().mockResolvedValue(makeActiveView()),
@@ -127,11 +130,7 @@ describe("PollView", () => {
     const submitVote = vi
       .fn()
       .mockRejectedValue(
-        new ApiError(
-          409,
-          { code: "ALREADY_VOTED", message: "already voted" },
-          "already voted"
-        )
+        new ApiError(409, { code: "ALREADY_VOTED", message: "already voted" }, "already voted")
       );
     const client = makeClient({ submitVote });
     const wrapper = await mountView(client);
@@ -157,11 +156,7 @@ describe("PollView", () => {
     const submitVote = vi
       .fn()
       .mockRejectedValue(
-        new ApiError(
-          409,
-          { code: "QUESTION_NOT_ACTIVE", message: "closed" },
-          "closed"
-        )
+        new ApiError(409, { code: "QUESTION_NOT_ACTIVE", message: "closed" }, "closed")
       );
     const client = makeClient({ publicPoll, submitVote });
     const wrapper = await mountView(client);

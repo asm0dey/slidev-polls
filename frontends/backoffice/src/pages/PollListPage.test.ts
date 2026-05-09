@@ -72,7 +72,12 @@ describe("PollListPage", () => {
 
   it("renders one row per poll with title, slug, join link and QR preview", async () => {
     const polls: Poll[] = [
-      poll({ id: "p1", title: "Quickstart demo", slug: "quickstart-demo", publicUrl: "http://localhost:8080/quickstart-demo" }),
+      poll({
+        id: "p1",
+        title: "Quickstart demo",
+        slug: "quickstart-demo",
+        publicUrl: "http://localhost:8080/quickstart-demo"
+      }),
       poll({
         id: "p2",
         title: "Favourite IDE?",

@@ -137,7 +137,11 @@ describe("AdminApiClient setup + user management", () => {
 
   it("runSetup posts to /api/admin/setup without CSRF token", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse(201, { username: "alice", displayName: "Alice", createdAt: "2026-05-09T00:00:00Z" })
+      jsonResponse(201, {
+        username: "alice",
+        displayName: "Alice",
+        createdAt: "2026-05-09T00:00:00Z"
+      })
     );
     const client = new AdminApiClient({
       fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -168,7 +172,11 @@ describe("AdminApiClient setup + user management", () => {
 
   it("createUser posts to /api/admin/users with CSRF token", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse(201, { username: "bob", displayName: "Bob", createdAt: "2026-05-09T00:00:00Z" })
+      jsonResponse(201, {
+        username: "bob",
+        displayName: "Bob",
+        createdAt: "2026-05-09T00:00:00Z"
+      })
     );
     const client = new AdminApiClient({
       fetchImpl: fetchImpl as unknown as typeof fetch,

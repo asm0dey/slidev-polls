@@ -5,11 +5,7 @@ import { getConfiguredBackend } from "./configureDeckAuthBackend";
 // presenter-credential state, persists it in localStorage, and surfaces the distinct
 // FR-014 status messages. See specs/002-presenter-auth-gating/data-model.md §DeckAuthState.
 
-export type DeckAuthStatus =
-  | "anonymous"
-  | "signed-in-pending"
-  | "signed-in"
-  | "revoked";
+export type DeckAuthStatus = "anonymous" | "signed-in-pending" | "signed-in" | "revoked";
 
 export interface DeckAuthState {
   token: string | null;
@@ -104,11 +100,7 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
 
   async function signIn(rawToken: string): Promise<void> {
     const token = (rawToken ?? "").trim();
-    if (
-      token.length < MIN_TOKEN ||
-      token.length > MAX_TOKEN ||
-      !isPrintableAscii(token)
-    ) {
+    if (token.length < MIN_TOKEN || token.length > MAX_TOKEN || !isPrintableAscii(token)) {
       status.value = "anonymous";
       message.value = AUTH_FAILURE_MESSAGE;
       clearStored();

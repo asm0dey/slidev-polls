@@ -19,12 +19,23 @@ const ariaLabel = computed(() =>
 
 <style scoped>
 .sp-themetoggle {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  background: transparent; border: 1px solid var(--sp-border);
-  border-radius: var(--sp-radius); cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  cursor: pointer;
   color: var(--sp-fg-muted);
 }
-.sp-themetoggle:hover { background: var(--sp-bg-muted); color: var(--sp-fg); }
-.sp-themetoggle:focus-visible { outline: 2px solid var(--sp-accent-ring); outline-offset: 2px; }
+.sp-themetoggle:hover {
+  background: var(--sp-bg-muted);
+  color: var(--sp-fg);
+}
+.sp-themetoggle:focus-visible {
+  outline: 2px solid var(--sp-accent-ring);
+  outline-offset: 2px;
+}
 </style>

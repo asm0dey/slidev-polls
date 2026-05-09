@@ -28,7 +28,9 @@ async function xsrfHeaders(
   const state = await request.storageState();
   const origin = new URL(baseURL);
   const cookie = state.cookies.find(
-    (c) => c.name === "XSRF-TOKEN" && (c.domain === origin.hostname || c.domain === `.${origin.hostname}`)
+    (c) =>
+      c.name === "XSRF-TOKEN" &&
+      (c.domain === origin.hostname || c.domain === `.${origin.hostname}`)
   );
   return cookie ? { "X-XSRF-TOKEN": decodeURIComponent(cookie.value) } : {};
 }

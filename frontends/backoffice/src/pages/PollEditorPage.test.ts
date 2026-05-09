@@ -104,9 +104,7 @@ describe("PollEditorPage — create mode", () => {
   });
 
   it("submits the form and redirects to /polls on success", async () => {
-    const createPoll = vi.fn(async (req: CreatePollRequest) =>
-      pollDetail({ title: req.title })
-    );
+    const createPoll = vi.fn(async (req: CreatePollRequest) => pollDetail({ title: req.title }));
     const client = makeFake({ createPoll });
     const { wrapper, router } = await mountCreate(client);
 
@@ -129,13 +127,15 @@ describe("PollEditorPage — create mode", () => {
   });
 
   it("surfaces server-issued SLUG_TAKEN as a readable error, not a stack trace", async () => {
-    const createPoll = vi.fn().mockRejectedValue(
-      new AdminApiError(
-        409,
-        { code: "SLUG_TAKEN", message: "Slug already in use" },
-        "Slug already in use"
-      )
-    );
+    const createPoll = vi
+      .fn()
+      .mockRejectedValue(
+        new AdminApiError(
+          409,
+          { code: "SLUG_TAKEN", message: "Slug already in use" },
+          "Slug already in use"
+        )
+      );
     const client = makeFake({ createPoll });
     const { wrapper } = await mountCreate(client);
 
@@ -155,9 +155,9 @@ describe("PollEditorPage — create mode", () => {
 
 describe("PollEditorPage — allowed origins editor", () => {
   it("populates AllowedOriginsField from PollDetail.allowedOrigins on load", async () => {
-    const getPoll = vi.fn().mockResolvedValue(
-      pollDetail({ allowedOrigins: ["http://a.example", "http://b.example"] })
-    );
+    const getPoll = vi
+      .fn()
+      .mockResolvedValue(pollDetail({ allowedOrigins: ["http://a.example", "http://b.example"] }));
     const client = makeFake({ getPoll });
     const { wrapper } = await mountEdit(client);
 

@@ -41,7 +41,7 @@ Frontmatter wins when both are set.
 
 It also mounts a **sign-in button in the Slidev nav bar** for deck-token
 auth (paste the token minted in the backoffice → toolbar flips to
-*signed in: <label>*).
+_signed in: <label>_).
 
 ## Embed poll results on a slide
 

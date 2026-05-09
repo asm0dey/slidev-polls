@@ -38,11 +38,11 @@ export function useTheme() {
   modeRef = ref<ThemeMode>(initial);
   apply(initial);
 
-  watch(modeRef, m => apply(m));
+  watch(modeRef, (m) => apply(m));
 
   mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") ?? null;
   if (mediaQuery) {
-    mediaListener = e => {
+    mediaListener = (e) => {
       if (readOverride() !== null) return;
       modeRef!.value = e.matches ? "dark" : "light";
     };

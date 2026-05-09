@@ -42,8 +42,7 @@ const headmatterServer = (() => {
 })();
 
 const attrs = useAttrs();
-const isDev =
-  (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+const isDev = (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
 if (isDev && "deckToken" in attrs) {
   // eslint-disable-next-line no-console
   console.warn(
@@ -71,7 +70,7 @@ const panelQuestion = computed(() => {
   if (!s?.activeQuestion) return null;
   return {
     prompt: s.activeQuestion.prompt,
-    options: s.activeQuestion.options.map(o => ({ id: o.id, label: o.label })),
+    options: s.activeQuestion.options.map((o) => ({ id: o.id, label: o.label })),
     tally: s.tally
   };
 });
@@ -81,8 +80,12 @@ function isElementVisible(el: HTMLElement): boolean {
   if (r.width === 0 || r.height === 0) return false;
   const cs = getComputedStyle(el);
   if (cs.visibility === "hidden" || cs.display === "none") return false;
-  return r.top < (window.innerHeight || 0) && r.bottom > 0
-      && r.left < (window.innerWidth || 0) && r.right > 0;
+  return (
+    r.top < (window.innerHeight || 0) &&
+    r.bottom > 0 &&
+    r.left < (window.innerWidth || 0) &&
+    r.right > 0
+  );
 }
 
 async function activateFromDeck(base: string) {
@@ -130,13 +133,16 @@ onMounted(async () => {
     }
   );
   if (root.value && typeof IntersectionObserver !== "undefined") {
-    visibilityObserver = new IntersectionObserver(entries => {
-      for (const e of entries) {
-        if (e.isIntersecting && e.intersectionRatio > 0.5) {
-          void activateFromDeck(base);
+    visibilityObserver = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio > 0.5) {
+            void activateFromDeck(base);
+          }
         }
-      }
-    }, { threshold: [0.5, 0.95] });
+      },
+      { threshold: [0.5, 0.95] }
+    );
     visibilityObserver.observe(root.value);
   }
   stop = openPollStream(base, props.slug, {
@@ -154,7 +160,7 @@ onMounted(async () => {
     },
     onTally: (ev: TallyDeltaEvent) => {
       if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
-      const entry = snapshot.value.tally.find(t => t.optionId === ev.optionId);
+      const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
     },
@@ -164,7 +170,7 @@ onMounted(async () => {
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
       }
     },
-    onConnectionStateChange: state => {
+    onConnectionStateChange: (state) => {
       paused.value = state === "paused";
     }
   });

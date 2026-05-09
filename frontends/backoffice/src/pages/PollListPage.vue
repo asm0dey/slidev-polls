@@ -66,14 +66,10 @@ onMounted(() => {
 
 const filterText = ref("");
 const filteredPolls = computed(() =>
-  (polls.value ?? []).filter((p) =>
-    p.title.toLowerCase().includes(filterText.value.toLowerCase())
-  )
+  (polls.value ?? []).filter((p) => p.title.toLowerCase().includes(filterText.value.toLowerCase()))
 );
 const totalCount = computed(() => polls.value?.length ?? 0);
-const activeCount = computed(
-  () => (polls.value ?? []).filter((p) => p.status === "OPEN").length
-);
+const activeCount = computed(() => (polls.value ?? []).filter((p) => p.status === "OPEN").length);
 
 function statusTone(s: string): "neutral" | "success" | "danger" {
   if (s === "OPEN") return "success";
@@ -94,11 +90,7 @@ function statusLabel(s: string): string {
         <p class="pl__sub">{{ totalCount }} polls · {{ activeCount }} active sessions</p>
       </div>
       <div class="pl__actions">
-        <Input
-          v-model="filterText"
-          placeholder="Search…"
-          style="width: 200px;"
-        />
+        <Input v-model="filterText" placeholder="Search…" style="width: 200px" />
         <RouterLink to="/polls/new" data-testid="new-poll-link">
           <Button>+ New poll</Button>
         </RouterLink>
@@ -107,12 +99,7 @@ function statusLabel(s: string): string {
 
     <p v-if="loading" data-testid="poll-list-loading">Loading polls…</p>
 
-    <p
-      v-else-if="errorMessage"
-      data-testid="poll-list-error"
-      role="alert"
-      class="pl__error"
-    >
+    <p v-else-if="errorMessage" data-testid="poll-list-error" role="alert" class="pl__error">
       {{ errorMessage }}
     </p>
 
@@ -128,12 +115,7 @@ function statusLabel(s: string): string {
         <span>Join link</span>
         <span>Actions</span>
       </div>
-      <div
-        v-for="poll in filteredPolls"
-        :key="poll.id"
-        data-testid="poll-row"
-        class="pl__row"
-      >
+      <div v-for="poll in filteredPolls" :key="poll.id" data-testid="poll-row" class="pl__row">
         <div class="pl__row-main">
           <span class="pl__name">{{ poll.title }}</span>
           <span class="pl__slug">/{{ poll.slug }}</span>
@@ -154,12 +136,7 @@ function statusLabel(s: string): string {
           {{ poll.publicUrl }}
         </a>
         <div class="pl__row-side">
-          <QrPreview
-            data-testid="poll-qr-img"
-            :poll-id="poll.id"
-            :slug="poll.slug"
-            :size="120"
-          />
+          <QrPreview data-testid="poll-qr-img" :poll-id="poll.id" :slug="poll.slug" :size="120" />
           <div class="pl__row-actions">
             <RouterLink
               :to="{ name: 'poll-edit', params: { pollId: poll.id } }"
@@ -306,5 +283,7 @@ function statusLabel(s: string): string {
   text-decoration: none;
   transition: background var(--sp-dur) var(--sp-ease);
 }
-.btn-link:hover { background: var(--sp-bg-muted); }
+.btn-link:hover {
+  background: var(--sp-bg-muted);
+}
 </style>

@@ -16,7 +16,7 @@ defineEmits<{ "update:modelValue": [v: string] }>();
     :value="modelValue"
     :placeholder="placeholder"
     @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-  >
+  />
 </template>
 
 <style scoped>
@@ -31,11 +31,15 @@ defineEmits<{ "update:modelValue": [v: string] }>();
   background: var(--sp-bg);
   color: var(--sp-fg);
 }
-.sp-input::placeholder { color: var(--sp-fg-faint); }
+.sp-input::placeholder {
+  color: var(--sp-fg-faint);
+}
 .sp-input:focus {
   outline: 2px solid var(--sp-accent-ring);
   outline-offset: 0;
   border-color: var(--sp-accent);
 }
-.sp-input[data-invalid] { border-color: var(--sp-danger); }
+.sp-input[data-invalid] {
+  border-color: var(--sp-danger);
+}
 </style>

@@ -12,11 +12,7 @@ import {
   LiveDot,
   ResultsPanel
 } from "@slidev-polls/shared";
-import {
-  clearAlreadyVoted,
-  hasAlreadyVoted,
-  markAlreadyVoted
-} from "../lib/voterFlag";
+import { clearAlreadyVoted, hasAlreadyVoted, markAlreadyVoted } from "../lib/voterFlag";
 
 type ViewStatus = "loading" | "waiting" | "active" | "voted" | "error";
 
@@ -98,7 +94,7 @@ function ensureStream() {
             prompt: next.prompt,
             ordinal: next.ordinal,
             status: "ACTIVE",
-            options: next.options.map(o => ({ id: o.id, label: o.label, position: o.position }))
+            options: next.options.map((o) => ({ id: o.id, label: o.label, position: o.position }))
           },
           alreadyVoted: undefined
         };
@@ -117,7 +113,7 @@ function ensureStream() {
       }
     },
     onTally: (ev: TallyDeltaEvent) => {
-      const entry = liveTally.value.find(t => t.optionId === ev.optionId);
+      const entry = liveTally.value.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else liveTally.value.push({ optionId: ev.optionId, count: ev.count });
     },
@@ -187,7 +183,7 @@ const resultsForPanel = computed(() => {
   if (!q) return { prompt: "", options: [], tally: [] };
   return {
     prompt: q.prompt,
-    options: q.options.map(o => ({ id: o.id, label: o.label })),
+    options: q.options.map((o) => ({ id: o.id, label: o.label })),
     tally: liveTally.value
   };
 });
@@ -195,11 +191,14 @@ const resultsForPanel = computed(() => {
 const votedOptionLabel = computed(() => {
   const id = selectedOptionId.value;
   if (!id) return null;
-  return poll.value?.activeQuestion?.options.find(o => o.id === id)?.label ?? null;
+  return poll.value?.activeQuestion?.options.find((o) => o.id === id)?.label ?? null;
 });
 
 onMounted(load);
-watch(() => props.slug, () => load());
+watch(
+  () => props.slug,
+  () => load()
+);
 onUnmounted(() => stopStream?.());
 </script>
 
@@ -261,7 +260,9 @@ onUnmounted(() => stopStream?.());
       <div v-else-if="status === 'voted' && poll?.activeQuestion" data-testid="poll-voted">
         <div class="pv__confirm">
           <IconCheck />
-          <span>Answer recorded<span v-if="votedOptionLabel"> · {{ votedOptionLabel }}</span></span>
+          <span
+            >Answer recorded<span v-if="votedOptionLabel"> · {{ votedOptionLabel }}</span></span
+          >
         </div>
         <h2 class="pv__prompt pv__prompt--small">{{ poll.activeQuestion.prompt }}</h2>
         <ResultsPanel :question="resultsForPanel" mode="flat" />
@@ -277,60 +278,118 @@ onUnmounted(() => stopStream?.());
   border-radius: var(--sp-radius-xl);
   border: 1px solid var(--sp-border);
   padding: 24px 20px;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   min-height: 70vh;
 }
 .pv__bar {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 11px; color: var(--sp-fg-subtle); margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--sp-fg-subtle);
+  margin-bottom: 24px;
 }
-.pv__live { display: flex; align-items: center; gap: 6px; }
-.pv__counter { font-variant-numeric: tabular-nums; }
-.pv__title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 8px; }
-.pv__waiting-text { color: var(--sp-fg-subtle); margin: 0; }
+.pv__live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pv__counter {
+  font-variant-numeric: tabular-nums;
+}
+.pv__title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+}
+.pv__waiting-text {
+  color: var(--sp-fg-subtle);
+  margin: 0;
+}
 .pv__eyebrow {
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--sp-fg-subtle); font-weight: 500; margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sp-fg-subtle);
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 .pv__prompt {
-  font-size: 20px; font-weight: 600;
-  letter-spacing: -0.015em; line-height: 1.3; margin: 0 0 24px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin: 0 0 24px;
   color: var(--sp-fg);
 }
-.pv__prompt--small { font-size: 18px; margin-bottom: 18px; }
-.pv__options { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.pv__prompt--small {
+  font-size: 18px;
+  margin-bottom: 18px;
+}
+.pv__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
 .pv__opt {
-  text-align: left; background: var(--sp-bg);
+  text-align: left;
+  background: var(--sp-bg);
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius-lg);
-  padding: 14px 16px; font-size: 14px;
-  font-family: var(--sp-font-sans); color: var(--sp-fg); cursor: pointer;
-  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-family: var(--sp-font-sans);
+  color: var(--sp-fg);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .pv__opt[data-selected] {
-  background: var(--sp-fg); border-color: var(--sp-fg);
-  color: var(--sp-bg); font-weight: 500;
+  background: var(--sp-fg);
+  border-color: var(--sp-fg);
+  color: var(--sp-bg);
+  font-weight: 500;
 }
-.pv__opt:focus-visible { outline: 2px solid var(--sp-accent-ring); outline-offset: 2px; }
+.pv__opt:focus-visible {
+  outline: 2px solid var(--sp-accent-ring);
+  outline-offset: 2px;
+}
 .pv__submit {
-  margin-top: 18px; width: 100%;
+  margin-top: 18px;
+  width: 100%;
   background: var(--sp-accent);
   color: var(--sp-accent-fg);
   border-color: var(--sp-accent);
 }
 .pv__error {
-  background: var(--sp-danger-bg); color: var(--sp-danger-fg);
-  border: 1px solid var(--sp-danger); border-radius: var(--sp-radius-sm);
-  padding: 8px 10px; font-size: 12px; margin: 8px 0 0;
+  background: var(--sp-danger-bg);
+  color: var(--sp-danger-fg);
+  border: 1px solid var(--sp-danger);
+  border-radius: var(--sp-radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  margin: 8px 0 0;
 }
 .pv__confirm {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; color: var(--sp-accent); font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--sp-accent);
+  font-weight: 500;
   margin-bottom: 6px;
 }
 .pv__waiting-card {
-  margin: 14px 0 0; padding: 10px;
-  background: var(--sp-bg-muted); border-radius: var(--sp-radius-sm);
-  text-align: center; font-size: 11px; color: var(--sp-fg-subtle);
+  margin: 14px 0 0;
+  padding: 10px;
+  background: var(--sp-bg-muted);
+  border-radius: var(--sp-radius-sm);
+  text-align: center;
+  font-size: 11px;
+  color: var(--sp-fg-subtle);
 }
 </style>

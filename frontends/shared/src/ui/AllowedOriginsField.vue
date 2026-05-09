@@ -11,7 +11,7 @@ const draft = ref("");
 const error = ref<string | null>(null);
 
 const items = computed(() =>
-  props.modelValue.map(o => {
+  props.modelValue.map((o) => {
     const r = validateOrigin(o);
     return { raw: o, invalid: !r.ok };
   })
@@ -66,7 +66,7 @@ function remove(idx: number) {
         placeholder="https://… (Enter or Tab to add)"
         @keydown.enter.prevent="commit"
         @blur="commit"
-      >
+      />
     </div>
     <div v-if="error" class="sp-aof-error" data-testid="aof-error" role="alert">
       <IconAlert />
@@ -76,23 +76,41 @@ function remove(idx: number) {
 </template>
 
 <style scoped>
-.sp-aof { display: flex; flex-direction: column; gap: 8px; }
+.sp-aof {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .sp-aof-box {
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius);
-  padding: 8px; display: flex; flex-wrap: wrap; gap: 6px;
-  min-height: 42px; background: var(--sp-bg);
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 42px;
+  background: var(--sp-bg);
 }
 .sp-aof-input {
-  flex: 1; min-width: 160px;
-  border: 0; outline: 0; background: transparent;
-  font-size: 13px; font-family: var(--sp-font-mono);
-  padding: 4px 6px; color: var(--sp-fg);
+  flex: 1;
+  min-width: 160px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--sp-font-mono);
+  padding: 4px 6px;
+  color: var(--sp-fg);
 }
 .sp-aof-error {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; background: var(--sp-danger-bg);
-  border: 1px solid var(--sp-danger); border-radius: var(--sp-radius-sm);
-  font-size: 12px; color: var(--sp-danger-fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--sp-danger-bg);
+  border: 1px solid var(--sp-danger);
+  border-radius: var(--sp-radius-sm);
+  font-size: 12px;
+  color: var(--sp-danger-fg);
 }
 </style>
