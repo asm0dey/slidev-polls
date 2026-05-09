@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@polls/slidev-addon": "workspace:*",
-    "@slidev/cli": "^0.49.0",
+    "@slidev/cli": "^52.15.1",
     "@slidev/theme-default": "^0.25.0",
     "vue": "^3.5.0"
   }
