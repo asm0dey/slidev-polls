@@ -118,6 +118,21 @@ function onSignOut() {
   padding: 10px 12px;
   min-width: 200px;
 }
+.deck-auth-control[data-theme="dark"] {
+  --sp-fg: #e5e7eb;
+  --sp-fg-muted: #cbd5e1;
+  --sp-fg-subtle: #94a3b8;
+  --sp-fg-faint: #64748b;
+  --sp-bg: #0f172a;
+  --sp-bg-muted: #1e293b;
+  --sp-border: #1f2937;
+  --sp-accent: #8b5cf6;
+  --sp-accent-fg: #ffffff;
+  --sp-accent-ring: rgba(139, 92, 246, 0.45);
+  --sp-danger: #ef4444;
+  --sp-danger-bg: #3f1d1d;
+  --sp-danger-fg: #fecaca;
+}
 .deck-auth-control__form {
   display: flex;
   flex-direction: column;
