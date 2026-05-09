@@ -37,6 +37,19 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!--
+          Argon2PasswordEncoder (SecurityConfig#passwordEncoder) delegates the
+          primitive to org.bouncycastle.crypto.generators.Argon2BytesGenerator.
+          Spring Security ships the encoder but not the BC primitive, so we add
+          it explicitly. Recorded under Constitution §VIII: justified by the
+          password-hashing upgrade documented in
+          docs/superpowers/specs/2026-05-09-replace-hardcoded-admin-credentials-design.md.
+        -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
