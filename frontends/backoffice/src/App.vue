@@ -1,46 +1,63 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from "vue-router";
+import { computed } from "vue";
+import { RouterLink, RouterView, useRoute } from "vue-router";
+import { ThemeToggle } from "@polls/shared/ui";
+
+const route = useRoute();
+const isLogin = computed(() => route.name === "login");
 </script>
 
 <template>
-  <div class="app-shell">
-    <header class="app-header">
-      <h1><RouterLink to="/polls">Slidev Polls</RouterLink></h1>
-      <nav>
-        <RouterLink to="/polls">Polls</RouterLink>
-        <RouterLink to="/polls/new">New poll</RouterLink>
+  <div v-if="isLogin" class="bo-login-host">
+    <RouterView />
+  </div>
+  <div v-else class="bo-shell">
+    <aside class="bo-sidebar">
+      <div class="bo-brand">slidev polls</div>
+      <nav class="bo-nav">
+        <RouterLink to="/polls" class="bo-nav-item">Polls</RouterLink>
+        <RouterLink to="/deck-tokens" class="bo-nav-item">Deck tokens</RouterLink>
       </nav>
-    </header>
-    <main class="app-main">
+      <div class="bo-sidebar-foot">
+        <ThemeToggle />
+      </div>
+    </aside>
+    <main class="bo-main">
       <RouterView />
     </main>
   </div>
 </template>
 
-<style scoped>
-.app-shell {
-  font-family: system-ui, sans-serif;
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 0.5rem;
-  margin-bottom: 1rem;
-}
-.app-header h1 {
-  font-size: 1.25rem;
+<style>
+body {
   margin: 0;
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+  font-family: var(--sp-font-sans);
 }
-.app-header h1 a {
-  color: inherit;
-  text-decoration: none;
+</style>
+
+<style scoped>
+.bo-login-host { min-height: 100vh; }
+.bo-shell { display: flex; min-height: 100vh; background: var(--sp-bg); }
+.bo-sidebar {
+  width: 200px; background: var(--sp-bg-muted);
+  border-right: 1px solid var(--sp-border);
+  padding: 18px 12px; display: flex; flex-direction: column;
 }
-.app-header nav a {
-  margin-left: 1rem;
+.bo-brand {
+  font-size: 13px; font-weight: 600; padding: 0 8px 16px;
+  letter-spacing: -0.01em; color: var(--sp-fg);
 }
+.bo-nav { display: flex; flex-direction: column; gap: 2px; }
+.bo-nav-item {
+  padding: 7px 8px; border-radius: var(--sp-radius-sm);
+  font-size: 13px; color: var(--sp-fg-muted); text-decoration: none;
+}
+.bo-nav-item:hover { background: var(--sp-bg-subtle); color: var(--sp-fg); }
+.bo-nav-item.router-link-active {
+  background: var(--sp-accent-soft); color: var(--sp-accent); font-weight: 500;
+}
+.bo-sidebar-foot { margin-top: auto; padding: 10px 8px; }
+.bo-main { flex: 1; padding: 24px 32px; box-sizing: border-box; min-width: 0; }
 </style>
