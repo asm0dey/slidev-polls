@@ -30,8 +30,11 @@ SPAs baked in as same-origin static assets. The task runs `task codegen`
 first to regenerate jOOQ sources; after that the image is cached and
 subsequent `task up` runs are fast. `task down` tears everything down.
 
-Sign in at `http://localhost:8080/admin/` as `alice` / `correct-horse`,
-create a poll, and have an audience load the join link on their phones.
+Open `http://localhost:8080/admin/` to create the first presenter account.
+The setup screen appears when `admin_user` is empty; once you've completed
+it, sign in with the credentials you chose, create a poll, and have your
+audience load the join link on their phones. Add additional presenters
+from **Presenters** in the sidebar.
 
 ### Inner-loop dev (Vite HMR + host spring-boot:run)
 
