@@ -260,10 +260,12 @@ async function copySnippet(q: DraftQuestion) {
   if (!props.pollId || !q.id) return;
   formError.value = null;
   try {
-    const minted = await client.mintDeckToken(props.pollId, {
-      label: "snippet for " + (q.prompt.trim() || "question")
-    });
-    const snippet = `<PollResults\n  slug="${slug.value}"\n  pollId="${props.pollId}"\n  questionId="${q.id}"\n  deckToken="${minted.plaintext}"\n/>`;
+    // The deck token does NOT belong in the markup — PollPanel reads it from
+    // the in-deck auth control via useDeckAuth() and warns in dev if a
+    // deckToken prop is present. Operators mint the token separately on the
+    // Deck tokens page and paste it into the deck's sign-in bar; anonymous
+    // viewers skip that step and still see live tallies (read-only).
+    const snippet = `<PollResults\n  slug="${slug.value}"\n  pollId="${props.pollId}"\n  questionId="${q.id}"\n/>`;
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
       throw new Error("Clipboard API is not available in this browser.");
     }
