@@ -80,9 +80,17 @@ class PerPollCorsConfigurationSourceTest {
   }
 
   private static Poll pollWithOrigins(List<String> origins, String slug, UUID id) {
-    return new Poll(id, "alice", "T", slug,
+    return new Poll(
+        id,
+        "alice",
+        "T",
+        slug,
         site.asm0dey.slidev.polls.core.domain.PollStatus.OPEN,
-        java.util.Map.of(), null, java.util.List.of(),
-        origins, java.time.Instant.now(), java.time.Instant.now());
+        java.util.Map.of(),
+        null,
+        java.util.List.of(),
+        origins,
+        java.time.Instant.now(),
+        java.time.Instant.now());
   }
 }

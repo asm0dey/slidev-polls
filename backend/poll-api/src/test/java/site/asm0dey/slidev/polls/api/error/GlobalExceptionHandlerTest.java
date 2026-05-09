@@ -84,8 +84,7 @@ class GlobalExceptionHandlerTest {
 
   // PerPollCorsConfigurationSource is also a @Component reachable through SecurityConfig and
   // requires PollRepository; mocked here for the same reason as DeckTokenService.
-  @MockitoBean
-  private site.asm0dey.slidev.polls.core.service.PollRepository pollRepository;
+  @MockitoBean private site.asm0dey.slidev.polls.core.service.PollRepository pollRepository;
 
   // @TS-042 — a representative request for each Problem code must surface the
   // matching HTTP status and code, with a correlationId accompanying every

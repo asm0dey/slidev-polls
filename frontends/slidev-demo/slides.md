@@ -65,7 +65,11 @@ Example shape:
   />
 -->
 
-<PollResults slug="my-talk" />
+<PollResults
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
+/>
 
 <!--
 Navigate here while **signed in** to activate this question on the backend.
@@ -78,7 +82,11 @@ layout: center
 
 ## Q2 — paste your second snippet here
 
-<PollResults slug="my-talk" />
+<PollResults
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
+/>
 
 ---
 

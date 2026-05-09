@@ -78,8 +78,7 @@ class AdminAuthWebMvcTest {
 
   // PerPollCorsConfigurationSource is a @Component pulled in through SecurityConfig and depends
   // on PollRepository. The slice does not test CORS, so mock the repo dependency away.
-  @MockitoBean
-  private site.asm0dey.slidev.polls.core.service.PollRepository pollRepository;
+  @MockitoBean private site.asm0dey.slidev.polls.core.service.PollRepository pollRepository;
 
   // @TS-001 — GET on the list endpoint without a session yields 401 with AUTH_REQUIRED.
   @Test

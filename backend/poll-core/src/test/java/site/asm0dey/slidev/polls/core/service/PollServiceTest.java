@@ -73,7 +73,11 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
+                        "irrelevant",
+                        "UPPER",
+                        null,
+                        List.of(questionDraft("Prompt?", "A", "B")),
+                        null)))
         .isInstanceOf(SlugInvalidException.class);
   }
 
@@ -86,7 +90,11 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
+                        "irrelevant",
+                        "admin",
+                        null,
+                        List.of(questionDraft("Prompt?", "A", "B")),
+                        null)))
         .isInstanceOf(SlugReservedException.class);
   }
 
@@ -104,7 +112,11 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
+                        "another",
+                        "my-talk",
+                        null,
+                        List.of(questionDraft("Prompt?", "A", "B")),
+                        null)))
         .isInstanceOf(SlugTakenException.class);
   }
 
@@ -205,7 +217,8 @@ class PollServiceTest {
     Poll created =
         service.create(
             "alice",
-            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
+            new CreatePollCommand(
+                "x", "x-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
