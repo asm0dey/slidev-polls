@@ -55,7 +55,8 @@ class PollServiceTest {
                 "Quickstart demo",
                 null,
                 null,
-                List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM"))));
+                List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM")),
+                null));
 
     assertThat(created.slug()).isEqualTo("quickstart-demo");
     assertThat(created.ownerUsername()).isEqualTo("alice");
@@ -71,7 +72,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugInvalidException.class);
   }
 
@@ -84,7 +85,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugReservedException.class);
   }
 
@@ -95,14 +96,14 @@ class PollServiceTest {
     service.create(
         "alice",
         new CreatePollCommand(
-            "My Talk", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B"))));
+            "My Talk", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")), null));
 
     assertThatThrownBy(
             () ->
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugTakenException.class);
   }
 
@@ -114,7 +115,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "my poll", "my-poll", null, List.of(questionDraft("Q?", "A", "B"))));
+                "my poll", "my-poll", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     assertThatThrownBy(() -> service.getForOwner(created.id(), "bob"))
         .isInstanceOf(NotOwnerException.class);
@@ -133,7 +134,8 @@ class PollServiceTest {
                 "agenda",
                 "agenda",
                 null,
-                List.of(questionDraft("Q1?", "A", "B"), questionDraft("Q2?", "C", "D"))));
+                List.of(questionDraft("Q1?", "A", "B"), questionDraft("Q2?", "C", "D")),
+                null));
     UUID q1 = created.questions().get(0).id();
     UUID q2 = created.questions().get(1).id();
 
@@ -156,7 +158,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "broken", "broken", null, List.of(questionDraft("Q?", "only-one"))));
+                "broken", "broken", null, List.of(questionDraft("Q?", "only-one")), null));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "alice", qid))
@@ -170,7 +172,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "disposable", "disposable", null, List.of(questionDraft("Q?", "A", "B"))));
+                "disposable", "disposable", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     service.deleteForOwner(created.id(), "alice");
 
@@ -186,11 +188,11 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "talk", "old-slug", null, List.of(questionDraft("Q?", "A", "B"))));
+                "talk", "old-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     Poll renamed =
         service.updateForOwner(
-            created.id(), "alice", new UpdatePollCommand(null, "new-slug", null));
+            created.id(), "alice", new UpdatePollCommand(null, "new-slug", null, null));
 
     assertThat(renamed.slug()).isEqualTo("new-slug");
   }
@@ -202,7 +204,7 @@ class PollServiceTest {
     Poll created =
         service.create(
             "alice",
-            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B"))));
+            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
@@ -421,6 +423,26 @@ class PollServiceTest {
               Instant.now());
       byId.put(pollId, after);
       return after;
+    }
+
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
+      Poll existing = requirePresent(pollId);
+      Poll updated =
+          new Poll(
+              existing.id(),
+              existing.ownerUsername(),
+              existing.title(),
+              existing.slug(),
+              existing.status(),
+              existing.style(),
+              existing.activeQuestionId(),
+              existing.questions(),
+              List.copyOf(origins),
+              existing.createdAt(),
+              Instant.now());
+      byId.put(pollId, updated);
+      return updated;
     }
 
     private Poll requirePresent(UUID pollId) {

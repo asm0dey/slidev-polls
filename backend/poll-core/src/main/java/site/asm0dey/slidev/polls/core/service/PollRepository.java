@@ -47,4 +47,11 @@ public interface PollRepository {
 
   /** Close the currently-ACTIVE question on {@code pollId}. No-op when none is active. */
   Poll closeActiveQuestion(UUID pollId);
+
+  /**
+   * Replace the allowed-origins list for {@code pollId}. A non-null (even empty) list replaces the
+   * current value. Throws {@link site.asm0dey.slidev.polls.core.error.NotFoundException} when the
+   * poll does not exist.
+   */
+  Poll updateAllowedOrigins(UUID pollId, List<String> origins);
 }

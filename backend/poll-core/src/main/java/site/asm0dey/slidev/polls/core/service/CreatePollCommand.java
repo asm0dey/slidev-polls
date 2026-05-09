@@ -10,10 +10,18 @@ import java.util.Map;
  *
  * <p>{@code slug} is optional — when {@code null} the service derives one from {@code title} per
  * {@code @TS-010}. {@code style} is a free-form theme map persisted as jsonb; {@code null} is
- * equivalent to an empty map.
+ * equivalent to an empty map. {@code allowedOrigins} is normalised to an empty list when null.
  */
 public record CreatePollCommand(
-    String title, String slug, Map<String, Object> style, List<QuestionDraft> questions) {
+    String title,
+    String slug,
+    Map<String, Object> style,
+    List<QuestionDraft> questions,
+    List<String> allowedOrigins) {
+
+  public CreatePollCommand {
+    allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
+  }
 
   public record QuestionDraft(String prompt, List<OptionDraft> options) {}
 

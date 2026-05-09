@@ -27,6 +27,6 @@ public record UpdatePollRequest(
         drafts.add(q.toDraft());
       }
     }
-    return new UpdatePollCommand(title, slug, drafts);
+    return new UpdatePollCommand(title, slug, drafts, null);
   }
 }

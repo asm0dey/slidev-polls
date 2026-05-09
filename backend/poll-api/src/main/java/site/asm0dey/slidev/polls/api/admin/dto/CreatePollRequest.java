@@ -35,6 +35,6 @@ public record CreatePollRequest(
         drafts.add(q.toDraft());
       }
     }
-    return new CreatePollCommand(title, slug, style == null ? null : style.toMap(), drafts);
+    return new CreatePollCommand(title, slug, style == null ? null : style.toMap(), drafts, null);
   }
 }

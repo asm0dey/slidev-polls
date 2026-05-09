@@ -62,6 +62,7 @@ public class PollRepositoryImpl implements PollRepository {
         .set(POLLS.STATUS, poll.status().name())
         .set(POLLS.STYLE, toJsonb(poll.style()))
         .set(POLLS.ACTIVE_QUESTION_ID, poll.activeQuestionId())
+        .set(POLLS.ALLOWED_ORIGINS, poll.allowedOrigins().toArray(new String[0]))
         .set(POLLS.CREATED_AT, now)
         .set(POLLS.UPDATED_AT, now)
         .execute();
@@ -242,6 +243,20 @@ public class PollRepositoryImpl implements PollRepository {
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
+  @Override
+  public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
+    int updated =
+        dsl.update(POLLS)
+            .set(POLLS.ALLOWED_ORIGINS, origins.toArray(new String[0]))
+            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
+            .where(POLLS.ID.eq(pollId))
+            .execute();
+    if (updated == 0) {
+      throw new NotFoundException("poll " + pollId + " does not exist");
+    }
+    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+  }
+
   private List<Question> insertQuestions(UUID pollId, List<Question> questions) {
     if (questions == null || questions.isEmpty()) {
       return List.of();
@@ -319,6 +334,9 @@ public class PollRepositoryImpl implements PollRepository {
                 })
             .toList();
 
+    String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);
+    List<String> origins = originsArr == null ? List.of() : List.of(originsArr);
+
     return new Poll(
         pollId,
         row.get(POLLS.OWNER_USERNAME),
@@ -328,7 +346,7 @@ public class PollRepositoryImpl implements PollRepository {
         fromJsonb(row.get(POLLS.STYLE)),
         row.get(POLLS.ACTIVE_QUESTION_ID),
         questions,
-        List.of(), // allowedOrigins — populated in Task A3
+        origins,
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
   }
