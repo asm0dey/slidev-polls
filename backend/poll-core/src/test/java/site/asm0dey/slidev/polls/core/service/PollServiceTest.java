@@ -20,6 +20,7 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
@@ -209,6 +210,55 @@ class PollServiceTest {
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
         .isInstanceOf(NotOwnerException.class);
+  }
+
+  // @TS-A4a — a malformed origin (e.g. containing a space) is rejected with InvalidOriginException
+  // whose message echoes the offending value.
+  @Test
+  void rejectsMalformedOrigin() {
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    "alice",
+                    new CreatePollCommand(
+                        "bad-origin-poll",
+                        "bad-origin-poll",
+                        null,
+                        List.of(questionDraft("Q?", "A", "B")),
+                        List.of("not a url"))))
+        .isInstanceOf(InvalidOriginException.class)
+        .hasMessageContaining("not a url");
+  }
+
+  // @TS-A4b — a valid origin is accepted and persisted verbatim after normalisation.
+  @Test
+  void acceptsValidOriginsOnCreate() {
+    Poll p =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "good-origin-poll",
+                "good-origin-poll",
+                null,
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("http://localhost:3030")));
+    assertThat(p.allowedOrigins()).containsExactly("http://localhost:3030");
+  }
+
+  // @TS-A4c — scheme and host are lower-cased; explicit port is preserved; trailing slash stripped.
+  @Test
+  void normalisesOrigins() {
+    Poll p =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "normalise-poll",
+                "normalise-poll",
+                null,
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("HTTP://Demo.example.COM:443/")));
+    // host lowercased, default port preserved (explicit in input), trailing slash removed
+    assertThat(p.allowedOrigins()).containsExactly("http://demo.example.com:443");
   }
 
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
