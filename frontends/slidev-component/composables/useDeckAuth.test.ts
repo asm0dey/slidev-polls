@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { __resetUseDeckAuthForTests, useDeckAuth } from "./useDeckAuth";
+import {
+  configureDeckAuthBackend,
+  __resetConfiguredBackendForTests,
+} from "./configureDeckAuthBackend";
 
 // Tests mirror the scenarios from
 // specs/002-presenter-auth-gating/tests/features/deck-auth-signin.feature and
@@ -215,5 +219,33 @@ describe("useDeckAuth composable", () => {
     expect(auth.message.value).toBe("couldn't reach server");
     expect(auth.message.value).not.toBe("credential not recognised");
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe("dynamic backend URL", () => {
+  beforeEach(() => {
+    __resetUseDeckAuthForTests();
+    __resetConfiguredBackendForTests();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("uses the URL set by configureDeckAuthBackend, even when the singleton was created earlier with a different baseUrl", async () => {
+    // Singleton is created first (e.g. by the nav control on a non-poll slide)
+    const auth = useDeckAuth();
+    configureDeckAuthBackend("http://localhost:8080");
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        token: "T".repeat(40), tokenId: "id", pollId: "pid", label: "demo",
+      }), { status: 200, headers: { "content-type": "application/json" } })
+    );
+
+    await auth.signInWithCredentials("alice", "p");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:8080/api/deck/auth/login",
+      expect.any(Object)
+    );
   });
 });

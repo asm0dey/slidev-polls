@@ -1,4 +1,5 @@
 import { ref, type Ref } from "vue";
+import { getConfiguredBackend } from "./configureDeckAuthBackend";
 
 // Reactive auth-state composable for the Slidev addon (feature 002). Owns per-browser
 // presenter-credential state, persists it in localStorage, and surfaces the distinct
@@ -86,12 +87,16 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
   const state = ref<DeckAuthState>(emptyState());
   const message = ref<string | null>(null);
 
-  const base = baseUrl.replace(/\/$/, "");
-  const verifyUrl = `${base}/api/deck/auth/me`;
-  const loginUrl = `${base}/api/deck/auth/login`;
+  // baseUrl arg is treated as a fallback for backwards compat with existing PollResults
+  // invocations. configureDeckAuthBackend() wins when set — this is read dynamically
+  // on every call so it can be set after the singleton is constructed.
+  function currentBase(): string {
+    const cfg = getConfiguredBackend();
+    return cfg !== "" ? cfg : baseUrl.replace(/\/$/, "");
+  }
 
   async function verify(token: string): Promise<Response> {
-    return fetch(verifyUrl, {
+    return fetch(`${currentBase()}/api/deck/auth/me`, {
       method: "GET",
       headers: { "X-Deck-Token": token }
     });
@@ -166,7 +171,7 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
     message.value = null;
     let res: Response;
     try {
-      res = await fetch(loginUrl, {
+      res = await fetch(`${currentBase()}/api/deck/auth/login`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username, password })
