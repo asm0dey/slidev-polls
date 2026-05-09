@@ -6,7 +6,7 @@ import {
   type QuestionClosedEvent,
   type SnapshotEvent,
   type TallyDeltaEvent
-} from "@polls/shared";
+} from "@slidev-polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
 import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";

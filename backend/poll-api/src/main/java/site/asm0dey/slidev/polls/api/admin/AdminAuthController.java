@@ -62,8 +62,6 @@ public class AdminAuthController {
       // BadCredentialsException message leaks internal wording ("Bad credentials"); we keep the
       // user-facing message on the wrapped exception.
       throw new BadCredentialsAsAuthException("invalid username or password", ex);
-    } catch (AuthenticationException ex) {
-      throw ex;
     }
     return ResponseEntity.noContent().build();
   }

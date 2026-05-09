@@ -1,10 +1,30 @@
 {
-  "name": "@polls/slidev-addon",
+  "name": "@slidev-polls/component",
   "version": "0.0.1",
   "type": "module",
-  "private": true,
   "description": "Slidev addon that renders live poll results on-slide.",
+  "license": "GPL-3.0-or-later",
+  "author": "Pavel Finkelshtein <pavel.finkelshtein@gmail.com>",
+  "homepage": "https://github.com/asm0dey/slidev-polls#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asm0dey/slidev-polls.git",
+    "directory": "frontends/slidev-component"
+  },
+  "bugs": {
+    "url": "https://github.com/asm0dey/slidev-polls/issues"
+  },
+  "keywords": [
+    "slidev",
+    "slidev-addon",
+    "polls",
+    "voting",
+    "presentation"
+  ],
   "main": "./index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "slidev": {
     "defaults": {}
   },
@@ -12,23 +32,24 @@
     "build": "vue-tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test --config=../playwright.config.ts --project=slidev-chromium"
+    "e2e": "playwright test --config=../playwright.config.ts --project=slidev-chromium",
+    "prepublishOnly": "bun run test && bun run build"
   },
   "dependencies": {
-    "@polls/shared": "workspace:*",
-    "vue": "^3.5.0"
+    "@slidev-polls/shared": "workspace:*"
   },
   "peerDependencies": {
-    "@slidev/client": ">=0.49.0"
+    "@slidev/client": "^52.0.0",
+    "vue": "^3.5.0"
   },
   "devDependencies": {
     "@slidev/client": "^52.15.1",
-    "@vitejs/plugin-vue": "^6.0.0",
-    "@vue/test-utils": "^2.4.6",
-    "jsdom": "^26.0.0",
-    "typescript": "^5.6.0",
-    "vite": "^6.0.0",
-    "vitest": "^3.2.0",
-    "vue-tsc": "^2.1.0"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.10",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.5",
+    "vue-tsc": "^3.2.8"
   }
 }

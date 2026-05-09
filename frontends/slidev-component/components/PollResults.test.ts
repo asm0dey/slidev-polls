@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
-import type { QuestionClosedEvent, SnapshotEvent, StreamHandlers, TallyDeltaEvent } from "@polls/shared";
+import type { QuestionClosedEvent, SnapshotEvent, StreamHandlers, TallyDeltaEvent } from "@slidev-polls/shared";
 import type {
   DeckAuthState,
   DeckAuthStatus,
@@ -23,8 +23,8 @@ import PollResults from "./PollResults.vue";
 let capturedHandlers: StreamHandlers | null = null;
 let unsubscribeCalls = 0;
 
-vi.mock("@polls/shared", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@polls/shared")>();
+vi.mock("@slidev-polls/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@slidev-polls/shared")>();
   return {
     ...actual,
     openPollStream: (

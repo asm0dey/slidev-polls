@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import type { Poll } from "@polls/shared";
-import { Button, Input, Pill } from "@polls/shared/ui";
+import type { Poll } from "@slidev-polls/shared";
+import { Button, Input, Pill } from "@slidev-polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import QrPreview from "../components/QrPreview.vue";
 

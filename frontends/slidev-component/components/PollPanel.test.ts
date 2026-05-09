@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import PollPanel from "./PollPanel.vue";
 
-vi.mock("@polls/shared", async () => {
-  const actual = await vi.importActual<typeof import("@polls/shared")>("@polls/shared");
+vi.mock("@slidev-polls/shared", async () => {
+  const actual = await vi.importActual<typeof import("@slidev-polls/shared")>("@slidev-polls/shared");
   return {
     ...actual,
     openPollStream: (

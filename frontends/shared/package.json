@@ -1,8 +1,19 @@
 {
-  "name": "@polls/shared",
+  "name": "@slidev-polls/shared",
   "version": "0.0.1",
   "type": "module",
-  "private": true,
+  "description": "Shared types, API client, SSE client, and Vue UI primitives for the slidev-polls suite.",
+  "license": "GPL-3.0-or-later",
+  "author": "Pavel Finkelshtein <pavel.finkelshtein@gmail.com>",
+  "homepage": "https://github.com/asm0dey/slidev-polls#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asm0dey/slidev-polls.git",
+    "directory": "frontends/shared"
+  },
+  "bugs": {
+    "url": "https://github.com/asm0dey/slidev-polls/issues"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -10,18 +21,25 @@
     "./ui": "./src/ui/index.ts",
     "./tokens.css": "./src/ui/tokens.css"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "bun run test && bun run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.0",
-    "@vue/test-utils": "^2.4.6",
-    "jsdom": "^26.0.0",
-    "typescript": "^5.6.0",
-    "vite": "^6.0.0",
-    "vitest": "^3.2.0",
-    "vue": "^3.5.0"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.10",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.5",
+    "vue": "^3.5.34"
   }
 }

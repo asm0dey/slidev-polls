@@ -76,8 +76,8 @@ backend/
   poll-realtime/         # SSE hub + tally broadcaster
   poll-api/              # Spring Boot entrypoint, controllers, SPA hosting
 frontends/               # bun workspace
-  shared/                # @polls/shared — DTOs, api-client, sse-client
-  voter/                 # @polls/voter — public SPA at /
-  backoffice/            # @polls/backoffice — SPA at /admin/
-  slidev-component/      # @polls/slidev-addon — Slidev addon
+  shared/                # @slidev-polls/shared — DTOs, api-client, sse-client
+  voter/                 # @slidev-polls/voter — public SPA at /
+  backoffice/            # @slidev-polls/backoffice — SPA at /admin/
+  slidev-component/      # @slidev-polls/component — Slidev addon
 ```

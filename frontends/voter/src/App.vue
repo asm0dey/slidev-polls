@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from "vue-router";
-import { ThemeToggle } from "@polls/shared/ui";
+import { ThemeToggle } from "@slidev-polls/shared/ui";
 </script>
 
 <template>

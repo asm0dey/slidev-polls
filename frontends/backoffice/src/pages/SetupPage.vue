@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
-import { Button, Input } from "@polls/shared/ui";
+import { Button, Input } from "@slidev-polls/shared/ui";
 
 const props = withDefaults(
   defineProps<{ apiClient?: AdminApiClient }>(),

@@ -1,8 +1,9 @@
 {
-  "name": "@polls/voter",
+  "name": "@slidev-polls/voter",
   "version": "0.0.1",
   "type": "module",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,19 +13,19 @@
     "e2e": "playwright test --config=../playwright.config.ts --project=voter-chromium"
   },
   "dependencies": {
-    "@polls/shared": "workspace:*",
-    "vue": "^3.5.0",
-    "vue-router": "^4.4.0"
+    "@slidev-polls/shared": "workspace:*",
+    "vue": "^3.5.34",
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@fontsource/inter": "^5",
     "@fontsource/jetbrains-mono": "^5",
-    "@vitejs/plugin-vue": "^5.1.0",
-    "@vue/test-utils": "^2.4.6",
-    "jsdom": "^26.0.0",
-    "typescript": "^5.6.0",
-    "vite": "^5.4.0",
-    "vitest": "^2.1.0",
-    "vue-tsc": "^2.1.0"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.10",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.5",
+    "vue-tsc": "^3.2.8"
   }
 }

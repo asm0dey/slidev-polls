@@ -2,6 +2,7 @@
   "name": "slidev-polls-frontends",
   "private": true,
   "type": "module",
+  "license": "GPL-3.0-or-later",
   "workspaces": [
     "shared",
     "voter",
@@ -10,6 +11,8 @@
     "slidev-demo"
   ],
   "scripts": {
+    "test": "bun --filter='*' run test",
+    "build": "bun --filter='*' run build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check \"**/*.{ts,vue,json,md,yml,yaml,html,css}\"",
@@ -18,14 +21,14 @@
     "e2e:install-browsers": "playwright install chromium"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.3",
-    "@playwright/test": "^1.58.2",
-    "eslint": "^9.39.3",
-    "eslint-config-prettier": "^10.1.1",
-    "eslint-plugin-vue": "^10.6.0",
-    "globals": "^16.0.0",
-    "prettier": "^3.4.2",
-    "typescript-eslint": "^8.48.0",
-    "vue-eslint-parser": "^10.2.0"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "typescript-eslint": "^8.59.2",
+    "vue-eslint-parser": "^10.4.0"
   }
 }

@@ -11,7 +11,7 @@ import {
   IconCheck,
   LiveDot,
   ResultsPanel
-} from "@polls/shared";
+} from "@slidev-polls/shared";
 import {
   clearAlreadyVoted,
   hasAlreadyVoted,

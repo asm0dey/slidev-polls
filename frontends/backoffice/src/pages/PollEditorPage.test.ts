@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
-import type { CreatePollRequest, PollDetail } from "@polls/shared";
+import type { CreatePollRequest, PollDetail } from "@slidev-polls/shared";
 import PollEditorPage from "./PollEditorPage.vue";
 import type { AdminApiClient } from "../lib/admin-api";
 import { AdminApiError } from "../lib/admin-api";

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@polls/shared", async () => {
-  const actual = await vi.importActual<typeof import("@polls/shared")>("@polls/shared");
+vi.mock("@slidev-polls/shared", async () => {
+  const actual = await vi.importActual<typeof import("@slidev-polls/shared")>("@slidev-polls/shared");
   return { ...actual, openPollStream: vi.fn(() => () => {}) };
 });
 
 import { flushPromises, mount } from "@vue/test-utils";
 import PollView from "./PollView.vue";
-import { ApiClient, ApiError } from "@polls/shared";
-import type { PublicPollView, VoteAccepted } from "@polls/shared";
+import { ApiClient, ApiError } from "@slidev-polls/shared";
+import type { PublicPollView, VoteAccepted } from "@slidev-polls/shared";
 
 // Coverage for the voter PollView page. The ApiClient is injected via the `apiClient` prop so
 // the tests can stub `publicPoll` / `submitVote` without monkey-patching the global fetch.

@@ -81,9 +81,9 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, type PropType } from "vue";
-import type { DeckToken, DeckTokenMinted } from "@polls/shared";
+import type { DeckToken, DeckTokenMinted } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
-import { Button } from "@polls/shared/ui";
+import { Button } from "@slidev-polls/shared/ui";
 
 export default defineComponent({
   name: "DeckTokensPage",

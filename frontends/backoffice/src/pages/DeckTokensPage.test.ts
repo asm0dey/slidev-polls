@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
-import type { DeckToken, DeckTokenMinted } from "@polls/shared";
+import type { DeckToken, DeckTokenMinted } from "@slidev-polls/shared";
 import DeckTokensPage from "./DeckTokensPage.vue";
 import type { AdminApiClient } from "../lib/admin-api";
 import { AdminApiError } from "../lib/admin-api";

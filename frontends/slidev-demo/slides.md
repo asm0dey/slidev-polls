@@ -2,7 +2,7 @@
 theme: default
 title: Slidev Polls — Auth-Gated Demo
 addons:
-  - "@polls/slidev-addon"
+  - "@slidev-polls/component"
 colorSchema: dark
 drawings:
   persist: false
@@ -13,7 +13,6 @@ transition: slide-left
 # by adding `pollServer: ...` to that slide's own frontmatter block.
 pollServer: http://localhost:8080
 ---
-
 
 # Slidev Polls
 

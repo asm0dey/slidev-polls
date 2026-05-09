@@ -109,7 +109,7 @@ test.describe("slidev addon sse smoke", () => {
     await page.goto(`/${fixture.slug}`);
 
     // Open an EventSource from the page and wait for the initial snapshot. The slidev addon does
-    // this through @polls/shared's openPollStream; here we bypass the Vue layer so the spec
+    // this through @slidev-polls/shared's openPollStream; here we bypass the Vue layer so the spec
     // survives any future change to the component's internals.
     const snapshot = await page.evaluate((slug) => {
       return new Promise<unknown>((resolve, reject) => {

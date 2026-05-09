@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Button } from "@polls/shared/ui";
+import { Button } from "@slidev-polls/shared/ui";
 
 const router = useRouter();
 const slug = ref("");

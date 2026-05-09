@@ -11,7 +11,7 @@ import type {
   Problem,
   ProblemCode,
   UpdatePollRequest
-} from "@polls/shared";
+} from "@slidev-polls/shared";
 
 /** Thrown by {@link AdminApiClient} on any non-2xx response. */
 export class AdminApiError extends Error {

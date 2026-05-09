@@ -7,7 +7,7 @@ import type {
   CreateQuestionRequest,
   PollDetail,
   UpdatePollRequest
-} from "@polls/shared";
+} from "@slidev-polls/shared";
 import {
   AdminApiClient,
   AdminApiError,
@@ -21,7 +21,7 @@ import {
   Input,
   Pill,
   IconChevronDown
-} from "@polls/shared/ui";
+} from "@slidev-polls/shared/ui";
 
 type Mode = "create" | "edit";
 

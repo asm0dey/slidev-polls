@@ -1,0 +1,9 @@
+node_modules/
+*.test.ts
+*.spec.ts
+__tests__/
+e2e/
+test/
+tsconfig.json
+vitest.config.ts
+.npmignore

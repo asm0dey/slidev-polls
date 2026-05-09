@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
-import { ThemeToggle } from "@polls/shared/ui";
+import { ThemeToggle } from "@slidev-polls/shared/ui";
 
 const route = useRoute();
 // Routes that render full-bleed (no sidebar/chrome). Both login and the

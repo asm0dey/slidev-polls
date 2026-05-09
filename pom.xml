@@ -17,6 +17,29 @@
     <packaging>pom</packaging>
     <name>slidev-polls-parent</name>
     <description>Slidev Polls — reactor parent</description>
+    <url>https://github.com/asm0dey/slidev-polls</url>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License v3.0 or later</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>asm0dey</id>
+            <name>Pavel Finkelshtein</name>
+            <email>pavel.finkelshtein@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/asm0dey/slidev-polls.git</connection>
+        <developerConnection>scm:git:git@github.com:asm0dey/slidev-polls.git</developerConnection>
+        <url>https://github.com/asm0dey/slidev-polls</url>
+    </scm>
 
     <modules>
         <module>backend</module>
