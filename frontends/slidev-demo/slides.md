@@ -3,10 +3,14 @@ theme: default
 title: Slidev Polls — Auth-Gated Demo
 addons:
   - "@polls/slidev-addon"
-colorSchema: light
+colorSchema: dark
 drawings:
   persist: false
 transition: slide-left
+# Custom — read by setup/main.ts and routed at the in-deck auth control,
+# SSE stream, and activate calls. Drop this if the deck runs same-origin
+# with the backend.
+pollServer: http://localhost:8080
 ---
 
 # Slidev Polls
@@ -36,17 +40,12 @@ past this slide.
 layout: center
 ---
 
-<script setup lang="ts">
-import { pollServer, pollSlug, pollId, q1Id } from "./data";
-</script>
-
 ## Q1 — Which JVM for the workshop?
 
 <PollResults
-  :slug="pollSlug"
-  :server="pollServer"
-  :poll-id="pollId"
-  :question-id="q1Id"
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
 />
 
 <!--
@@ -59,17 +58,12 @@ never fire an activation POST.
 layout: center
 ---
 
-<script setup lang="ts">
-import { pollServer, pollSlug, pollId, q2Id } from "./data";
-</script>
-
 ## Q2 — Favourite build tool?
 
 <PollResults
-  :slug="pollSlug"
-  :server="pollServer"
-  :poll-id="pollId"
-  :question-id="q2Id"
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
 />
 
 ---
