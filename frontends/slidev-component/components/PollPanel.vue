@@ -10,6 +10,7 @@ import {
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
 import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
+import { useSlideContext } from "@slidev/client";
 
 const props = defineProps<{
   slug: string;
@@ -19,6 +20,26 @@ const props = defineProps<{
 }>();
 
 const auth = useDeckAuth();
+
+// Slidev exposes parsed headmatter via $slidev.configs and per-slide
+// frontmatter via $frontmatter. We accept pollServer in either, and fall
+// through to the legacy configureDeckAuthBackend() call. This composable
+// uses Vue inject under the hood — safe to call here because PollPanel
+// always renders inside a slide's component tree.
+const slideCtx = (() => {
+  try {
+    return useSlideContext();
+  } catch {
+    return null; // outside slidev (unit tests) — fall back to other sources.
+  }
+})();
+const headmatterServer = (() => {
+  const fm = (slideCtx?.$frontmatter ?? {}) as Record<string, unknown>;
+  if (typeof fm.pollServer === "string" && fm.pollServer.length > 0) return fm.pollServer;
+  const cfgs = (slideCtx?.$slidev?.configs ?? {}) as Record<string, unknown>;
+  if (typeof cfgs.pollServer === "string" && cfgs.pollServer.length > 0) return cfgs.pollServer;
+  return "";
+})();
 
 const attrs = useAttrs();
 const isDev =
@@ -88,11 +109,12 @@ async function activateFromDeck(base: string) {
 let visibilityObserver: IntersectionObserver | null = null;
 
 onMounted(async () => {
-  // Prefer the explicit prop, then fall back to the URL the operator already
-  // set via configureDeckAuthBackend(). That keeps slides clean (no per-slide
-  // server="..." attribute) while still letting cross-origin decks point at
-  // the right backend host.
-  const base = (props.server ?? "") || getConfiguredBackend();
+  // Resolve the backend URL in this priority order:
+  //   1. explicit `server="..."` attribute on the tag (per-slide override)
+  //   2. `pollServer:` on the slide's frontmatter or the deck headmatter
+  //   3. URL set via configureDeckAuthBackend() (legacy data.ts side-effect)
+  // All three eventually drive the same auth + SSE + activate routing.
+  const base = (props.server ?? "") || headmatterServer || getConfiguredBackend();
   await activateFromDeck(base);
   watch(
     () => auth.status.value,

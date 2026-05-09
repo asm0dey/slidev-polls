@@ -7,17 +7,12 @@ colorSchema: dark
 drawings:
   persist: false
 transition: slide-left
+# Custom — read by PollPanel via useSlideContext().$slidev.configs and
+# routed at the in-deck auth control + SSE + activate calls. Drop this
+# if the deck runs same-origin with the backend, or override per slide
+# by adding `pollServer: ...` to that slide's own frontmatter block.
+pollServer: http://localhost:8080
 ---
-
-<!--
-Backend URL lives in ./data.ts (gitignored, per-operator) — set
-pollServer there and run configureDeckAuthBackend(pollServer)
-on module load. setup/main.ts side-effect-imports ../data so the
-call lands before the in-deck auth control rehydrates.
-Slidev's plugin pipeline does not rewrite @slidev/client/env
-imports from user setup files, so a headmatter-driven config
-cannot read configs at boot time without breaking the app.
--->
 
 
 # Slidev Polls
