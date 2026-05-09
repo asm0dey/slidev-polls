@@ -109,8 +109,6 @@ onMounted(async () => {
     onSnapshot: (ev: SnapshotEvent) => {
       if (props.questionId && ev.activeQuestion?.id !== props.questionId) {
         paused.value = false;
-        // Server is on a different active question — try to activate ours
-        // when the slide is currently visible.
         if (root.value && isElementVisible(root.value)) {
           void activateFromDeck(base);
         }
