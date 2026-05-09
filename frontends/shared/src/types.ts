@@ -124,6 +124,9 @@ export type ProblemCode =
   | "SLUG_RESERVED"
   | "DECK_TOKEN_INVALID"
   | "DECK_TOKEN_POLL_MISMATCH"
+  | "ORIGIN_INVALID"
+  | "SETUP_LOCKED"
+  | "USERNAME_TAKEN"
   | "TRANSPORT_FAILURE";
 
 export interface Problem {
