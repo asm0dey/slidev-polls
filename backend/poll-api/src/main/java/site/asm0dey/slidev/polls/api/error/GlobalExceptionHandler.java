@@ -21,9 +21,11 @@ import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
+import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
+import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 
 /**
  * Single source of truth for how domain exceptions become HTTP responses. Every handler emits a
@@ -77,6 +79,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(SlugTakenException.class)
   ResponseEntity<Problem> handleSlugTaken(SlugTakenException ex) {
     return respond(HttpStatus.CONFLICT, ProblemCode.SLUG_TAKEN, safe(ex));
+  }
+
+  @ExceptionHandler(SetupLockedException.class)
+  ResponseEntity<Problem> handleSetupLocked(SetupLockedException ex) {
+    return respond(HttpStatus.CONFLICT, ProblemCode.SETUP_LOCKED, safe(ex));
+  }
+
+  @ExceptionHandler(UsernameTakenException.class)
+  ResponseEntity<Problem> handleUsernameTaken(UsernameTakenException ex) {
+    return respond(HttpStatus.CONFLICT, ProblemCode.USERNAME_TAKEN, safe(ex));
   }
 
   @ExceptionHandler(SlugInvalidException.class)

@@ -35,9 +35,11 @@ import site.asm0dey.slidev.polls.core.error.DeckTokenPollMismatchException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
+import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
+import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 import site.asm0dey.slidev.polls.core.service.DeckTokenService;
 
 /**
@@ -101,6 +103,8 @@ class GlobalExceptionHandlerTest {
     "/__problem__/slug-reserved,    409, SLUG_RESERVED",
     "/__problem__/deck-invalid,     401, DECK_TOKEN_INVALID",
     "/__problem__/deck-mismatch,    403, DECK_TOKEN_POLL_MISMATCH",
+    "/__problem__/setup-locked,     409, SETUP_LOCKED",
+    "/__problem__/username-taken,   409, USERNAME_TAKEN",
     "/__problem__/transport,        500, TRANSPORT_FAILURE",
   })
   void maps_each_exception_to_its_problem_code(String path, int status, String code)
@@ -217,6 +221,16 @@ class GlobalExceptionHandlerTest {
     @GetMapping("/deck-mismatch")
     void deckMismatch() {
       throw new DeckTokenPollMismatchException("token scoped to a different poll");
+    }
+
+    @GetMapping("/setup-locked")
+    void setupLocked() {
+      throw new SetupLockedException("setup already complete");
+    }
+
+    @GetMapping("/username-taken")
+    void usernameTaken() {
+      throw new UsernameTakenException("alice");
     }
 
     @GetMapping("/transport")
