@@ -207,6 +207,7 @@ class TallyBroadcastTest {
             Map.of(),
             null,
             List.of(question1, question2),
+            List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
     polls.insert(poll);
@@ -343,6 +344,7 @@ class TallyBroadcastTest {
               existing.style(),
               questionId,
               updated,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, after);
@@ -352,6 +354,16 @@ class TallyBroadcastTest {
     @Override
     public Poll closeActiveQuestion(UUID pollId) {
       throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
   }
 

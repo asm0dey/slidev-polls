@@ -17,7 +17,8 @@ public record PollDetailDto(
     String publicUrl,
     UUID activeQuestionId,
     PollStyleDto style,
-    List<QuestionDto> questions) {
+    List<QuestionDto> questions,
+    List<String> allowedOrigins) {
 
   public static PollDetailDto from(Poll domain, String publicUrlBase) {
     PollDto summary = PollDto.from(domain, publicUrlBase);
@@ -30,6 +31,7 @@ public record PollDetailDto(
         summary.publicUrl(),
         summary.activeQuestionId(),
         PollStyleDto.fromMap(domain.style()),
-        questions);
+        questions,
+        domain.allowedOrigins());
   }
 }

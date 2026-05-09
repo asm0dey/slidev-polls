@@ -78,6 +78,7 @@ class PollDtoMappingTest {
         style,
         null,
         List.of(q),
+        List.of(), // allowedOrigins
         Instant.now(),
         Instant.now());
   }

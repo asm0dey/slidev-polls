@@ -20,6 +20,7 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
@@ -55,7 +56,8 @@ class PollServiceTest {
                 "Quickstart demo",
                 null,
                 null,
-                List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM"))));
+                List.of(questionDraft("Which JVM?", "OpenJDK", "GraalVM")),
+                null));
 
     assertThat(created.slug()).isEqualTo("quickstart-demo");
     assertThat(created.ownerUsername()).isEqualTo("alice");
@@ -71,7 +73,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "UPPER", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugInvalidException.class);
   }
 
@@ -84,7 +86,7 @@ class PollServiceTest {
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "irrelevant", "admin", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugReservedException.class);
   }
 
@@ -95,14 +97,14 @@ class PollServiceTest {
     service.create(
         "alice",
         new CreatePollCommand(
-            "My Talk", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B"))));
+            "My Talk", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")), null));
 
     assertThatThrownBy(
             () ->
                 service.create(
                     "alice",
                     new CreatePollCommand(
-                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")))))
+                        "another", "my-talk", null, List.of(questionDraft("Prompt?", "A", "B")), null)))
         .isInstanceOf(SlugTakenException.class);
   }
 
@@ -114,7 +116,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "my poll", "my-poll", null, List.of(questionDraft("Q?", "A", "B"))));
+                "my poll", "my-poll", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     assertThatThrownBy(() -> service.getForOwner(created.id(), "bob"))
         .isInstanceOf(NotOwnerException.class);
@@ -133,7 +135,8 @@ class PollServiceTest {
                 "agenda",
                 "agenda",
                 null,
-                List.of(questionDraft("Q1?", "A", "B"), questionDraft("Q2?", "C", "D"))));
+                List.of(questionDraft("Q1?", "A", "B"), questionDraft("Q2?", "C", "D")),
+                null));
     UUID q1 = created.questions().get(0).id();
     UUID q2 = created.questions().get(1).id();
 
@@ -156,7 +159,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "broken", "broken", null, List.of(questionDraft("Q?", "only-one"))));
+                "broken", "broken", null, List.of(questionDraft("Q?", "only-one")), null));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "alice", qid))
@@ -170,7 +173,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "disposable", "disposable", null, List.of(questionDraft("Q?", "A", "B"))));
+                "disposable", "disposable", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     service.deleteForOwner(created.id(), "alice");
 
@@ -186,11 +189,11 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand(
-                "talk", "old-slug", null, List.of(questionDraft("Q?", "A", "B"))));
+                "talk", "old-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
 
     Poll renamed =
         service.updateForOwner(
-            created.id(), "alice", new UpdatePollCommand(null, "new-slug", null));
+            created.id(), "alice", new UpdatePollCommand(null, "new-slug", null, null));
 
     assertThat(renamed.slug()).isEqualTo("new-slug");
   }
@@ -202,11 +205,60 @@ class PollServiceTest {
     Poll created =
         service.create(
             "alice",
-            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B"))));
+            new CreatePollCommand("x", "x-slug", null, List.of(questionDraft("Q?", "A", "B")), null));
     UUID qid = created.questions().get(0).id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
         .isInstanceOf(NotOwnerException.class);
+  }
+
+  // @TS-A4a — a malformed origin (e.g. containing a space) is rejected with InvalidOriginException
+  // whose message echoes the offending value.
+  @Test
+  void rejectsMalformedOrigin() {
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    "alice",
+                    new CreatePollCommand(
+                        "bad-origin-poll",
+                        "bad-origin-poll",
+                        null,
+                        List.of(questionDraft("Q?", "A", "B")),
+                        List.of("not a url"))))
+        .isInstanceOf(InvalidOriginException.class)
+        .hasMessageContaining("not a url");
+  }
+
+  // @TS-A4b — a valid origin is accepted and persisted verbatim after normalisation.
+  @Test
+  void acceptsValidOriginsOnCreate() {
+    Poll p =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "good-origin-poll",
+                "good-origin-poll",
+                null,
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("http://localhost:3030")));
+    assertThat(p.allowedOrigins()).containsExactly("http://localhost:3030");
+  }
+
+  // @TS-A4c — scheme and host are lower-cased; explicit port is preserved; trailing slash stripped.
+  @Test
+  void normalisesOrigins() {
+    Poll p =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "normalise-poll",
+                "normalise-poll",
+                null,
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("HTTP://Demo.example.COM:443/")));
+    // host lowercased, default port preserved (explicit in input), trailing slash removed
+    assertThat(p.allowedOrigins()).containsExactly("http://demo.example.com:443");
   }
 
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
@@ -273,6 +325,7 @@ class PollServiceTest {
               existing.style(),
               existing.activeQuestionId(),
               existing.questions(),
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -303,6 +356,7 @@ class PollServiceTest {
               existing.style(),
               null,
               rebuilt,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -322,6 +376,7 @@ class PollServiceTest {
               style,
               existing.activeQuestionId(),
               existing.questions(),
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -376,6 +431,7 @@ class PollServiceTest {
               existing.style(),
               questionId,
               updated,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, after);
@@ -412,10 +468,36 @@ class PollServiceTest {
               existing.style(),
               null,
               updated,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, after);
       return after;
+    }
+
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
+      Poll existing = requirePresent(pollId);
+      Poll updated =
+          new Poll(
+              existing.id(),
+              existing.ownerUsername(),
+              existing.title(),
+              existing.slug(),
+              existing.status(),
+              existing.style(),
+              existing.activeQuestionId(),
+              existing.questions(),
+              List.copyOf(origins),
+              existing.createdAt(),
+              Instant.now());
+      byId.put(pollId, updated);
+      return updated;
+    }
+
+    @Override
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
 
     private Poll requirePresent(UUID pollId) {

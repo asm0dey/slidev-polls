@@ -176,6 +176,7 @@ class VoteServiceTest {
                 new Question(
                     q1, pollId, "Q1", 0, QuestionStatus.ACTIVE, q1Options, Instant.now(), null),
                 new Question(q2, pollId, "Q2", 1, QuestionStatus.DRAFT, q2Options, null, null)),
+            List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
     polls.insert(poll);
@@ -198,6 +199,7 @@ class VoteServiceTest {
             Map.of(),
             null,
             List.of(new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, q1Options, null, null)),
+            List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
     polls.insert(poll);
@@ -263,6 +265,16 @@ class VoteServiceTest {
     @Override
     public Poll closeActiveQuestion(UUID pollId) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
+
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
+      throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
+
+    @Override
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
   }
 

@@ -101,6 +101,60 @@ class PollAuthoringIT {
     assertThat(decoded).isEqualTo(detail.get("publicUrl").asText());
   }
 
+  // @TS-A5-001 — allowedOrigins is accepted in the request body and echoed in the response.
+  @Test
+  void createPollAcceptsAllowedOrigins() throws Exception {
+    MockHttpSession session = loginAsAlice();
+
+    String body =
+        """
+        {
+          "title": "T",
+          "slug": "with-origins",
+          "questions": [{"prompt":"p","options":[{"label":"A"},{"label":"B"}]}],
+          "allowedOrigins": ["http://localhost:3030"]
+        }
+        """;
+    MvcResult created =
+        mvc.perform(
+                post("/api/admin/polls")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.allowedOrigins[0]").value("http://localhost:3030"))
+            .andReturn();
+    // Clean up so other tests that assert exact list sizes aren't polluted.
+    String pollId =
+        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+    mvc.perform(delete("/api/admin/polls/" + pollId).session(session).with(csrf()))
+        .andExpect(status().isNoContent());
+  }
+
+  // @TS-A5-002 — a malformed origin causes a 400 with code ORIGIN_INVALID.
+  @Test
+  void rejectsMalformedOrigin() throws Exception {
+    MockHttpSession session = loginAsAlice();
+
+    String body =
+        """
+        {
+          "title": "T", "slug": "bad-origin",
+          "questions": [{"prompt":"p","options":[{"label":"A"},{"label":"B"}]}],
+          "allowedOrigins": ["not a url"]
+        }
+        """;
+    mvc.perform(
+            post("/api/admin/polls")
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ORIGIN_INVALID"));
+  }
+
   // @TS-006 — deleting a poll removes it from the list and later GETs return 404.
   @Test
   void alice_deletes_her_poll_and_subsequent_fetch_returns_404() throws Exception {

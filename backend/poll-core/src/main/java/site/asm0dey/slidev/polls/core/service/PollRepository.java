@@ -47,4 +47,19 @@ public interface PollRepository {
 
   /** Close the currently-ACTIVE question on {@code pollId}. No-op when none is active. */
   Poll closeActiveQuestion(UUID pollId);
+
+  /**
+   * Replace the allowed-origins list for {@code pollId}. A non-null (even empty) list replaces the
+   * current value. Throws {@link site.asm0dey.slidev.polls.core.error.NotFoundException} when the
+   * poll does not exist.
+   */
+  Poll updateAllowedOrigins(UUID pollId, List<String> origins);
+
+  /**
+   * True iff some poll's {@code allowed_origins} array contains {@code origin} verbatim.
+   * Used by the per-poll CORS resolver for pre-auth deck-login preflight where no path
+   * or header identifies a single poll. Implemented as a single existence query so the
+   * resolver does not pay for question / option hydration on every preflight.
+   */
+  boolean isOriginAllowedByAnyPoll(String origin);
 }

@@ -45,6 +45,7 @@ const router = useRouter();
 const title = ref("");
 const slug = ref("");
 const slugValid = ref(true); // empty slug is valid in create mode (server derives)
+const allowedOrigins = ref<string[]>([]);
 const questions = reactive<DraftQuestion[]>(emptyDraft());
 
 const loading = ref(props.mode === "edit");
@@ -81,6 +82,7 @@ function loadFromDetail(d: PollDetail) {
   detail.value = d;
   title.value = d.title;
   slug.value = d.slug;
+  allowedOrigins.value = d.allowedOrigins ?? [];
   questions.splice(0, questions.length, ...questionsFromDetail(d));
 }
 
@@ -134,6 +136,13 @@ const slugIsAcceptable = computed(() => {
   return checkSlug(slug.value).valid;
 });
 
+const originsText = computed({
+  get: () => allowedOrigins.value.join("\n"),
+  set: (v: string) => {
+    allowedOrigins.value = v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+});
+
 const canSubmit = computed(() => {
   if (submitting.value) return false;
   if (title.value.trim().length === 0) return false;
@@ -155,6 +164,7 @@ function buildCreateRequest(): CreatePollRequest {
     questions: questions.map(toCreateQuestion)
   };
   if (slug.value.length > 0) req.slug = slug.value;
+  if (allowedOrigins.value.length > 0) req.allowedOrigins = allowedOrigins.value.slice();
   return req;
 }
 
@@ -166,6 +176,7 @@ function buildUpdateRequest(): UpdatePollRequest {
     req.slug = slug.value;
   }
   req.questions = questions.map(toCreateQuestion);
+  req.allowedOrigins = allowedOrigins.value.slice();
   return req;
 }
 
@@ -313,6 +324,19 @@ onMounted(() => {
         :value="slug"
       />
 
+      <label class="poll-editor__field">
+        <span>Allowed cross-origin hosts (one per line)</span>
+        <textarea
+          v-model="originsText"
+          rows="3"
+          spellcheck="false"
+          placeholder="http://localhost:3030"
+          data-testid="poll-allowed-origins"
+          class="poll-editor__origins"
+        />
+        <small>Leave empty to allow only the backend's own origin.</small>
+      </label>
+
       <ul class="poll-editor__questions">
         <li
           v-for="(q, qIdx) in questions"
@@ -435,10 +459,14 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.25rem;
 }
-.poll-editor__field input {
+.poll-editor__field input,
+.poll-editor__field textarea {
   padding: 0.4rem 0.5rem;
   border: 1px solid #ccc;
   border-radius: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
 }
 .poll-editor__questions {
   list-style: none;

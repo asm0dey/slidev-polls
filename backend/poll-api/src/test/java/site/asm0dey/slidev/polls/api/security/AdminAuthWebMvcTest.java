@@ -62,6 +62,7 @@ import site.asm0dey.slidev.polls.core.service.PollService;
   ProblemAccessDeniedHandler.class,
   GlobalExceptionHandler.class,
   CorrelationIdFilter.class,
+  PerPollCorsConfigurationSource.class,
   AdminAuthWebMvcTest.TestUserDetails.class
 })
 class AdminAuthWebMvcTest {
@@ -74,6 +75,11 @@ class AdminAuthWebMvcTest {
   // wiring. The slice itself doesn't exercise the /api/deck/** surface, but the filter's
   // constructor needs a DeckTokenService bean to satisfy autowiring — mock it away.
   @MockitoBean private DeckTokenService deckTokenService;
+
+  // PerPollCorsConfigurationSource is a @Component pulled in through SecurityConfig and depends
+  // on PollRepository. The slice does not test CORS, so mock the repo dependency away.
+  @MockitoBean
+  private site.asm0dey.slidev.polls.core.service.PollRepository pollRepository;
 
   // @TS-001 — GET on the list endpoint without a session yields 401 with AUTH_REQUIRED.
   @Test
@@ -190,6 +196,7 @@ class AdminAuthWebMvcTest {
         Map.of(),
         null,
         List.of(),
+        List.of(), // allowedOrigins
         Instant.now(),
         Instant.now());
   }

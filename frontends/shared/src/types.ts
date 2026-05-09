@@ -44,6 +44,7 @@ export interface Poll {
 export interface PollDetail extends Poll {
   style: PollStyle;
   questions: Question[];
+  allowedOrigins?: string[];
 }
 
 /** Public-facing poll view (GET /api/polls/by-slug/{slug}). */
@@ -80,6 +81,7 @@ export interface CreatePollRequest {
   slug?: string;
   style?: PollStyle;
   questions: CreateQuestionRequest[];
+  allowedOrigins?: string[];
 }
 
 /** Patch-style update payload (PATCH /api/admin/polls/{id}). */
@@ -87,6 +89,7 @@ export interface UpdatePollRequest {
   title?: string;
   slug?: string;
   questions?: CreateQuestionRequest[];
+  allowedOrigins?: string[];
 }
 
 /** Activate-question payload (POST /api/admin/polls/{id}/open). */

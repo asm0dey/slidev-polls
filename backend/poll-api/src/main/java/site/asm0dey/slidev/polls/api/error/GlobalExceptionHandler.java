@@ -17,6 +17,7 @@ import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenInvalidException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenPollMismatchException;
+import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
@@ -96,6 +97,11 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DeckTokenPollMismatchException.class)
   ResponseEntity<Problem> handleDeckTokenPollMismatch(DeckTokenPollMismatchException ex) {
     return respond(HttpStatus.FORBIDDEN, ProblemCode.DECK_TOKEN_POLL_MISMATCH, safe(ex));
+  }
+
+  @ExceptionHandler(InvalidOriginException.class)
+  ResponseEntity<Problem> handleInvalidOrigin(InvalidOriginException ex) {
+    return respond(HttpStatus.BAD_REQUEST, ProblemCode.ORIGIN_INVALID, safe(ex));
   }
 
   @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})

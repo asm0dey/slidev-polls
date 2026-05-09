@@ -154,6 +154,46 @@ describe("PollEditorPage — create mode", () => {
   });
 });
 
+describe("PollEditorPage — allowed origins editor", () => {
+  it("populates the textarea from PollDetail.allowedOrigins on load", async () => {
+    const getPoll = vi.fn().mockResolvedValue(
+      pollDetail({ allowedOrigins: ["http://a.example", "http://b.example"] })
+    );
+    const client = makeFake({ getPoll });
+    const { wrapper } = await mountEdit(client);
+
+    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
+    expect(ta.element.value).toBe("http://a.example\nhttp://b.example");
+  });
+
+  it("splits textarea value into array on edit (pasted multi-line)", async () => {
+    const getPoll = vi.fn().mockResolvedValue(pollDetail({ allowedOrigins: [] }));
+    const updatePoll = vi.fn(async (_id: string, _req) => pollDetail());
+    const client = makeFake({ getPoll, updatePoll });
+    const { wrapper } = await mountEdit(client);
+
+    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
+    await ta.setValue("http://a\nhttp://b\n");
+
+    // trigger submit
+    await wrapper.find('form[data-testid="poll-form"]').trigger("submit.prevent");
+    await flushPromises();
+
+    const sentReq = (updatePoll.mock.calls[0] as unknown[])[1] as { allowedOrigins: string[] };
+    expect(sentReq.allowedOrigins).toEqual(["http://a", "http://b"]);
+  });
+
+  it("joining the array back from the computed reproduces the display string", async () => {
+    const origins = ["http://a", "http://b"];
+    const getPoll = vi.fn().mockResolvedValue(pollDetail({ allowedOrigins: origins }));
+    const client = makeFake({ getPoll });
+    const { wrapper } = await mountEdit(client);
+
+    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
+    expect(ta.element.value).toBe(origins.join("\n"));
+  });
+});
+
 describe("PollEditorPage — edit mode", () => {
   it("loads the poll on mount and populates fields", async () => {
     const getPoll = vi.fn().mockResolvedValue(pollDetail());

@@ -21,6 +21,7 @@ import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
+import site.asm0dey.slidev.polls.core.origin.OriginNormaliser;
 import site.asm0dey.slidev.polls.core.slug.ReservedSlugs;
 import site.asm0dey.slidev.polls.core.slug.SlugDeriver;
 import site.asm0dey.slidev.polls.core.slug.SlugValidator;
@@ -49,6 +50,9 @@ public class PollService {
     UUID pollId = UUID.randomUUID();
     Instant now = Instant.now();
     List<Question> questions = buildDraftQuestions(pollId, command.questions());
+    List<String> origins =
+        OriginNormaliser.normalise(
+            command.allowedOrigins() == null ? List.of() : command.allowedOrigins());
     Poll poll =
         new Poll(
             pollId,
@@ -59,6 +63,7 @@ public class PollService {
             command.style() == null ? Map.of() : command.style(),
             null,
             questions,
+            origins,
             now,
             now);
     return repository.insert(poll);
@@ -86,6 +91,11 @@ public class PollService {
       slug = resolveSlug(command.slug(), title, existing.id());
     }
     Poll afterHeader = repository.updateHeader(pollId, title, slug);
+    if (command.allowedOrigins() != null) {
+      afterHeader =
+          repository.updateAllowedOrigins(
+              pollId, OriginNormaliser.normalise(command.allowedOrigins()));
+    }
     if (command.questions() != null) {
       return repository.replaceQuestions(pollId, command.questions());
     }
