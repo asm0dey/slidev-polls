@@ -17,7 +17,12 @@ type Overrides = Partial<{
 }>;
 
 function makeStub(overrides: Overrides = {}): UseDeckAuthReturn & {
-  _calls: { signIn: string[]; signOut: number; markRevoked: number };
+  _calls: {
+    signIn: string[];
+    signInWithCredentials: { username: string; password: string }[];
+    signOut: number;
+    markRevoked: number;
+  };
 } {
   const status = ref<DeckAuthStatus>(overrides.status ?? "anonymous");
   const state = ref<DeckAuthState>({
@@ -29,13 +34,21 @@ function makeStub(overrides: Overrides = {}): UseDeckAuthReturn & {
     ...(overrides.state ?? {})
   });
   const message = ref<string | null>(overrides.message ?? null);
-  const _calls = { signIn: [] as string[], signOut: 0, markRevoked: 0 };
+  const _calls = {
+    signIn: [] as string[],
+    signInWithCredentials: [] as { username: string; password: string }[],
+    signOut: 0,
+    markRevoked: 0
+  };
   return {
     status,
     state,
     message,
     signIn: async (token: string) => {
       _calls.signIn.push(token);
+    },
+    signInWithCredentials: async (username: string, password: string) => {
+      _calls.signInWithCredentials.push({ username, password });
     },
     signOut: () => {
       _calls.signOut++;
@@ -71,6 +84,30 @@ describe("DeckAuthControl", () => {
     expect(wrapper.text()).toMatch(/not signed in/i);
     expect(wrapper.find("input").exists()).toBe(true);
     expect(wrapper.find("button[type='submit']").exists()).toBe(true);
+  });
+
+  // @BUG-002 — Given anonymous popover render, Then login + password inputs are shown and no
+  // opaque "deck token" input is rendered.
+  it("BUG-002: anonymous render shows login + password inputs, no token field", () => {
+    stub = makeStub({ status: "anonymous" });
+    const wrapper = mount(DeckAuthControl);
+    expect(wrapper.find("[data-testid='deck-auth-username']").exists()).toBe(true);
+    expect(wrapper.find("[data-testid='deck-auth-password']").exists()).toBe(true);
+    // No placeholder or data-testid that advertises a "deck token" paste field.
+    expect(wrapper.html()).not.toMatch(/deck token/i);
+  });
+
+  // @BUG-002 — Submitting credentials invokes composable.signInWithCredentials with the
+  // typed values, matching the admin UI credential flow.
+  it("BUG-002: submitting the form invokes signInWithCredentials with {username, password}", async () => {
+    stub = makeStub({ status: "anonymous" });
+    const wrapper = mount(DeckAuthControl);
+    await wrapper.get("[data-testid='deck-auth-username']").setValue("alice");
+    await wrapper.get("[data-testid='deck-auth-password']").setValue("correct-horse");
+    await wrapper.get("form").trigger("submit.prevent");
+    expect(stub._calls.signInWithCredentials).toEqual([
+      { username: "alice", password: "correct-horse" }
+    ]);
   });
 
   // @TS-101 — Given signed-in with label "Laptop", Then the pill carries the label and a

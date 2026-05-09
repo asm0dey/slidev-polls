@@ -68,6 +68,7 @@ function makeAuthStub(overrides: AuthOverrides = {}): UseDeckAuthReturn & {
     state,
     message,
     signIn: async () => {},
+    signInWithCredentials: async () => {},
     signOut: () => {
       _calls.signOut++;
     },

@@ -154,6 +154,55 @@ describe("useDeckAuth composable", () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  // @BUG-002 — Given valid admin-equivalent credentials, When signInWithCredentials(user, pass)
+  // succeeds, Then status transitions to signed-in, localStorage carries the minted token plus
+  // scope, and the POST hits /api/deck/auth/login.
+  it("BUG-002: signInWithCredentials persists minted token and flips status to signed-in", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      asResponse(200, {
+        token: "dtk-minted-plaintext-value",
+        tokenId: "11111111-1111-1111-1111-111111111111",
+        pollId: "22222222-2222-2222-2222-222222222222",
+        label: "deck"
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const auth = useDeckAuth();
+    await auth.signInWithCredentials("alice", "correct-horse");
+    expect(auth.status.value).toBe("signed-in");
+
+    const call = fetchMock.mock.calls[0];
+    expect(call[0]).toContain("/api/deck/auth/login");
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body)).toEqual({
+      username: "alice",
+      password: "correct-horse"
+    });
+
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    const stored = JSON.parse(raw!);
+    expect(stored.token).toBe("dtk-minted-plaintext-value");
+    expect(stored.tokenId).toBe("11111111-1111-1111-1111-111111111111");
+    expect(stored.pollId).toBe("22222222-2222-2222-2222-222222222222");
+    expect(stored.label).toBe("deck");
+  });
+
+  // @BUG-002 — Invalid credentials → 401 → anonymous + "credential not recognised".
+  it("BUG-002: signInWithCredentials on 401 stays anonymous with auth-failure message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      asResponse(401, { code: "AUTH_REQUIRED", message: "authentication required" })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const auth = useDeckAuth();
+    await auth.signInWithCredentials("alice", "wrong");
+    expect(auth.status.value).toBe("anonymous");
+    expect(auth.message.value).toBe("credential not recognised");
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   // @TS-106 — Given transport failure, When signIn fetch rejects, Then status stays anonymous
   // and message is "couldn't reach server" (distinct from the TS-105 message).
   it("TS-106: signIn with network error surfaces the transport message", async () => {

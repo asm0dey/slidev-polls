@@ -23,6 +23,7 @@ export interface UseDeckAuthReturn {
   state: Ref<DeckAuthState>;
   message: Ref<string | null>;
   signIn: (token: string) => Promise<void>;
+  signInWithCredentials: (username: string, password: string) => Promise<void>;
   signOut: () => void;
   markRevoked: () => void;
 }
@@ -85,7 +86,9 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
   const state = ref<DeckAuthState>(emptyState());
   const message = ref<string | null>(null);
 
-  const verifyUrl = `${baseUrl.replace(/\/$/, "")}/api/deck/auth/me`;
+  const base = baseUrl.replace(/\/$/, "");
+  const verifyUrl = `${base}/api/deck/auth/me`;
+  const loginUrl = `${base}/api/deck/auth/login`;
 
   async function verify(token: string): Promise<Response> {
     return fetch(verifyUrl, {
@@ -148,6 +151,61 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
     clearStored();
   }
 
+  async function signInWithCredentials(rawUsername: string, rawPassword: string): Promise<void> {
+    const username = (rawUsername ?? "").trim();
+    const password = rawPassword ?? "";
+    if (username.length === 0 || password.length === 0) {
+      status.value = "anonymous";
+      message.value = AUTH_FAILURE_MESSAGE;
+      state.value = emptyState();
+      clearStored();
+      return;
+    }
+
+    status.value = "signed-in-pending";
+    message.value = null;
+    let res: Response;
+    try {
+      res = await fetch(loginUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+    } catch {
+      status.value = "anonymous";
+      message.value = TRANSPORT_FAILURE_MESSAGE;
+      state.value = emptyState();
+      clearStored();
+      return;
+    }
+
+    if (res.status === 200) {
+      const body = (await res.json()) as {
+        token: string;
+        tokenId: string;
+        pollId: string;
+        label: string | null;
+      };
+      const next: DeckAuthState = {
+        token: body.token,
+        tokenId: body.tokenId,
+        pollId: body.pollId,
+        label: body.label ?? null,
+        verifiedAt: new Date().toISOString()
+      };
+      state.value = next;
+      writeStored(next);
+      status.value = "signed-in";
+      message.value = null;
+      return;
+    }
+
+    status.value = "anonymous";
+    message.value = AUTH_FAILURE_MESSAGE;
+    state.value = emptyState();
+    clearStored();
+  }
+
   function signOut(): void {
     // Local-only per research.md D-002 — no backend call.
     status.value = "anonymous";
@@ -203,7 +261,15 @@ export function useDeckAuth(baseUrl: string = ""): UseDeckAuthReturn {
     })();
   }
 
-  singleton = { status, state, message, signIn, signOut, markRevoked };
+  singleton = {
+    status,
+    state,
+    message,
+    signIn,
+    signInWithCredentials,
+    signOut,
+    markRevoked
+  };
   return singleton;
 }
 
