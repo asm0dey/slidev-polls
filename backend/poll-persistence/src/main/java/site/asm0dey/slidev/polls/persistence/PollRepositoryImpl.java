@@ -361,14 +361,14 @@ public class PollRepositoryImpl implements PollRepository {
                   r.map(
                       q ->
                           new Question(
-                              q.value1(),
-                              q.value2(),
-                              q.value3(),
-                              q.value4(),
-                              QuestionStatus.valueOf(q.value5()),
-                              q.value8(),
-                              q.value6() == null ? null : q.value6().toInstant(),
-                              q.value7() == null ? null : q.value7().toInstant())));
+                              q.get(POLL_QUESTIONS.ID),
+                              q.get(POLL_QUESTIONS.POLL_ID),
+                              q.get(POLL_QUESTIONS.PROMPT),
+                              q.get(POLL_QUESTIONS.ORDINAL),
+                              QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
+                              q.get(OPTIONS_FIELD),
+                              q.get(POLL_QUESTIONS.ACTIVATED_AT) == null ? null : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
+                              q.get(POLL_QUESTIONS.CLOSED_AT) == null ? null : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
 
   private Poll toPoll(Record row) {
     String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);
