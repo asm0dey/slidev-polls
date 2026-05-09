@@ -53,12 +53,16 @@ async function load() {
 }
 
 function applyServerView(view: PublicPollView) {
+  // Open the SSE stream up front. Pre-vote voters must observe live
+  // active-question rotations (presenter advances slides) and live tally
+  // updates while reviewing the options; without this, the form would
+  // freeze on whichever question was active at page-load.
+  ensureStream();
   if (view.state === "ACTIVE" && view.activeQuestion) {
     const qid = view.activeQuestion.id;
     if (view.alreadyVoted || hasAlreadyVoted(props.slug, qid)) {
       markAlreadyVoted(props.slug, qid);
       status.value = "voted";
-      ensureStream();
       return;
     }
     status.value = "active";
