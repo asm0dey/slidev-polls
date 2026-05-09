@@ -116,6 +116,55 @@ paste into the in-deck auth control.
   the export but inert; no network call is attempted — matches 001
   Principle IV posture.
 
+## Divergence notes (T048 walkthrough, 2026-05-09)
+
+Run with backend on `:8080`, slidev-demo dev server on `:3030`,
+`@slidev/cli@52.15.1`. Steps below diverge from the manual script:
+
+- §1 step 2: "top-overlay tool strip added by the addon" predates the
+  BUG-001 fix. The auth control now lives in Slidev's nav bar via
+  `custom-nav-controls.vue` — bottom of the viewport, auto-hidden in
+  SPA mode (hover/focus reveals it), always visible in presenter
+  mode. There is no top-overlay strip on the slide canvas.
+- §1 step 2: the trigger reads "sign in" (no emoji prefix), not
+  "🔒 Sign in".
+- §1 step 3: BUG-002 replaced the opaque-token paste with a
+  login + password form. The popover now takes admin-equivalent
+  credentials and POSTs them to `/api/deck/auth/login`; the backend
+  mints a fresh deck token internally and returns
+  `{token, tokenId, pollId, label}`. Step 0's
+  `/api/admin/polls/$POLL_ID/deck-tokens` mint flow still works and
+  remains useful for tooling (`scripts/seed.sh` uses it), but is no
+  longer the presenter-facing path.
+- §1 step 4: the signed-in pill renders the token's label only
+  (no "✅" emoji prefix), confirmed by `CustomNavControls.vue`.
+- §3 in-browser verification of the read-only path could not be
+  completed from the slidev-demo dev server: `data.ts` hardcodes
+  `pollServer = "http://localhost:8080"` while the deck is served
+  from `:3030`, and the backend has no CORS configuration, so
+  EventSource is silently blocked and `<PollResults>` shows
+  "live updates paused / Waiting for the next question…" even when
+  the backend has an active question. The backend SSE stream itself
+  is healthy (verified with `curl -N` against
+  `/api/polls/{slug}/stream`). Production deployments serve the
+  slidev export from the backend origin (same-origin) and the
+  `task up` flow exposes everything on `:8080`, so neither is
+  affected. A per-poll `allowedOrigins` configuration to fix the
+  cross-origin dev/GitHub-Pages case is planned as a separate
+  feature (proposed as `003-per-poll-cors-allowlist`).
+- §2 backoffice token revocation flow was not exercised in this
+  walkthrough; the activation 401 → revoked transition is covered
+  by `useDeckAuth.test.ts` and `DeckAuthControllerTest`.
+- Backend activate / deactivate / anonymous-block path verified
+  end-to-end against the seeded demo poll via curl:
+  `POST /api/deck/auth/login` mints a deck token; signed-in
+  `POST /api/deck/polls/{pollId}/activate` flips
+  `activeQuestion` between Q1 and Q2; anonymous activate (no
+  `X-Deck-Token` header) returns `401 DECK_TOKEN_INVALID` and
+  leaves `activeQuestion` unchanged; anonymous
+  `GET /api/polls/by-slug/{slug}` returns the full state with
+  options and tallies (read-only path unbroken).
+
 ## Automated coverage
 
 | Story | Automated assertion |

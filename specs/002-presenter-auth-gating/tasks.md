@@ -141,7 +141,7 @@
 - [x] T045 Run `./mvnw verify` from the repo root (Principle XI). All new backend tests (T007–T010, T029, T030) must be green.
 - [x] T046 Run `bun --cwd frontends/slidev-component test` and `bun --cwd frontends/slidev-component run build`. All new composable + component + PollResults tests must be green.
 - [x] T047 Run `bun --cwd frontends/slidev-component run e2e` — `slidev-results.spec.ts` auth scenarios (T031, T032) must be green.
-- [ ] T048 Run the `quickstart.md` walkthrough §1–§4 against a live dev stack; record any divergence between the manual steps and the automated coverage.
+- [x] T048 Run the `quickstart.md` walkthrough §1–§4 against a live dev stack; record any divergence between the manual steps and the automated coverage.
 
 ---
 
