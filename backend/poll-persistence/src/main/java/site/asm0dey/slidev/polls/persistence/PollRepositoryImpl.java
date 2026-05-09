@@ -328,6 +328,7 @@ public class PollRepositoryImpl implements PollRepository {
         fromJsonb(row.get(POLLS.STYLE)),
         row.get(POLLS.ACTIVE_QUESTION_ID),
         questions,
+        List.of(), // allowedOrigins — populated in Task A3
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
   }

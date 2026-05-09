@@ -59,6 +59,7 @@ public class PollService {
             command.style() == null ? Map.of() : command.style(),
             null,
             questions,
+            List.of(), // allowedOrigins
             now,
             now);
     return repository.insert(poll);

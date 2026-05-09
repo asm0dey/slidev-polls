@@ -162,6 +162,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
             List.of(
                 new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null),
                 new Question(q2, pollId, "Q2?", 1, QuestionStatus.DRAFT, q2Options, null, null)),
+            List.of(), // allowedOrigins
             null,
             null);
     return repository.insert(poll);

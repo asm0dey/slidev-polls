@@ -190,6 +190,7 @@ class AdminAuthWebMvcTest {
         Map.of(),
         null,
         List.of(),
+        List.of(), // allowedOrigins
         Instant.now(),
         Instant.now());
   }

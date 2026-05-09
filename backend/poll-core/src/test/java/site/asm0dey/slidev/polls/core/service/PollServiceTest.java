@@ -273,6 +273,7 @@ class PollServiceTest {
               existing.style(),
               existing.activeQuestionId(),
               existing.questions(),
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -303,6 +304,7 @@ class PollServiceTest {
               existing.style(),
               null,
               rebuilt,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -322,6 +324,7 @@ class PollServiceTest {
               style,
               existing.activeQuestionId(),
               existing.questions(),
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, updated);
@@ -376,6 +379,7 @@ class PollServiceTest {
               existing.style(),
               questionId,
               updated,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, after);
@@ -412,6 +416,7 @@ class PollServiceTest {
               existing.style(),
               null,
               updated,
+              existing.allowedOrigins(),
               existing.createdAt(),
               Instant.now());
       byId.put(pollId, after);

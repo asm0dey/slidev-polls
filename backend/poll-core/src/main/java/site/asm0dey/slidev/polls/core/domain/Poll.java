@@ -21,5 +21,11 @@ public record Poll(
     Map<String, Object> style,
     UUID activeQuestionId,
     List<Question> questions,
+    List<String> allowedOrigins,
     Instant createdAt,
-    Instant updatedAt) {}
+    Instant updatedAt) {
+
+  public Poll {
+    allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
+  }
+}
