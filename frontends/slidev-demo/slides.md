@@ -28,7 +28,7 @@ To run this deck:
    `<PollResults />` tags into Q1 / Q2 slides below (replacing the stubs).
 4. Mint a deck token on the **Deck tokens** page; copy the plaintext token.
 5. Click **sign in** in the Slidev nav bar and paste the token. The button
-   flips to *signed in: <label>*.
+   flips to *signed in: &lt;label&gt;*.
 
 ---
 
@@ -37,7 +37,7 @@ To run this deck:
 - The addon mounts a **sign-in button in the nav bar** (hover the toolbar to
   reveal it during play). Pre-sign-in the button reads *sign in*; click to
   open the token popover.
-- Paste the deck token; the toolbar flips to **signed in: <label>**.
+- Paste the deck token; the toolbar flips to **signed in: &lt;label&gt;**.
 - Poll slides embed `<PollResults />` — on mount they POST
   `/api/deck/polls/{pollId}/activate` **only** if the composable is
   `signed-in`. Anonymous viewers never hijack the active question.
