@@ -78,6 +78,8 @@ function pctOf(id: string): number {
   color: var(--sp-fg);
   border-radius: var(--sp-radius-xl);
   padding: 24px 28px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .sp-rp[data-mode="scrim-dark"] {
   background: rgba(10, 10, 10, 0.55);
@@ -161,9 +163,10 @@ function pctOf(id: string): number {
 .sp-rp__label, .sp-rp__pct, .sp-rp__count { position: relative; }
 .sp-rp__pct { font-variant-numeric: tabular-nums; }
 .sp-rp__count {
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  opacity: 0.6;
-  padding-right: 6px;
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
 }
 </style>

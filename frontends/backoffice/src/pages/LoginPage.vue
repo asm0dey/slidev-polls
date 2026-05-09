@@ -55,8 +55,8 @@ function describeError(err: unknown): string {
       <form data-testid="login-form" @submit.prevent="onSubmit">
         <Input
           v-model="username"
-          type="email"
-          placeholder="you@team.dev"
+          type="text"
+          placeholder="username"
           data-testid="login-username"
         />
         <Input

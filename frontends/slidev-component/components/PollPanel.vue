@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useAttrs } from "vue";
+import { computed, onMounted, onUnmounted, ref, useAttrs, watch } from "vue";
 import {
   openPollStream,
   ResultsPanel,
@@ -47,6 +47,15 @@ const panelQuestion = computed(() => {
   };
 });
 
+function isElementVisible(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return false;
+  const cs = getComputedStyle(el);
+  if (cs.visibility === "hidden" || cs.display === "none") return false;
+  return r.top < (window.innerHeight || 0) && r.bottom > 0
+      && r.left < (window.innerWidth || 0) && r.right > 0;
+}
+
 async function activateFromDeck(base: string) {
   if (auth.status.value !== "signed-in") return;
   if (!props.questionId || !props.pollId) return;
@@ -75,13 +84,36 @@ async function activateFromDeck(base: string) {
   }
 }
 
+let visibilityObserver: IntersectionObserver | null = null;
+
 onMounted(async () => {
   const base = props.server ?? "";
   await activateFromDeck(base);
+  watch(
+    () => auth.status.value,
+    (s) => {
+      if (s === "signed-in") void activateFromDeck(base);
+    }
+  );
+  if (root.value && typeof IntersectionObserver !== "undefined") {
+    visibilityObserver = new IntersectionObserver(entries => {
+      for (const e of entries) {
+        if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          void activateFromDeck(base);
+        }
+      }
+    }, { threshold: [0.5, 0.95] });
+    visibilityObserver.observe(root.value);
+  }
   stop = openPollStream(base, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
       if (props.questionId && ev.activeQuestion?.id !== props.questionId) {
         paused.value = false;
+        // Server is on a different active question — try to activate ours
+        // when the slide is currently visible.
+        if (root.value && isElementVisible(root.value)) {
+          void activateFromDeck(base);
+        }
         return;
       }
       snapshot.value = ev;
@@ -106,11 +138,14 @@ onMounted(async () => {
   });
 });
 
-onUnmounted(() => stop?.());
+onUnmounted(() => {
+  stop?.();
+  visibilityObserver?.disconnect();
+});
 </script>
 
 <template>
-  <div ref="root" class="sp-pollpanel" data-testid="poll-results">
+  <div ref="root" class="sp-pollpanel" data-testid="poll-results" :data-theme="theme.mode">
     <div v-if="paused" class="sp-pollpanel__paused" data-testid="poll-paused">
       live updates paused
     </div>
@@ -131,7 +166,9 @@ onUnmounted(() => stop?.());
 <style scoped>
 .sp-pollpanel {
   position: relative;
-  width: 85%;
+  width: 80vw;
+  max-width: 1200px;
+  min-width: min(85vw, 700px);
   margin: 0 auto;
   font-family: var(--sp-font-sans);
 }
