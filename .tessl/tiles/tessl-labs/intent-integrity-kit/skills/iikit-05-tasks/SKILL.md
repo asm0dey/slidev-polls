@@ -5,7 +5,7 @@ description: >-
   Use when breaking features into implementable tasks, planning sprints, or creating work items with parallel markers.
 license: MIT
 metadata:
-  version: "2.9.12"
+  version: "2.10.0"
 ---
 
 # Intent Integrity Kit Tasks

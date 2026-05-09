@@ -1,0 +1,18 @@
+{
+  "name": "@polls/slidev-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hand-runnable Slidev deck that demonstrates the feature 002 in-deck auth control and deck-token activation against a running backend.",
+  "scripts": {
+    "seed": "bash ./scripts/seed.sh",
+    "slidev": "slidev slides.md --open",
+    "build": "slidev build slides.md"
+  },
+  "dependencies": {
+    "@polls/slidev-addon": "workspace:*",
+    "@slidev/cli": "^52.15.1",
+    "@slidev/theme-default": "^0.25.0",
+    "vue": "^3.5.0"
+  }
+}

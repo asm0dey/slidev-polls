@@ -1,19 +1,29 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.2.0 → 1.3.0
+Version change: 1.3.0 → 1.4.0
 Modified principles: none
 Added principles:
-  - XI. Reactor-Native Maven Invocation
+  - XII. Task-Runner-Driven Automation
 Added sections: none (addition lands inside Core Principles)
 Removed sections: none
+Templates reviewed for consistency:
+  - plan-template.md: ✅ constitution-check section still valid;
+    Principle XII is a contributor-workflow rule, not a per-feature gate
+  - spec-template.md: ✅ unaffected
+  - tasks-template.md: ✅ unaffected (command shape is a contributor
+    duty, not a standalone task)
+Follow-up TODOs: none.
+
+---- Previous SYNC IMPACT REPORT (1.2.0 → 1.3.0) ----
+Added principles:
+  - XI. Reactor-Native Maven Invocation
 Templates reviewed for consistency:
   - plan-template.md: ✅ constitution-check section still valid;
     Principle XI is a contributor-workflow rule, not a per-feature gate
   - spec-template.md: ✅ unaffected
   - tasks-template.md: ✅ unaffected (invocation-form is a contributor
     duty, not a standalone task)
-Follow-up TODOs: none.
 
 ---- Previous SYNC IMPACT REPORT (1.1.0 → 1.2.0) ----
 Added principles:
@@ -191,6 +201,27 @@ path that drifts from both, so "my build works" stops being equivalent
 to "their build works". Keeping the local Maven repository free of
 project-authored JARs removes that drift surface entirely.
 
+### XII. Task-Runner-Driven Automation
+
+All repeatable automation — build, test, lint, format, codegen,
+compose orchestration, demo seeding, e2e harness bring-up — MUST be
+expressed as a task in the repository's `Taskfile.yml` and invoked
+through [Task](https://taskfile.dev). New ad-hoc shell scripts under
+`scripts/` or one-off commands baked into documentation are
+prohibited; if a command is worth documenting it is worth making a
+`Taskfile.yml` entry, and if it is not worth making a Taskfile entry
+it is not worth documenting as a repeatable step. Existing helper
+scripts remain where they are, but new orchestration MUST land in
+`Taskfile.yml` and existing scripts SHOULD be migrated when they are
+next touched. CI jobs MUST call the same `task` names a contributor
+would run locally; divergence between CI and local invocation is
+itself a constitutional violation. Rationale: a single
+contributor-visible entry point ("run `task <name>`") removes the
+"how do I build this" bus factor, keeps the command surface greppable
+from the repo root, and forces the CI job shape and the local
+invocation shape to match — so a green local run means the same
+commands will be green in CI.
+
 ## Quality Standards
 
 - Every merged change MUST include tests covering its acceptance criteria
@@ -242,4 +273,4 @@ NOT silently deviate. Complexity or deviations introduced to meet a
 requirement MUST be justified in the plan for the feature that introduces
 them.
 
-**Version**: 1.3.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-19
+**Version**: 1.4.0 | **Ratified**: 2026-04-19 | **Last Amended**: 2026-04-21

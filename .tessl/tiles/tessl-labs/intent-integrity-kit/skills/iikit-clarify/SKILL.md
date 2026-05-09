@@ -7,7 +7,7 @@ description: >-
   task dependencies seem off, or constitution principles are vague.
 license: MIT
 metadata:
-  version: "2.9.12"
+  version: "2.10.0"
 ---
 
 # Intent Integrity Kit Clarify (Generic Utility)

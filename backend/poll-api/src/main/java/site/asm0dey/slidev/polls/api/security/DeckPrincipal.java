@@ -15,7 +15,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
  * <p>The authority {@code ROLE_DECK} is deliberately narrow — {@code SecurityConfig} only permits
  * it on {@code /api/deck/**}, so the token cannot unlock any other admin surface ({@code @TS-057}).
  */
-public record DeckPrincipal(UUID tokenId, UUID pollId) {
+public record DeckPrincipal(UUID tokenId, UUID pollId, String label) {
 
   public static final String ROLE = "ROLE_DECK";
 

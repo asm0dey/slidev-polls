@@ -135,6 +135,19 @@ tasks:
     cmds:
       - bun run test
 
+  slidev:demo:
+    desc: Seed a demo poll and launch the Slidev demo deck (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
+    dir: frontends/slidev-demo
+    cmds:
+      - task: e2e:backend-up
+      - defer: { task: e2e:backend-down }
+      # Ensure slidev CLI + addon are resolved for the workspace — cheap when
+      # already installed (bun reports "no changes"). Runs at the workspace
+      # root since workspace:* links only resolve from there.
+      - bun install --cwd ..
+      - bun run seed
+      - bun run slidev
+
   test:e2e:voter:
     desc: Run Playwright voter happy-path (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
     dir: frontends/voter
