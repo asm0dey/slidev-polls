@@ -1,5 +1,8 @@
 package site.asm0dey.slidev.polls.api.error;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -8,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -116,8 +120,30 @@ public class GlobalExceptionHandler {
     return respond(HttpStatus.BAD_REQUEST, ProblemCode.ORIGIN_INVALID, safe(ex));
   }
 
-  @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
-  ResponseEntity<Problem> handleValidation(Exception ex) {
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  ResponseEntity<Problem> handleValidation(MethodArgumentNotValidException ex) {
+    // Group field-level violations so the SPA can highlight the offending field. Each entry
+    // maps the JSON property name to the list of constraint messages on it.
+    Map<String, List<String>> fieldErrors =
+        ex.getBindingResult().getFieldErrors().stream()
+            .collect(
+                Collectors.groupingBy(
+                    FieldError::getField,
+                    Collectors.mapping(
+                        fe ->
+                            fe.getDefaultMessage() == null
+                                ? "invalid value"
+                                : fe.getDefaultMessage(),
+                        Collectors.toList())));
+    return respond(
+        HttpStatus.BAD_REQUEST,
+        ProblemCode.VALIDATION_FAILED,
+        "request body is invalid",
+        fieldErrors);
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  ResponseEntity<Problem> handleUnreadableBody(HttpMessageNotReadableException ex) {
     return respond(
         HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, "request body is invalid");
   }
@@ -140,8 +166,13 @@ public class GlobalExceptionHandler {
   }
 
   private static ResponseEntity<Problem> respond(HttpStatus status, ProblemCode code, String msg) {
+    return respond(status, code, msg, null);
+  }
+
+  private static ResponseEntity<Problem> respond(
+      HttpStatus status, ProblemCode code, String msg, Map<String, List<String>> errors) {
     String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
-    return ResponseEntity.status(status).body(new Problem(code, msg, correlationId));
+    return ResponseEntity.status(status).body(new Problem(code, msg, correlationId, errors));
   }
 
   /**

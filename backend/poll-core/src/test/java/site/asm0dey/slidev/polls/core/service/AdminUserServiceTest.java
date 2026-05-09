@@ -127,13 +127,14 @@ class AdminUserServiceTest {
   }
 
   @Test
-  void rejectsUppercaseUsernameToMatchCheckConstraint() {
-    assertThatThrownBy(
-            () ->
-                service.createInitialAdmin(
-                    new CreateAdminCommand("Alice", "password-twelve", "Alice")))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("username");
+  void normalisesMixedCaseUsernameToLowercaseBeforeInsert() {
+    when(repo.count()).thenReturn(0L);
+
+    service.createInitialAdmin(new CreateAdminCommand("Alice", "password-twelve", "Alice"));
+
+    // Stored username is lowercase to match the admin_user.username CHECK constraint and the
+    // case-insensitive login flow. Operators may type "Alice" or "ALICE"; both resolve to "alice".
+    verify(repo).insert("alice", "$argon2id$encoded", "Alice");
   }
 
   @Test

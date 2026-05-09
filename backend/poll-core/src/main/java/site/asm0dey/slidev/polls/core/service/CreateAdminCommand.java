@@ -7,14 +7,20 @@ package site.asm0dey.slidev.polls.core.service;
  */
 public record CreateAdminCommand(String username, String password, String displayName) {
 
+  // Accept any-case input from the user; we normalise to lowercase before
+  // storage so the admin_user.username CHECK constraint (lower(username))
+  // and the case-insensitive login flow keep their invariants. "Alice" and
+  // "alice" therefore refer to the same account, which is the behaviour
+  // most operators expect.
   private static final java.util.regex.Pattern USERNAME_PATTERN =
-      java.util.regex.Pattern.compile("^[a-z0-9_-]{3,64}$");
+      java.util.regex.Pattern.compile("^[a-zA-Z0-9_-]{3,64}$");
 
   public CreateAdminCommand {
     if (username == null || !USERNAME_PATTERN.matcher(username).matches()) {
       throw new IllegalArgumentException(
-          "username must match ^[a-z0-9_-]{3,64}$ (lowercase, no spaces)");
+          "username must match ^[a-zA-Z0-9_-]{3,64}$ (letters, digits, underscore, hyphen)");
     }
+    username = username.toLowerCase(java.util.Locale.ROOT);
     if (password == null || password.length() < 12) {
       throw new IllegalArgumentException("password must be at least 12 characters");
     }
