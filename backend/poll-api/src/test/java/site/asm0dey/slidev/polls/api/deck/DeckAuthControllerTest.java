@@ -93,6 +93,47 @@ class DeckAuthControllerTest {
         .andExpect(jsonPath("$.code").value("DECK_TOKEN_INVALID"));
   }
 
+  // @BUG-002 — Given valid admin-equivalent credentials and an owned poll, When POST
+  // /api/deck/auth/login with {username, password}, Then response is 200 with a minted deck
+  // token plaintext plus the scope the frontend persists under slidev-polls:deck-auth.
+  @Test
+  void returns200WithMintedToken_whenCredentialsValid() throws Exception {
+    PollFixture poll = createPoll("deck-login-ok");
+
+    MvcResult result =
+        mvc.perform(
+                post("/api/deck/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()))
+            .andExpect(jsonPath("$.label").value("deck"))
+            .andExpect(jsonPath("$.token").isString())
+            .andExpect(jsonPath("$.tokenId").isString())
+            .andReturn();
+
+    JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+    String plaintext = body.get("token").asText();
+
+    // The returned plaintext must actually authenticate the follow-up /me probe — otherwise the
+    // frontend would get stuck in signed-in-pending on the very next reload.
+    mvc.perform(get("/api/deck/auth/me").header("X-Deck-Token", plaintext))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()));
+  }
+
+  // @BUG-002 — Invalid credentials → 401. Composable maps any 401 to FR-014
+  // "credential not recognised".
+  @Test
+  void returns401_whenCredentialsInvalid() throws Exception {
+    mvc.perform(
+            post("/api/deck/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"wrong\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
+  }
+
   // ---------- fixtures (mirrored from DeckActivationIT) --------------------
 
   private JsonNode mintTokenRaw(PollFixture poll, String label) throws Exception {

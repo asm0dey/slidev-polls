@@ -77,6 +77,10 @@ public class SecurityConfig {
                     // Everything else under /api/admin/** requires authentication.
                     .requestMatchers("/api/admin/**")
                     .authenticated()
+                    // Deck login is permitAll — the caller has no deck token yet (BUG-002). The
+                    // controller calls AuthenticationManager itself.
+                    .requestMatchers(HttpMethod.POST, "/api/deck/auth/login")
+                    .permitAll()
                     // SPA shells and public surfaces are open at the filter chain.
                     .requestMatchers("/", "/admin/", "/admin/**")
                     .permitAll()

@@ -38,6 +38,9 @@ function makeStub(overrides: Overrides = {}): UseDeckAuthReturn & {
     signIn: async (token: string) => {
       _calls.signIn.push(token);
     },
+    signInWithCredentials: async (_u: string, _p: string) => {
+      // CustomNavControls does not call this; included to satisfy UseDeckAuthReturn.
+    },
     signOut: () => {
       _calls.signOut++;
       status.value = "anonymous";

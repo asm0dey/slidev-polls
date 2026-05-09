@@ -3,14 +3,16 @@ import { computed, ref } from "vue";
 import { useDeckAuth } from "../composables/useDeckAuth";
 
 // Visible states per FR-001 / FR-002 / FR-014:
-//   - "not signed in" → form with an input + submit button
+//   - "not signed in" → form with login + password inputs + submit button (BUG-002: parity
+//     with the admin UI credential flow — no opaque "deck token" paste field)
 //   - "checking…"    → pending visual while the reload-time verify or a fresh signIn is in flight
 //   - signed-in pill → shows the mint-time label + sign-out affordance
 // Three distinct status messages (FR-014) come from the composable's `message` ref:
 //   credential not recognised / couldn't reach server / (null).
 
 const auth = useDeckAuth();
-const pasted = ref("");
+const username = ref("");
+const password = ref("");
 
 const isAnonymous = computed(
   () => auth.status.value === "anonymous" || auth.status.value === "revoked"
@@ -19,9 +21,10 @@ const isPending = computed(() => auth.status.value === "signed-in-pending");
 const isSignedIn = computed(() => auth.status.value === "signed-in");
 
 async function submit() {
-  const token = pasted.value;
-  pasted.value = "";
-  await auth.signIn(token);
+  const u = username.value;
+  const p = password.value;
+  password.value = "";
+  await auth.signInWithCredentials(u, p);
 }
 
 function onSignOut() {
@@ -46,11 +49,21 @@ function onSignOut() {
     <form v-else class="deck-auth-control__form" @submit.prevent="submit">
       <span class="deck-auth-control__status">not signed in</span>
       <input
-        v-model="pasted"
-        type="password"
-        autocomplete="off"
+        v-model="username"
+        type="text"
+        autocomplete="username"
         spellcheck="false"
-        placeholder="deck token"
+        placeholder="login"
+        data-testid="deck-auth-username"
+        class="deck-auth-control__input"
+      />
+      <input
+        v-model="password"
+        type="password"
+        autocomplete="current-password"
+        spellcheck="false"
+        placeholder="password"
+        data-testid="deck-auth-password"
         class="deck-auth-control__input"
       />
       <button type="submit" class="deck-auth-control__submit">sign in</button>
@@ -73,8 +86,9 @@ function onSignOut() {
 }
 .deck-auth-control__form {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
 }
 .deck-auth-control__status {
   color: #555;
