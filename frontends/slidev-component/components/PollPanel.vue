@@ -9,6 +9,7 @@ import {
 } from "@polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
+import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
 
 const props = defineProps<{
   slug: string;
@@ -87,7 +88,11 @@ async function activateFromDeck(base: string) {
 let visibilityObserver: IntersectionObserver | null = null;
 
 onMounted(async () => {
-  const base = props.server ?? "";
+  // Prefer the explicit prop, then fall back to the URL the operator already
+  // set via configureDeckAuthBackend(). That keeps slides clean (no per-slide
+  // server="..." attribute) while still letting cross-origin decks point at
+  // the right backend host.
+  const base = (props.server ?? "") || getConfiguredBackend();
   await activateFromDeck(base);
   watch(
     () => auth.status.value,
