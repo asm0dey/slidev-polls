@@ -6,15 +6,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,6 +48,13 @@ class QuestionLifecycleIT {
 
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private DSLContext dsl;
+  @Autowired private PasswordEncoder encoder;
+
+  @BeforeEach
+  void seedAlice() {
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+  }
 
   // @TS-003 — opening Q2 while Q1 is ACTIVE atomically closes Q1. The poll's active_question
   // pointer flips from Q1 to Q2 in the same transaction.
@@ -51,9 +62,9 @@ class QuestionLifecycleIT {
   void activating_a_second_question_atomically_closes_the_first() throws Exception {
     MockHttpSession session = loginAsAlice();
     JsonNode detail = createTwoQuestionPoll(session, "Lifecycle demo one");
-    String pollId = detail.get("id").asText();
-    String q1Id = detail.get("questions").get(0).get("id").asText();
-    String q2Id = detail.get("questions").get(1).get("id").asText();
+    String pollId = detail.get("id").asString();
+    String q1Id = detail.get("questions").get(0).get("id").asString();
+    String q2Id = detail.get("questions").get(1).get("id").asString();
 
     // Open Q1 first so the "atomic close" path has something to close.
     mvc.perform(
@@ -87,8 +98,8 @@ class QuestionLifecycleIT {
   void closing_the_active_question_clears_the_pointer_and_marks_it_closed() throws Exception {
     MockHttpSession session = loginAsAlice();
     JsonNode detail = createTwoQuestionPoll(session, "Lifecycle demo two");
-    String pollId = detail.get("id").asText();
-    String q1Id = detail.get("questions").get(0).get("id").asText();
+    String pollId = detail.get("id").asString();
+    String q1Id = detail.get("questions").get(0).get("id").asString();
 
     mvc.perform(
             post("/api/admin/polls/" + pollId + "/open")

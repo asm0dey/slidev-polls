@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,8 +29,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestTemplate;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,6 +53,8 @@ class StreamIT {
 
   @LocalServerPort int port;
   @Autowired ObjectMapper objectMapper;
+  @Autowired DSLContext dsl;
+  @Autowired PasswordEncoder encoder;
 
   private RestTemplate rest;
   private ExecutorService readerPool;
@@ -60,6 +65,9 @@ class StreamIT {
     rest = new RestTemplate();
     readerPool = Executors.newSingleThreadExecutor();
     reading = new AtomicBoolean(true);
+    // V6 dropped the seed migration; ensure alice exists. Idempotent because polls from earlier
+    // tests reference admin_user via FK.
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
   }
 
   @AfterEach

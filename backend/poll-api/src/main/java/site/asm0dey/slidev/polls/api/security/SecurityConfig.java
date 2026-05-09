@@ -9,8 +9,9 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -39,7 +40,10 @@ public class SecurityConfig {
 
   @Bean
   PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+    // Argon2id with OWASP "stronger" parameters: 64 MiB memory, 3 iterations, 4 lanes.
+    // Self-describing hash format ($argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>) means future
+    // parameter tuning does not break verification of older rows.
+    return new Argon2PasswordEncoder(16, 32, 4, 65536, 3);
   }
 
   @Bean
@@ -59,8 +63,7 @@ public class SecurityConfig {
       ProblemAuthenticationEntryPoint entryPoint,
       ProblemAccessDeniedHandler accessDeniedHandler,
       DeckTokenAuthenticationFilter deckTokenFilter,
-      PerPollCorsConfigurationSource corsSource)
-      throws Exception {
+      PerPollCorsConfigurationSource corsSource) {
     // CSRF tokens live in a cookie the backoffice SPA can read (CookieCsrfTokenRepository
     // withHttpOnlyFalse), so a JSON POST from the SPA can echo them on a header. The raw-value
     // handler avoids the XOR scheme that confuses simple fetch clients — the cookie value and the
@@ -75,6 +78,12 @@ public class SecurityConfig {
                 auth
                     // Login must be reachable before the caller holds a session.
                     .requestMatchers(HttpMethod.POST, "/api/admin/login")
+                    .permitAll()
+                    // First-run bootstrap is intentionally public — the SPA polls /setup/status
+                    // before any admin exists, and POST /setup creates the very first admin. The
+                    // service layer (AdminUserService) enforces the once-only semantics by
+                    // throwing SetupLockedException once admin_user is non-empty.
+                    .requestMatchers("/api/admin/setup/**", "/api/admin/setup")
                     .permitAll()
                     // Everything else under /api/admin/** requires authentication.
                     .requestMatchers("/api/admin/**")
@@ -107,11 +116,16 @@ public class SecurityConfig {
                     // exempt. Admin login is exempt too: the caller has no session yet, so there's
                     // no CSRF surface to protect.
                     .ignoringRequestMatchers(
-                        "/api/polls/**", "/api/public/**", "/api/deck/**", "/api/admin/login"))
+                        "/api/polls/**",
+                        "/api/public/**",
+                        "/api/deck/**",
+                        "/api/admin/login",
+                        "/api/admin/setup",
+                        "/api/admin/setup/**"))
         .exceptionHandling(
             ex -> ex.authenticationEntryPoint(entryPoint).accessDeniedHandler(accessDeniedHandler))
-        .formLogin(form -> form.disable())
-        .httpBasic(basic -> basic.disable())
+        .formLogin(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
         .logout(Customizer.withDefaults());
 
     return http.build();

@@ -19,22 +19,22 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Integration tests for {@link PollRepositoryImpl} against a real Postgres instance (Testcontainers).
- * Covers round-trip persistence of poll fields beyond what the concurrency-focused ITs cover.
+ * Integration tests for {@link PollRepositoryImpl} against a real Postgres instance
+ * (Testcontainers). Covers round-trip persistence of poll fields beyond what the
+ * concurrency-focused ITs cover.
  */
 class PollRepositoryImplTest extends AbstractPostgresTest {
 
-  private DSLContext dsl;
   private PollRepositoryImpl repo;
 
   @BeforeEach
   void setUp() {
-    dsl = dsl();
+    DSLContext dsl = dsl();
     repo = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "repo-test-owner")
         .set(ADMIN_USER.DISPLAY_NAME, "Repo Test Owner")
-        .set(ADMIN_USER.BCRYPT_HASH, "n/a")
+        .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()
         .execute();
@@ -43,10 +43,9 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
   // @TS-A3-001 — allowed_origins written on insert are returned unchanged on findById.
   @Test
   void persistsAllowedOriginsRoundTrip() {
-    Poll poll = buildPoll(
-        "repo-test-owner",
-        "round-trip-origins",
-        List.of("http://localhost:3030", "https://demo.example.com"));
+    Poll poll =
+        buildPoll(
+            "round-trip-origins", List.of("http://localhost:3030", "https://demo.example.com"));
     Poll inserted = repo.insert(poll);
     Poll loaded = repo.findById(inserted.id()).orElseThrow();
     assertThat(loaded.allowedOrigins())
@@ -56,11 +55,12 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
   // @TS-A3-002 — updateAllowedOrigins replaces the origins list and returns the updated poll.
   @Test
   void updateAllowedOriginsReplacesOrigins() {
-    Poll poll = buildPoll("repo-test-owner", "update-origins", List.of("http://old.example.com"));
+    Poll poll = buildPoll("update-origins", List.of("http://old.example.com"));
     Poll inserted = repo.insert(poll);
 
-    Poll updated = repo.updateAllowedOrigins(
-        inserted.id(), List.of("http://new1.example.com", "http://new2.example.com"));
+    Poll updated =
+        repo.updateAllowedOrigins(
+            inserted.id(), List.of("http://new1.example.com", "http://new2.example.com"));
     assertThat(updated.allowedOrigins())
         .containsExactly("http://new1.example.com", "http://new2.example.com");
 
@@ -73,22 +73,24 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
   // @TS-A3-003 — updateAllowedOrigins with an empty list clears all origins.
   @Test
   void updateAllowedOriginsClearsWhenEmpty() {
-    Poll poll = buildPoll("repo-test-owner", "clear-origins", List.of("http://localhost:3030"));
+    Poll poll = buildPoll("clear-origins", List.of("http://localhost:3030"));
     Poll inserted = repo.insert(poll);
 
     Poll updated = repo.updateAllowedOrigins(inserted.id(), List.of());
     assertThat(updated.allowedOrigins()).isEmpty();
   }
 
-  private static Poll buildPoll(String owner, String slugSuffix, List<String> allowedOrigins) {
+  private static Poll buildPoll(String slugSuffix, List<String> allowedOrigins) {
     UUID pollId = UUID.randomUUID();
     UUID q1 = UUID.randomUUID();
-    List<Option> options = new ArrayList<>(List.of(
-        new Option(UUID.randomUUID(), q1, "A", 0),
-        new Option(UUID.randomUUID(), q1, "B", 1)));
+    List<Option> options =
+        new ArrayList<>(
+            List.of(
+                new Option(UUID.randomUUID(), q1, "A", 0),
+                new Option(UUID.randomUUID(), q1, "B", 1)));
     return new Poll(
         pollId,
-        owner,
+        "repo-test-owner",
         "Test poll",
         slugSuffix + "-" + pollId.toString().substring(0, 8),
         PollStatus.DRAFT,

@@ -12,6 +12,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,18 +32,17 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class OneActivePerPollIT extends AbstractPostgresTest {
 
-  private DSLContext dsl;
   private PollRepositoryImpl repository;
 
   @BeforeEach
   void setUp() {
-    dsl = dsl();
+    DSLContext dsl = dsl();
     repository = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
     // Each test needs an admin_user row to satisfy the polls.owner_username FK added in V3.
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "concurrency-owner")
         .set(ADMIN_USER.DISPLAY_NAME, "Concurrency Owner")
-        .set(ADMIN_USER.BCRYPT_HASH, "n/a")
+        .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()
         .execute();
@@ -56,8 +56,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
     UUID q1 = seeded.questions().get(0).id();
     UUID q2 = seeded.questions().get(1).id();
 
-    ExecutorService pool = Executors.newFixedThreadPool(2);
-    try {
+    try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
       Callable<Object> activateQ1 =
           () -> {
             try {
@@ -81,9 +80,9 @@ class OneActivePerPollIT extends AbstractPostgresTest {
       Object r1 = f1.get();
       Object r2 = f2.get();
 
-      long successes = List.of(r1, r2).stream().filter(r -> r instanceof Poll).count();
+      long successes = Stream.of(r1, r2).filter(Poll.class::isInstance).count();
       long failures =
-          List.of(r1, r2).stream()
+          Stream.of(r1, r2)
               .filter(r -> r instanceof PollRepositoryImpl.ConcurrentActivationException)
               .count();
 
@@ -97,8 +96,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
           .as("the poll still has at most one ACTIVE question after the race")
           .isEqualTo(1);
       assertThat(finalState.activeQuestionId()).isNotNull();
-    } finally {
-      pool.shutdownNow();
     }
   }
 
@@ -108,7 +105,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
   @Test
   void serial_activation_transitions_question_to_active() {
     Poll seeded = seedPollWithTwoQuestions();
-    UUID q1 = seeded.questions().get(0).id();
+    UUID q1 = seeded.questions().getFirst().id();
 
     Poll after = repository.activateQuestion(seeded.id(), q1);
 
@@ -124,7 +121,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
   @Test
   void reactivating_same_question_is_idempotent() {
     Poll seeded = seedPollWithTwoQuestions();
-    UUID q1 = seeded.questions().get(0).id();
+    UUID q1 = seeded.questions().getFirst().id();
 
     repository.activateQuestion(seeded.id(), q1);
     Poll after = repository.activateQuestion(seeded.id(), q1);
