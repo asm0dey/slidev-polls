@@ -75,6 +75,42 @@ function ensureStream() {
   stopStream = openPollStream(props.serverBase, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
       liveTally.value = ev.tally.slice();
+      // The presenter can rotate the active question (Q1 → Q2, then back to
+      // Q1 after re-OPEN). Each snapshot carries the current activeQuestion;
+      // when its id changes we have to swap PollView's local model in place
+      // so the form re-renders with the new prompt and options.
+      const next = ev.activeQuestion;
+      const current = poll.value;
+      if (!current) return;
+      const prevId = current.activeQuestion?.id ?? null;
+      const nextId = next?.id ?? null;
+      if (prevId === nextId) return;
+      if (next) {
+        poll.value = {
+          ...current,
+          state: "ACTIVE",
+          activeQuestion: {
+            id: next.id,
+            prompt: next.prompt,
+            ordinal: next.ordinal,
+            status: "ACTIVE",
+            options: next.options.map(o => ({ id: o.id, label: o.label, position: o.position }))
+          },
+          alreadyVoted: undefined
+        };
+        selectedOptionId.value = null;
+        // Per-question alreadyVoted check: the voter may have answered this
+        // question on a previous open; the cookie + cached flag both fire.
+        if (hasAlreadyVoted(props.slug, next.id)) {
+          status.value = "voted";
+        } else {
+          status.value = "active";
+        }
+      } else {
+        poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
+        selectedOptionId.value = null;
+        status.value = "waiting";
+      }
     },
     onTally: (ev: TallyDeltaEvent) => {
       const entry = liveTally.value.find(t => t.optionId === ev.optionId);
