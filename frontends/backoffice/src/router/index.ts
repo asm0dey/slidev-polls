@@ -4,6 +4,7 @@ import SetupPage from "../pages/SetupPage.vue";
 import PollListPage from "../pages/PollListPage.vue";
 import PollEditorPage from "../pages/PollEditorPage.vue";
 import DeckTokensPage from "../pages/DeckTokensPage.vue";
+import UsersPage from "../pages/UsersPage.vue";
 import { defaultAdminClient } from "../lib/admin-api";
 
 const routes: RouteRecordRaw[] = [
@@ -23,7 +24,8 @@ const routes: RouteRecordRaw[] = [
     name: "deck-tokens",
     component: DeckTokensPage,
     props: (route) => ({ pollId: route.params.pollId })
-  }
+  },
+  { path: "/users", name: "users", component: UsersPage }
 ];
 
 export const router = createRouter({
