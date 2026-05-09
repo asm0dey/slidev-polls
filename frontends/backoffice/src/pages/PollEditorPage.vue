@@ -15,6 +15,13 @@ import {
 } from "../lib/admin-api";
 import SlugField from "../components/SlugField.vue";
 import { checkSlug } from "../lib/slug-rules";
+import {
+  AllowedOriginsField,
+  Button,
+  Input,
+  Pill,
+  IconChevronDown
+} from "@polls/shared/ui";
 
 type Mode = "create" | "edit";
 
@@ -52,6 +59,8 @@ const loading = ref(props.mode === "edit");
 const submitting = ref(false);
 const formError = ref<string | null>(null);
 const detail = ref<PollDetail | null>(null);
+
+const expandedIndex = ref(0);
 
 function emptyDraft(): DraftQuestion[] {
   return [
@@ -136,13 +145,6 @@ const slugIsAcceptable = computed(() => {
   return checkSlug(slug.value).valid;
 });
 
-const originsText = computed({
-  get: () => allowedOrigins.value.join("\n"),
-  set: (v: string) => {
-    allowedOrigins.value = v.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  }
-});
-
 const canSubmit = computed(() => {
   if (submitting.value) return false;
   if (title.value.trim().length === 0) return false;
@@ -212,10 +214,14 @@ function addQuestion() {
     status: "DRAFT",
     options: [{ label: "" }, { label: "" }]
   });
+  expandedIndex.value = questions.length - 1;
 }
 
 function removeQuestion(idx: number) {
   questions.splice(idx, 1);
+  if (expandedIndex.value >= questions.length) {
+    expandedIndex.value = Math.max(0, questions.length - 1);
+  }
 }
 
 function addOption(qIdx: number) {
@@ -271,82 +277,98 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="poll-editor">
-    <header class="poll-editor__header">
-      <h2>{{ mode === "create" ? "New poll" : "Edit poll" }}</h2>
-      <div v-if="mode === 'edit'" class="poll-editor__header-actions">
-        <router-link
-          v-if="pollId"
-          :to="{ name: 'deck-tokens', params: { pollId } }"
-          class="poll-editor__deck-tokens"
-          data-testid="deck-tokens-link"
-        >
-          Deck tokens
-        </router-link>
-        <button
-          type="button"
-          data-testid="poll-delete"
-          class="poll-editor__delete"
-          @click="deletePoll"
-        >
-          Delete poll
-        </button>
+  <section class="pe" data-testid="poll-editor-page">
+    <p v-if="loading" data-testid="poll-editor-loading">Loading…</p>
+
+    <template v-else>
+      <header class="pe__header">
+        <div>
+          <div class="pe__crumb">{{ mode === "create" ? "New poll" : "Poll" }}</div>
+          <h1 class="pe__title">{{ title || "Untitled" }}</h1>
+          <p v-if="detail" class="pe__sub">
+            Code <code class="pe__code">{{ detail.slug }}</code> · {{ questions.length }} question{{ questions.length === 1 ? "" : "s" }}
+          </p>
+        </div>
+        <div class="pe__header-actions">
+          <router-link
+            v-if="mode === 'edit' && pollId"
+            :to="{ name: 'deck-tokens', params: { pollId } }"
+            class="poll-editor__deck-tokens"
+            data-testid="deck-tokens-link"
+          >
+            Deck tokens
+          </router-link>
+          <button
+            v-if="mode === 'edit'"
+            type="button"
+            data-testid="poll-delete"
+            class="pe__delete"
+            @click="deletePoll"
+          >
+            Delete poll
+          </button>
+          <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
+            {{ submitting ? "Saving…" : (mode === "create" ? "Create" : "Save changes") }}
+          </Button>
+        </div>
+      </header>
+
+      <!-- inline error after a submit failure -->
+      <div v-if="formError" role="alert" data-testid="poll-form-error" class="pe__error">{{ formError }}</div>
+
+      <details open class="pe__settings">
+        <summary class="pe__summary">
+          <span>Poll settings</span>
+          <IconChevronDown />
+        </summary>
+        <div class="pe__settings-body">
+          <div class="pe__field">
+            <label class="pe__label">Title</label>
+            <Input v-model="title" placeholder="Poll title" data-testid="poll-title" />
+            <!-- keep legacy testid alias for test compatibility -->
+            <input type="hidden" data-testid="poll-editor-title" :value="title" />
+          </div>
+
+          <div class="pe__field">
+            <label class="pe__label">Slug</label>
+            <SlugField v-model="slug" :mode="mode" @update:valid="(v: boolean) => slugValid = v" />
+            <input type="hidden" data-testid="poll-slug" :value="slug" />
+          </div>
+
+          <div class="pe__field">
+            <div class="pe__row">
+              <label class="pe__label">Allowed origins (CORS)</label>
+              <span class="pe__hint-inline">applies to entire poll</span>
+            </div>
+            <AllowedOriginsField v-model="allowedOrigins" />
+            <p class="pe__hint">Browsers from these origins can vote &amp; subscribe to live results. Use <code>*</code> for any origin.</p>
+          </div>
+        </div>
+      </details>
+
+      <div class="pe__qhead">
+        <span class="pe__qhead-label">Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span>
+        <Button size="sm" data-testid="add-question" @click="addQuestion">+ Add question</Button>
       </div>
-    </header>
-
-    <p v-if="loading">Loading…</p>
-
-    <form
-      v-else
-      data-testid="poll-form"
-      class="poll-editor__form"
-      @submit.prevent="onSubmit"
-    >
-      <label class="poll-editor__field">
-        <span>Title</span>
-        <input
-          v-model="title"
-          data-testid="poll-title"
-          type="text"
-          required
-          maxlength="200"
-        />
-      </label>
-
-      <SlugField
-        v-model="slug"
-        :label="mode === 'create' ? 'Slug (optional — derived from title if blank)' : 'Slug'"
-        @update:valid="slugValid = $event"
-      />
-      <input
-        type="hidden"
-        data-testid="poll-slug"
-        :value="slug"
-      />
-
-      <label class="poll-editor__field">
-        <span>Allowed cross-origin hosts (one per line)</span>
-        <textarea
-          v-model="originsText"
-          rows="3"
-          spellcheck="false"
-          placeholder="http://localhost:3030"
-          data-testid="poll-allowed-origins"
-          class="poll-editor__origins"
-        />
-        <small>Leave empty to allow only the backend's own origin.</small>
-      </label>
-
-      <ul class="poll-editor__questions">
-        <li
-          v-for="(q, qIdx) in questions"
-          :key="q.id ?? `new-${qIdx}`"
-          data-testid="question-block"
-          class="poll-editor__question"
+      <div class="pe__qlist">
+        <div
+          v-for="(q, i) in questions"
+          :key="(q.id ?? '') + ':' + i"
+          class="pe__qrow"
+          :data-active="q.status === 'ACTIVE' ? '' : undefined"
+          :data-expanded="i === expandedIndex ? '' : undefined"
+          :data-testid="`poll-editor-question-${i}`"
         >
-          <header class="poll-editor__question-header">
-            <h3>Question {{ qIdx + 1 }} <small>({{ q.status }})</small></h3>
-            <div class="poll-editor__question-actions">
+          <!-- legacy testid for tests that use question-block -->
+          <span style="display:none" data-testid="question-block" />
+          <div class="pe__qhdr">
+            <span class="pe__qhdr-meta">
+              {{ i + 1 }} · multi-choice
+              <Pill v-if="q.status" :tone="q.status === 'ACTIVE' ? 'success' : 'neutral'" :withDot="q.status === 'ACTIVE'">
+                {{ q.status.toLowerCase() }}
+              </Pill>
+            </span>
+            <div class="pe__qhdr-actions">
               <button
                 v-if="mode === 'edit' && q.id && q.status === 'DRAFT'"
                 type="button"
@@ -363,157 +385,116 @@ onMounted(() => {
               >
                 Close
               </button>
-              <button
-                v-if="questions.length > 1"
-                type="button"
-                data-testid="question-remove"
-                @click="removeQuestion(qIdx)"
-              >
-                Remove
-              </button>
+              <Button v-if="i !== expandedIndex" variant="ghost" size="sm" @click="expandedIndex = i">Edit</Button>
+              <Button v-if="questions.length > 1" variant="ghost" size="sm" data-testid="question-remove" @click="removeQuestion(i)">×</Button>
             </div>
-          </header>
-          <label class="poll-editor__field">
-            <span>Prompt</span>
-            <input
+          </div>
+          <template v-if="i === expandedIndex">
+            <Input
               v-model="q.prompt"
+              placeholder="Question prompt"
               data-testid="question-prompt"
-              type="text"
-              required
-              maxlength="500"
             />
-          </label>
-          <ol class="poll-editor__options">
-            <li
-              v-for="(opt, oIdx) in q.options"
-              :key="opt.id ?? `new-${qIdx}-${oIdx}`"
-              data-testid="option-row"
-              class="poll-editor__option"
-            >
-              <input
-                v-model="opt.label"
-                data-testid="option-label"
-                type="text"
-                required
-                maxlength="200"
-                :placeholder="`Option ${oIdx + 1}`"
-              />
-              <button
-                v-if="q.options.length > 2"
-                type="button"
-                data-testid="option-remove"
-                @click="removeOption(qIdx, oIdx)"
-              >
-                ×
-              </button>
-            </li>
-          </ol>
-          <button type="button" data-testid="add-option" @click="addOption(qIdx)">
-            Add option
-          </button>
-        </li>
-      </ul>
-
-      <button type="button" data-testid="add-question" @click="addQuestion">
-        Add question
-      </button>
-
-      <p
-        v-if="formError"
-        data-testid="poll-form-error"
-        role="alert"
-        class="poll-editor__error"
-      >
-        {{ formError }}
-      </p>
-
-      <div class="poll-editor__submit-row">
-        <button type="submit" :disabled="!canSubmit">
-          {{ submitting ? "Saving…" : mode === "create" ? "Create poll" : "Save changes" }}
-        </button>
+            <div class="pe__opts">
+              <div v-for="(o, oi) in q.options" :key="oi" class="pe__opt" data-testid="option-row">
+                <span class="pe__handle">⋮⋮</span>
+                <Input v-model="o.label" data-testid="option-label" />
+                <Button v-if="q.options.length > 2" variant="ghost" size="sm" data-testid="option-remove" @click="removeOption(i, oi)">×</Button>
+              </div>
+              <button class="pe__add-opt" type="button" data-testid="add-option" @click="addOption(i)">+ Add option</button>
+            </div>
+          </template>
+        </div>
       </div>
-    </form>
+    </template>
   </section>
 </template>
 
 <style scoped>
-.poll-editor__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+.pe__header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 24px; gap: 16px;
 }
-.poll-editor__delete {
+.pe__crumb {
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--sp-fg-subtle); font-weight: 500; margin-bottom: 4px;
+}
+.pe__title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.pe__sub { font-size: 12px; color: var(--sp-fg-subtle); margin: 4px 0 0; }
+.pe__code {
+  font-family: var(--sp-font-mono); font-size: 11px;
+  background: var(--sp-bg-muted); padding: 1px 6px; border-radius: 4px;
+}
+.pe__header-actions { display: flex; gap: 8px; align-items: center; }
+
+.pe__delete {
   background: #fdecea;
   color: #b71c1c;
   border: 1px solid #f5c6cb;
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
+  cursor: pointer;
 }
-.poll-editor__form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+
+.pe__error {
+  background: var(--sp-danger-bg, #fdecea); color: var(--sp-danger-fg, #b71c1c);
+  border: 1px solid var(--sp-danger, #f5c6cb); border-radius: var(--sp-radius-sm, 4px);
+  padding: 10px; font-size: 13px;
+  margin-bottom: 16px;
 }
-.poll-editor__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.poll-editor__field input,
-.poll-editor__field textarea {
-  padding: 0.4rem 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: inherit;
-  resize: vertical;
-}
-.poll-editor__questions {
+
+.pe__settings { margin-bottom: 22px; }
+.pe__summary {
+  cursor: pointer; padding-bottom: 10px;
+  border-bottom: 1px solid var(--sp-border);
+  margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between;
   list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-weight: 600; color: var(--sp-fg);
 }
-.poll-editor__question {
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.pe__summary::-webkit-details-marker { display: none; }
+.pe__settings-body { display: flex; flex-direction: column; gap: 14px; }
+.pe__field { display: flex; flex-direction: column; gap: 5px; }
+.pe__row { display: flex; justify-content: space-between; align-items: baseline; }
+.pe__label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--sp-fg-subtle); font-weight: 500;
 }
-.poll-editor__question-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.pe__hint-inline { font-size: 11px; color: var(--sp-fg-faint); }
+.pe__hint { font-size: 11px; color: var(--sp-fg-subtle); margin: 0; }
+
+.pe__qhead {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 28px 0 12px;
 }
-.poll-editor__question-actions {
-  display: flex;
-  gap: 0.5rem;
+.pe__qhead-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--sp-fg); font-weight: 600;
 }
-.poll-editor__options {
-  list-style: none;
-  padding-left: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.pe__qhead-count { color: var(--sp-fg-faint); font-weight: 400; letter-spacing: 0; }
+
+.pe__qlist { display: flex; flex-direction: column; gap: 8px; }
+.pe__qrow {
+  border: 1px solid var(--sp-border, #ddd);
+  border-radius: var(--sp-radius-lg, 8px);
+  padding: 12px 16px;
 }
-.poll-editor__option {
-  display: flex;
-  gap: 0.5rem;
+.pe__qrow[data-active] {
+  border-color: var(--sp-accent);
+  background: var(--sp-accent-soft);
 }
-.poll-editor__option input {
-  flex: 1;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.pe__qhdr { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pe__qhdr-meta { font-size: 12px; color: var(--sp-fg-subtle); display: inline-flex; align-items: center; gap: 8px; }
+.pe__qhdr-actions { display: flex; gap: 4px; align-items: center; }
+.pe__opts { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.pe__opt { display: flex; gap: 6px; align-items: center; }
+.pe__handle { color: var(--sp-fg-faint); font-size: 11px; width: 14px; cursor: grab; }
+.pe__add-opt {
+  padding: 8px; border: 1px dashed var(--sp-border-strong, #bbb);
+  background: transparent; border-radius: var(--sp-radius-sm, 4px);
+  font-size: 12px; color: var(--sp-fg-subtle); font-family: var(--sp-font-sans);
+  cursor: pointer;
 }
-.poll-editor__error {
-  background: #fdecea;
-  color: #b71c1c;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  margin: 0;
-}
+.pe__add-opt:hover { background: var(--sp-bg-muted); }
 </style>

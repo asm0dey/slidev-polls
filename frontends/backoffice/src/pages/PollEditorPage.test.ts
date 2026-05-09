@@ -116,7 +116,7 @@ describe("PollEditorPage — create mode", () => {
     await optionInputs[1].setValue("GraalVM");
     await wrapper.find('input[data-testid="question-prompt"]').setValue("Which JVM?");
 
-    await wrapper.find('form[data-testid="poll-form"]').trigger("submit.prevent");
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
     await flushPromises();
 
     expect(createPoll).toHaveBeenCalledTimes(1);
@@ -140,12 +140,11 @@ describe("PollEditorPage — create mode", () => {
     const { wrapper } = await mountCreate(client);
 
     await wrapper.find('input[data-testid="poll-title"]').setValue("My talk");
-    await wrapper.find('input[data-testid="poll-slug"]').setValue("taken-slug");
     await wrapper.find('input[data-testid="question-prompt"]').setValue("Q?");
     const opts = wrapper.findAll('input[data-testid="option-label"]');
     await opts[0].setValue("A");
     await opts[1].setValue("B");
-    await wrapper.find('form[data-testid="poll-form"]').trigger("submit.prevent");
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
     await flushPromises();
 
     const error = wrapper.find('[data-testid="poll-form-error"]');
@@ -155,42 +154,44 @@ describe("PollEditorPage — create mode", () => {
 });
 
 describe("PollEditorPage — allowed origins editor", () => {
-  it("populates the textarea from PollDetail.allowedOrigins on load", async () => {
+  it("populates AllowedOriginsField from PollDetail.allowedOrigins on load", async () => {
     const getPoll = vi.fn().mockResolvedValue(
       pollDetail({ allowedOrigins: ["http://a.example", "http://b.example"] })
     );
     const client = makeFake({ getPoll });
     const { wrapper } = await mountEdit(client);
 
-    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
-    expect(ta.element.value).toBe("http://a.example\nhttp://b.example");
+    const chips = wrapper.findAll("[data-testid='origin-chip']");
+    expect(chips).toHaveLength(2);
   });
 
-  it("splits textarea value into array on edit (pasted multi-line)", async () => {
+  it("adds origins via chip-list input and sends them on save", async () => {
     const getPoll = vi.fn().mockResolvedValue(pollDetail({ allowedOrigins: [] }));
     const updatePoll = vi.fn(async (_id: string, _req) => pollDetail());
     const client = makeFake({ getPoll, updatePoll });
     const { wrapper } = await mountEdit(client);
 
-    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
-    await ta.setValue("http://a\nhttp://b\n");
+    const input = wrapper.find<HTMLInputElement>("input.sp-aof-input");
+    await input.setValue("http://a.example");
+    await input.trigger("keydown", { key: "Enter" });
+    await input.setValue("http://b.example");
+    await input.trigger("keydown", { key: "Enter" });
 
-    // trigger submit
-    await wrapper.find('form[data-testid="poll-form"]').trigger("submit.prevent");
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
     await flushPromises();
 
     const sentReq = (updatePoll.mock.calls[0] as unknown[])[1] as { allowedOrigins: string[] };
-    expect(sentReq.allowedOrigins).toEqual(["http://a", "http://b"]);
+    expect(sentReq.allowedOrigins).toEqual(["http://a.example", "http://b.example"]);
   });
 
-  it("joining the array back from the computed reproduces the display string", async () => {
-    const origins = ["http://a", "http://b"];
+  it("displays pre-loaded origins as chips", async () => {
+    const origins = ["http://a.example", "http://b.example"];
     const getPoll = vi.fn().mockResolvedValue(pollDetail({ allowedOrigins: origins }));
     const client = makeFake({ getPoll });
     const { wrapper } = await mountEdit(client);
 
-    const ta = wrapper.find<HTMLTextAreaElement>('textarea[data-testid="poll-allowed-origins"]');
-    expect(ta.element.value).toBe(origins.join("\n"));
+    const chips = wrapper.findAll("[data-testid='origin-chip']");
+    expect(chips).toHaveLength(origins.length);
   });
 });
 
