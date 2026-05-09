@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useDeckAuth } from "../composables/useDeckAuth";
 
 // Visible states per FR-001 / FR-002 / FR-014:
@@ -13,6 +13,35 @@ import { useDeckAuth } from "../composables/useDeckAuth";
 const auth = useDeckAuth();
 const username = ref("");
 const password = ref("");
+
+const root = ref<HTMLElement | null>(null);
+const themeMode = ref<"light" | "dark">("light");
+
+function detectTheme() {
+  if (typeof window === "undefined" || !document.documentElement) return;
+  if (document.documentElement.classList.contains("dark")) {
+    themeMode.value = "dark";
+    return;
+  }
+  if (document.documentElement.classList.contains("light")) {
+    themeMode.value = "light";
+    return;
+  }
+  const bg = getComputedStyle(document.body).backgroundColor;
+  const m = bg.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (!m) return;
+  const r = Number(m[1]), g = Number(m[2]), b = Number(m[3]);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  themeMode.value = lum > 0.6 ? "light" : "dark";
+}
+
+let observer: MutationObserver | null = null;
+onMounted(() => {
+  detectTheme();
+  observer = new MutationObserver(detectTheme);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+});
+onUnmounted(() => observer?.disconnect());
 
 const isAnonymous = computed(
   () => auth.status.value === "anonymous" || auth.status.value === "revoked"
@@ -33,7 +62,7 @@ function onSignOut() {
 </script>
 
 <template>
-  <div class="deck-auth-control" data-testid="deck-auth-control">
+  <div ref="root" class="deck-auth-control" data-testid="deck-auth-control" :data-theme="themeMode">
     <div v-if="isSignedIn" class="deck-auth-control__pill">
       <span class="deck-auth-control__label">signed in: {{ auth.state.value.label ?? "deck" }}</span>
       <button
@@ -80,50 +109,94 @@ function onSignOut() {
 
 <style scoped>
 .deck-auth-control {
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 0.85rem;
-  color: #0e1622;
+  font-family: var(--sp-font-sans, system-ui, -apple-system, sans-serif);
+  font-size: 12px;
+  color: var(--sp-fg, #0a0a0a);
+  background: var(--sp-bg, #ffffff);
+  border: 1px solid var(--sp-border, #e5e5e5);
+  border-radius: var(--sp-radius, 8px);
+  padding: 10px 12px;
+  min-width: 200px;
 }
 .deck-auth-control__form {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
+  gap: 6px;
 }
 .deck-auth-control__status {
-  color: #555;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sp-fg-subtle, #737373);
+  font-weight: 500;
+  margin-bottom: 2px;
 }
 .deck-auth-control__input {
   font: inherit;
-  padding: 0.2rem 0.4rem;
-  border: 1px solid #c3cad1;
-  border-radius: 3px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--sp-border, #e5e5e5);
+  border-radius: var(--sp-radius-sm, 6px);
+  background: var(--sp-bg, #ffffff);
+  color: var(--sp-fg, #0a0a0a);
 }
-.deck-auth-control__submit,
+.deck-auth-control__input::placeholder {
+  color: var(--sp-fg-faint, #a1a1aa);
+}
+.deck-auth-control__input:focus {
+  outline: 2px solid var(--sp-accent-ring, rgba(124, 58, 237, 0.4));
+  outline-offset: 0;
+  border-color: var(--sp-accent, #7c3aed);
+}
+.deck-auth-control__submit {
+  font: inherit;
+  padding: 7px 10px;
+  border: 0;
+  background: var(--sp-accent, #7c3aed);
+  color: var(--sp-accent-fg, #ffffff);
+  border-radius: var(--sp-radius-sm, 6px);
+  font-weight: 500;
+  cursor: pointer;
+}
+.deck-auth-control__submit:hover {
+  opacity: 0.92;
+}
 .deck-auth-control__signout {
   font: inherit;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid #8996a3;
-  background: #f4f6f8;
-  border-radius: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--sp-border, #e5e5e5);
+  background: var(--sp-bg, #ffffff);
+  color: var(--sp-fg-muted, #52525b);
+  border-radius: var(--sp-radius-sm, 6px);
   cursor: pointer;
+  font-size: 11px;
+}
+.deck-auth-control__signout:hover {
+  background: var(--sp-bg-muted, #fafafa);
 }
 .deck-auth-control__pill {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #0e1622;
+  gap: 8px;
+  color: var(--sp-fg, #0a0a0a);
 }
 .deck-auth-control__label {
   font-weight: 600;
+  font-size: 12px;
 }
 .deck-auth-control__pending {
-  color: #555;
+  color: var(--sp-fg-subtle, #737373);
   font-style: italic;
+  font-size: 12px;
 }
 .deck-auth-control__message {
-  margin: 0.25rem 0 0 0;
-  color: #7a1f1f;
-  font-size: 0.8rem;
+  margin: 6px 0 0 0;
+  padding: 6px 8px;
+  background: var(--sp-danger-bg, #fef2f2);
+  color: var(--sp-danger-fg, #991b1b);
+  border: 1px solid var(--sp-danger, #dc2626);
+  border-radius: var(--sp-radius-sm, 6px);
+  font-size: 11px;
 }
 </style>

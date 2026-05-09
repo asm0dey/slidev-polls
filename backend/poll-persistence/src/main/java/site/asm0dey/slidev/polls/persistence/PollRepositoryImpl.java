@@ -190,9 +190,11 @@ public class PollRepositoryImpl implements PollRepository {
       case ACTIVE -> {
         return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
       }
-      case CLOSED ->
-          throw new ActivationRejectedException("question " + questionId + " is already CLOSED");
-      case DRAFT -> {}
+      // CLOSED questions are reopenable — slide navigation may bounce a
+      // viewer back to an earlier question and the deck must be able to
+      // re-activate it. Falls through to the ACTIVATE flow below, which
+      // clears closed_at as part of the update.
+      case CLOSED, DRAFT -> {}
     }
 
     OffsetDateTime now = OffsetDateTime.now();

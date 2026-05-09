@@ -17,6 +17,8 @@
     "vue-router": "^4.4.0"
   },
   "devDependencies": {
+    "@fontsource/inter": "^5",
+    "@fontsource/jetbrains-mono": "^5",
     "@vitejs/plugin-vue": "^5.1.0",
     "@vue/test-utils": "^2.4.6",
     "jsdom": "^26.0.0",

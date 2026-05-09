@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@polls/shared", async () => {
+  const actual = await vi.importActual<typeof import("@polls/shared")>("@polls/shared");
+  return { ...actual, openPollStream: vi.fn(() => () => {}) };
+});
+
 import { flushPromises, mount } from "@vue/test-utils";
 import PollView from "./PollView.vue";
 import { ApiClient, ApiError } from "@polls/shared";
@@ -102,6 +108,7 @@ describe("PollView", () => {
     const wrapper = await mountView(client);
 
     await wrapper.find('[data-testid="option-opt-a"]').trigger("click");
+    await wrapper.find('[data-testid="poll-submit"]').trigger("click");
     await flushPromises();
 
     expect(submitVote).toHaveBeenCalledWith(
@@ -130,6 +137,7 @@ describe("PollView", () => {
     const wrapper = await mountView(client);
 
     await wrapper.find('[data-testid="option-opt-a"]').trigger("click");
+    await wrapper.find('[data-testid="poll-submit"]').trigger("click");
     await flushPromises();
 
     expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
@@ -159,6 +167,7 @@ describe("PollView", () => {
     const wrapper = await mountView(client);
 
     await wrapper.find('[data-testid="option-opt-a"]').trigger("click");
+    await wrapper.find('[data-testid="poll-submit"]').trigger("click");
     await flushPromises();
 
     // After the refetch, the WAITING state renders — no duplicate-vote error message sticks.

@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
+import { Button, Input } from "@polls/shared/ui";
 
 const props = withDefaults(
   defineProps<{
@@ -46,63 +47,92 @@ function describeError(err: unknown): string {
 </script>
 
 <template>
-  <section class="login">
-    <h2>Sign in</h2>
-    <form data-testid="login-form" class="login__form" @submit.prevent="onSubmit">
-      <label class="login__field">
-        <span>Username</span>
-        <input
+  <div class="login" data-testid="login-page">
+    <div class="login__form">
+      <div class="login__brand">slidev polls</div>
+      <h1 class="login__title">Sign in</h1>
+      <p class="login__sub">Run polls in your decks.</p>
+      <form data-testid="login-form" @submit.prevent="onSubmit">
+        <Input
           v-model="username"
-          data-testid="login-username"
           type="text"
-          autocomplete="username"
-          required
+          placeholder="username"
+          data-testid="login-username"
         />
-      </label>
-      <label class="login__field">
-        <span>Password</span>
-        <input
+        <Input
           v-model="password"
-          data-testid="login-password"
           type="password"
-          autocomplete="current-password"
-          required
+          placeholder="Password"
+          data-testid="login-password"
+          style="margin-top: 10px;"
         />
-      </label>
-      <button type="submit" :disabled="submitting">
-        {{ submitting ? "Signing in…" : "Sign in" }}
-      </button>
-      <p v-if="errorMessage" data-testid="login-error" role="alert" class="login__error">
-        {{ errorMessage }}
-      </p>
-    </form>
-  </section>
+        <Button
+          type="submit"
+          :disabled="submitting"
+          style="margin-top: 12px; width: 100%;"
+          data-testid="login-submit"
+        >
+          {{ submitting ? "Signing in…" : "Continue →" }}
+        </Button>
+        <p v-if="errorMessage" role="alert" class="login__error" data-testid="login-error">
+          {{ errorMessage }}
+        </p>
+      </form>
+    </div>
+    <aside class="login__brandpanel">
+      <div class="login__brandpanel-inner">
+        <div class="login__eyebrow">Live polls in markdown</div>
+        <p class="login__pitch">
+          Embed polls next to your code blocks. Audience answers from any phone.
+          Results animate on the slide.
+        </p>
+      </div>
+    </aside>
+  </div>
 </template>
 
 <style scoped>
 .login {
-  max-width: 24rem;
+  display: grid; grid-template-columns: 1fr 1fr;
+  min-height: 100vh; background: var(--sp-bg);
 }
 .login__form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px;
 }
-.login__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.login__form > * { width: 320px; max-width: 100%; }
+.login__brand {
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  margin-bottom: 32px; color: var(--sp-fg);
 }
-.login__field input {
-  padding: 0.4rem 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.login__title {
+  font-size: 22px; font-weight: 600; margin: 0 0 6px;
+  letter-spacing: -0.02em; color: var(--sp-fg);
 }
+.login__sub { font-size: 13px; color: var(--sp-fg-subtle); margin: 0 0 24px; }
 .login__error {
-  background: #fdecea;
-  color: #b71c1c;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  margin: 0;
+  background: var(--sp-danger-bg); color: var(--sp-danger-fg);
+  border: 1px solid var(--sp-danger); border-radius: var(--sp-radius-sm);
+  padding: 8px 10px; font-size: 12px; margin-top: 10px;
+}
+.login__brandpanel {
+  background: linear-gradient(135deg, #7c3aed 0%, #4338ca 100%);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+}
+[data-theme="dark"] .login__brandpanel {
+  background: radial-gradient(ellipse at top right, #7c3aed 0%, #4338ca 50%, #1e1b4b 100%);
+}
+.login__brandpanel-inner { max-width: 280px; }
+.login__eyebrow {
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  opacity: 0.7; margin-bottom: 10px;
+}
+.login__pitch { font-size: 14px; line-height: 1.5; margin: 0; opacity: 0.92; }
+
+@media (max-width: 768px) {
+  .login { grid-template-columns: 1fr; }
+  .login__brandpanel { display: none; }
 }
 </style>
