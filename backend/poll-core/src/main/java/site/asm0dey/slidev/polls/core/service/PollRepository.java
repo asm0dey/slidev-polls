@@ -54,4 +54,11 @@ public interface PollRepository {
    * poll does not exist.
    */
   Poll updateAllowedOrigins(UUID pollId, List<String> origins);
+
+  /**
+   * Polls whose {@code allowed_origins} array contains {@code origin} verbatim.
+   * Used by the per-poll CORS resolver for pre-auth deck-login preflight where
+   * no path/header identifies a single poll.
+   */
+  List<Poll> findAllOriginsContaining(String origin);
 }

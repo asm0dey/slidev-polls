@@ -271,6 +271,11 @@ class VoteServiceTest {
     public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
+
+    @Override
+    public java.util.List<Poll> findAllOriginsContaining(String origin) {
+      throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
   }
 
   /**

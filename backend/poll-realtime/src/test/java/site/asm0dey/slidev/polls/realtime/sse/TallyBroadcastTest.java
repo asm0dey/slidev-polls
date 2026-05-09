@@ -360,6 +360,11 @@ class TallyBroadcastTest {
     public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public java.util.List<Poll> findAllOriginsContaining(String origin) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   private static final class InMemoryVoteRepository implements VoteRepository {

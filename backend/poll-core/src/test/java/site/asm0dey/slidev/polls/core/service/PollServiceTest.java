@@ -495,6 +495,11 @@ class PollServiceTest {
       return updated;
     }
 
+    @Override
+    public List<Poll> findAllOriginsContaining(String origin) {
+      throw new UnsupportedOperationException("not needed for PollServiceTest");
+    }
+
     private Poll requirePresent(UUID pollId) {
       Poll existing = byId.get(pollId);
       if (existing == null) {

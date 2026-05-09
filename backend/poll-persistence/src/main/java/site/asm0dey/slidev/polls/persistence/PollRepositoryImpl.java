@@ -244,6 +244,16 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   @Override
+  public List<Poll> findAllOriginsContaining(String origin) {
+    return dsl.selectFrom(POLLS)
+        .where("? = ANY(allowed_origins)", origin)
+        .fetch()
+        .stream()
+        .map(this::hydrate)
+        .toList();
+  }
+
+  @Override
   public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
     int updated =
         dsl.update(POLLS)
