@@ -26,3 +26,8 @@ backend/poll-api/src/main/resources/static/
 
 # go-task e2e orchestration marker (tracks whether `task test:e2e:*` started the stack)
 .task-e2e-backend-started
+
+# Slidev demo seed output - rewritten by `bun run seed` on every demo run
+# with a fresh slug / pollId / questionIds / deck token. Run seed before
+# `bun run slidev` on a fresh clone.
+frontends/slidev-demo/data.ts
