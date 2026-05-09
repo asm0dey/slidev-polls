@@ -1,18 +1,22 @@
 package site.asm0dey.slidev.polls.persistence;
 
+import static org.jooq.impl.DSL.any;
+import static org.jooq.impl.DSL.multiset;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.val;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.JSONB;
 import org.jooq.Record;
 import org.jooq.exception.IntegrityConstraintViolationException;
@@ -72,27 +76,33 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Optional<Poll> findById(UUID pollId) {
-    return dsl.selectFrom(POLLS).where(POLLS.ID.eq(pollId)).fetchOptional().map(this::hydrate);
+    return dsl.select(POLLS.fields())
+        .select(QUESTIONS_FIELD)
+        .from(POLLS)
+        .where(POLLS.ID.eq(pollId))
+        .fetchOptional()
+        .map(this::toPoll);
   }
 
   @Override
   public Optional<Poll> findBySlug(String slug) {
-    return dsl.selectFrom(POLLS)
+    return dsl.select(POLLS.fields())
+        .select(QUESTIONS_FIELD)
+        .from(POLLS)
         .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()))
         .fetchOptional()
-        .map(this::hydrate);
+        .map(this::toPoll);
   }
 
   @Override
   public List<Poll> findByOwner(String ownerUsername) {
-    return dsl
-        .selectFrom(POLLS)
+    return dsl.select(POLLS.fields())
+        .select(QUESTIONS_FIELD)
+        .from(POLLS)
         .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
         .orderBy(POLLS.CREATED_AT.desc())
         .fetch()
-        .stream()
-        .map(this::hydrate)
-        .toList();
+        .map(this::toPoll);
   }
 
   @Override
@@ -244,27 +254,36 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   @Override
-  public List<Poll> findAllOriginsContaining(String origin) {
-    return dsl.selectFrom(POLLS)
-        .where("? = ANY(allowed_origins)", origin)
-        .fetch()
-        .stream()
-        .map(this::hydrate)
-        .toList();
+  public boolean isOriginAllowedByAnyPoll(String origin) {
+    return dsl.fetchExists(
+        dsl.selectOne()
+            .from(POLLS)
+            .where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));
   }
 
   @Override
   public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
-    int updated =
-        dsl.update(POLLS)
-            .set(POLLS.ALLOWED_ORIGINS, origins.toArray(new String[0]))
-            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-            .where(POLLS.ID.eq(pollId))
-            .execute();
-    if (updated == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
-    }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    return dsl.update(POLLS)
+        .set(POLLS.ALLOWED_ORIGINS, origins.toArray(new String[0]))
+        .set(POLLS.UPDATED_AT, OffsetDateTime.now())
+        .where(POLLS.ID.eq(pollId))
+        .returningResult(pollFieldsWithQuestions())
+        .fetchOptional()
+        .map(this::toPoll)
+        .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
+  }
+
+  /**
+   * Combine the {@link site.asm0dey.slidev.polls.persistence.jooq.tables.Polls} columns with the
+   * {@link #QUESTIONS_FIELD} multiset so an {@code UPDATE … RETURNING} can hand back a fully
+   * hydrated poll aggregate in a single Postgres round-trip — no follow-up {@code SELECT}.
+   */
+  private static org.jooq.SelectField<?>[] pollFieldsWithQuestions() {
+    Field<?>[] cols = POLLS.fields();
+    org.jooq.SelectField<?>[] all = new org.jooq.SelectField<?>[cols.length + 1];
+    System.arraycopy(cols, 0, all, 0, cols.length);
+    all[cols.length] = QUESTIONS_FIELD;
+    return all;
   }
 
   private List<Question> insertQuestions(UUID pollId, List<Question> questions) {
@@ -272,91 +291,97 @@ public class PollRepositoryImpl implements PollRepository {
       return List.of();
     }
     List<Question> ordered = new ArrayList<>(questions.size());
-    for (int i = 0; i < questions.size(); i++) {
-      Question q = questions.get(i);
-      UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
-      dsl.insertInto(POLL_QUESTIONS)
-          .set(POLL_QUESTIONS.ID, qid)
-          .set(POLL_QUESTIONS.POLL_ID, pollId)
-          .set(POLL_QUESTIONS.PROMPT, q.prompt())
-          .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
-          .set(POLL_QUESTIONS.STATUS, q.status().name())
-          .execute();
-      List<Option> insertedOptions = new ArrayList<>(q.options().size());
-      for (Option o : q.options()) {
-        UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
-        dsl.insertInto(POLL_OPTIONS)
-            .set(POLL_OPTIONS.ID, oid)
-            .set(POLL_OPTIONS.QUESTION_ID, qid)
-            .set(POLL_OPTIONS.LABEL, o.label())
-            .set(POLL_OPTIONS.POSITION, o.position())
-            .execute();
-        insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
+      for (Question q : questions) {
+          UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
+          dsl.insertInto(POLL_QUESTIONS)
+              .set(POLL_QUESTIONS.ID, qid)
+              .set(POLL_QUESTIONS.POLL_ID, pollId)
+              .set(POLL_QUESTIONS.PROMPT, q.prompt())
+              .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
+              .set(POLL_QUESTIONS.STATUS, q.status().name())
+              .execute();
+          List<Option> insertedOptions = new ArrayList<>(q.options().size());
+          for (Option o : q.options()) {
+              UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
+              dsl.insertInto(POLL_OPTIONS)
+                  .set(POLL_OPTIONS.ID, oid)
+                  .set(POLL_OPTIONS.QUESTION_ID, qid)
+                  .set(POLL_OPTIONS.LABEL, o.label())
+                  .set(POLL_OPTIONS.POSITION, o.position())
+                  .execute();
+              insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
+          }
+          ordered.add(
+              new Question(
+                  qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
       }
-      ordered.add(
-          new Question(
-              qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
-    }
     return ordered;
   }
 
-  private Poll hydrate(Record row) {
-    UUID pollId = row.get(POLLS.ID);
-    List<Question> questions =
-        dsl
-            .selectFrom(POLL_QUESTIONS)
-            .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-            .orderBy(POLL_QUESTIONS.ORDINAL.asc())
-            .fetch()
-            .stream()
-            .map(
-                q -> {
-                  UUID questionId = q.get(POLL_QUESTIONS.ID);
-                  List<Option> options =
-                      dsl
-                          .selectFrom(POLL_OPTIONS)
-                          .where(POLL_OPTIONS.QUESTION_ID.eq(questionId))
-                          .orderBy(POLL_OPTIONS.POSITION.asc())
-                          .fetch()
-                          .stream()
-                          .map(
-                              o ->
-                                  new Option(
-                                      o.get(POLL_OPTIONS.ID),
-                                      questionId,
-                                      o.get(POLL_OPTIONS.LABEL),
-                                      o.get(POLL_OPTIONS.POSITION)))
-                          .sorted(Comparator.comparingInt(Option::position))
-                          .toList();
-                  return new Question(
-                      questionId,
-                      pollId,
-                      q.get(POLL_QUESTIONS.PROMPT),
-                      q.get(POLL_QUESTIONS.ORDINAL),
-                      QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
-                      options,
-                      q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
-                          ? null
-                          : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
-                      q.get(POLL_QUESTIONS.CLOSED_AT) == null
-                          ? null
-                          : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant());
-                })
-            .toList();
+  /**
+   * Inner multiset that materialises every {@link Option} for the surrounding {@link Question} row
+   * — correlated by {@code POLL_OPTIONS.QUESTION_ID = POLL_QUESTIONS.ID}. Used inside
+   * {@link #QUESTIONS_FIELD}; never emitted on its own.
+   */
+  private static final Field<List<Option>> OPTIONS_FIELD =
+      multiset(
+              select(
+                      POLL_OPTIONS.ID,
+                      POLL_OPTIONS.QUESTION_ID,
+                      POLL_OPTIONS.LABEL,
+                      POLL_OPTIONS.POSITION)
+                  .from(POLL_OPTIONS)
+                  .where(POLL_OPTIONS.QUESTION_ID.eq(POLL_QUESTIONS.ID))
+                  .orderBy(POLL_OPTIONS.POSITION.asc()))
+          .convertFrom(
+              r -> r.map(o -> new Option(o.value1(), o.value2(), o.value3(), o.value4())));
 
+  /**
+   * Outer multiset that materialises every {@link Question} (with its nested options) for the poll
+   * row in scope — correlated by {@code POLL_QUESTIONS.POLL_ID = POLLS.ID}. The whole poll
+   * aggregate is therefore one round-trip; on Postgres jOOQ emits a single SELECT with two
+   * subselects rendered as JSON arrays.
+   */
+  private static final Field<List<Question>> QUESTIONS_FIELD =
+      multiset(
+              select(
+                      POLL_QUESTIONS.ID,
+                      POLL_QUESTIONS.POLL_ID,
+                      POLL_QUESTIONS.PROMPT,
+                      POLL_QUESTIONS.ORDINAL,
+                      POLL_QUESTIONS.STATUS,
+                      POLL_QUESTIONS.ACTIVATED_AT,
+                      POLL_QUESTIONS.CLOSED_AT,
+                      OPTIONS_FIELD)
+                  .from(POLL_QUESTIONS)
+                  .where(POLL_QUESTIONS.POLL_ID.eq(POLLS.ID))
+                  .orderBy(POLL_QUESTIONS.ORDINAL.asc()))
+          .convertFrom(
+              r ->
+                  r.map(
+                      q ->
+                          new Question(
+                              q.value1(),
+                              q.value2(),
+                              q.value3(),
+                              q.value4(),
+                              QuestionStatus.valueOf(q.value5()),
+                              q.value8(),
+                              q.value6() == null ? null : q.value6().toInstant(),
+                              q.value7() == null ? null : q.value7().toInstant())));
+
+  private Poll toPoll(Record row) {
     String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);
-    List<String> origins = originsArr == null ? List.of() : List.of(originsArr);
-
     return new Poll(
-        pollId,
+        row.get(POLLS.ID),
         row.get(POLLS.OWNER_USERNAME),
         row.get(POLLS.TITLE),
         row.get(POLLS.SLUG),
         PollStatus.valueOf(row.get(POLLS.STATUS)),
         fromJsonb(row.get(POLLS.STYLE)),
         row.get(POLLS.ACTIVE_QUESTION_ID),
-        questions,
-        origins,
+        row.get(QUESTIONS_FIELD),
+        originsArr == null ? List.of() : List.of(originsArr),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
   }

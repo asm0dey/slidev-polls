@@ -273,8 +273,8 @@ class VoteServiceTest {
     }
 
     @Override
-    public java.util.List<Poll> findAllOriginsContaining(String origin) {
-      throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
   }
 

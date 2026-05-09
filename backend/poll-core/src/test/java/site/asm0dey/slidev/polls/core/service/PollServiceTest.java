@@ -496,8 +496,8 @@ class PollServiceTest {
     }
 
     @Override
-    public List<Poll> findAllOriginsContaining(String origin) {
-      throw new UnsupportedOperationException("not needed for PollServiceTest");
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
 
     private Poll requirePresent(UUID pollId) {

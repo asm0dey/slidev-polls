@@ -362,8 +362,8 @@ class TallyBroadcastTest {
     }
 
     @Override
-    public java.util.List<Poll> findAllOriginsContaining(String origin) {
-      throw new UnsupportedOperationException();
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+      return false;
     }
   }
 

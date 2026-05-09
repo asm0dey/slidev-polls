@@ -40,15 +40,20 @@ class PerPollCorsConfigurationSourceTest {
   }
 
   @Test
-  void deckAuthLoginUsesUnionAcrossPollsViaOriginHeader() {
-    Poll a = pollWithOrigins(List.of("http://localhost:3030"), "a");
-    Poll b = pollWithOrigins(List.of("https://x.example.com"), "b");
-    when(repo.findAllOriginsContaining("http://localhost:3030"))
-        .thenReturn(List.of(a));
+  void deckAuthLoginAllowsOriginIfAnyPollAllowsIt() {
+    when(repo.isOriginAllowedByAnyPoll("http://localhost:3030")).thenReturn(true);
     MockHttpServletRequest req = (MockHttpServletRequest) get("/api/deck/auth/login");
     req.addHeader("Origin", "http://localhost:3030");
     assertThat(src.getCorsConfiguration(req).getAllowedOrigins())
         .containsExactly("http://localhost:3030");
+  }
+
+  @Test
+  void deckAuthLoginRejectsOriginNoPollAllows() {
+    when(repo.isOriginAllowedByAnyPoll("https://attacker.example")).thenReturn(false);
+    MockHttpServletRequest req = (MockHttpServletRequest) get("/api/deck/auth/login");
+    req.addHeader("Origin", "https://attacker.example");
+    assertThat(src.getCorsConfiguration(req)).isNull();
   }
 
   @Test

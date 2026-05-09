@@ -67,8 +67,7 @@ public class PerPollCorsConfigurationSource implements CorsConfigurationSource {
     if (DECK_AUTH.matcher(uri).matches()) {
       String origin = request.getHeader("Origin");
       if (origin == null || origin.isBlank()) return null;
-      List<Poll> matches = repo.findAllOriginsContaining(origin);
-      if (matches.isEmpty()) return null;
+      if (!repo.isOriginAllowedByAnyPoll(origin)) return null;
       CorsConfiguration cfg = baseConfig();
       cfg.setAllowedOrigins(List.of(origin));
       return cfg;

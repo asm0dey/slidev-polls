@@ -56,9 +56,10 @@ public interface PollRepository {
   Poll updateAllowedOrigins(UUID pollId, List<String> origins);
 
   /**
-   * Polls whose {@code allowed_origins} array contains {@code origin} verbatim.
-   * Used by the per-poll CORS resolver for pre-auth deck-login preflight where
-   * no path/header identifies a single poll.
+   * True iff some poll's {@code allowed_origins} array contains {@code origin} verbatim.
+   * Used by the per-poll CORS resolver for pre-auth deck-login preflight where no path
+   * or header identifies a single poll. Implemented as a single existence query so the
+   * resolver does not pay for question / option hydration on every preflight.
    */
-  List<Poll> findAllOriginsContaining(String origin);
+  boolean isOriginAllowedByAnyPoll(String origin);
 }
