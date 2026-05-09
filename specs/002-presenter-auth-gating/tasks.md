@@ -212,7 +212,7 @@ The defect-closing MVP is **Phase 1 + Phase 2 + Phase 3 (US1) + Phase 4 (US2)**.
 - [x] T-B005 [BUG-003] Implement fix for BUG-003 referencing test spec bugfix_BUG-003.feature: in `frontends/slidev-component/components/CustomNavControls.vue` flip the popover anchor to open upward (`bottom: calc(100% + …)` / equivalent) so the popover stays inside the viewport when the Slidev nav bar is at the bottom of the window
 - [x] T-B006 [BUG-003] Verify fix passes test bugfix_BUG-003.feature for BUG-003: popover opens upward from the nav bar trigger, no content clipped below the viewport edge in SPA and presenter modes
 - [x] T-B007 [BUG-004] Implement fix for BUG-004 referencing test spec bugfix_BUG-004.feature: identify the component/slot painting the TOC overlay on the slide canvas (candidates: residual `global-top.vue`/`global-bottom.vue`, stray addon export, Slidev side-nav default-open config in `slidev-demo`) and remove/reconfigure it so the slide canvas shows only authored content
-- [ ] T-B008 [BUG-004] Verify fix passes test bugfix_BUG-004.feature for BUG-004: no TOC list is rendered over the slide canvas on first load in SPA and presenter modes; the Slidev menu/TOC remains reachable only via its explicit toggle
+- [x] T-B008 [BUG-004] Verify fix passes test bugfix_BUG-004.feature for BUG-004: no TOC list is rendered over the slide canvas on first load in SPA and presenter modes; the Slidev menu/TOC remains reachable only via its explicit toggle
 
 ## Clarifications
 
