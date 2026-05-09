@@ -253,6 +253,34 @@ async function closeActive() {
   }
 }
 
+const copiedQuestionId = ref<string | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function copySnippet(q: DraftQuestion) {
+  if (!props.pollId || !q.id) return;
+  formError.value = null;
+  try {
+    // The deck token does NOT belong in the markup — PollPanel reads it from
+    // the in-deck auth control via useDeckAuth() and warns in dev if a
+    // deckToken prop is present. Operators mint the token separately on the
+    // Deck tokens page and paste it into the deck's sign-in bar; anonymous
+    // viewers skip that step and still see live tallies (read-only).
+    const snippet = `<PollResults\n  slug="${slug.value}"\n  pollId="${props.pollId}"\n  questionId="${q.id}"\n/>`;
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      throw new Error("Clipboard API is not available in this browser.");
+    }
+    await navigator.clipboard.writeText(snippet);
+    copiedQuestionId.value = q.id;
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copiedQuestionId.value = null;
+      copiedTimer = null;
+    }, 3000);
+  } catch (err) {
+    formError.value = describeError(err);
+  }
+}
+
 async function deletePoll() {
   if (!props.pollId) return;
   if (!window.confirm(`Delete "${title.value}"? This cannot be undone.`)) return;
@@ -293,7 +321,7 @@ onMounted(() => {
           <router-link
             v-if="mode === 'edit' && pollId"
             :to="{ name: 'deck-tokens', params: { pollId } }"
-            class="poll-editor__deck-tokens"
+            class="btn-link"
             data-testid="deck-tokens-link"
           >
             Deck tokens
@@ -348,7 +376,7 @@ onMounted(() => {
 
       <div class="pe__qhead">
         <span class="pe__qhead-label">Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span>
-        <Button size="sm" data-testid="add-question" @click="addQuestion">+ Add question</Button>
+        <Button data-testid="add-question" @click="addQuestion">+ Add question</Button>
       </div>
       <div class="pe__qlist">
         <div
@@ -369,22 +397,41 @@ onMounted(() => {
               </Pill>
             </span>
             <div class="pe__qhdr-actions">
-              <button
+              <Button
                 v-if="mode === 'edit' && q.id && q.status === 'DRAFT'"
-                type="button"
+                variant="secondary"
+                size="sm"
                 data-testid="question-activate"
                 @click="activate(q)"
               >
                 Activate
-              </button>
-              <button
+              </Button>
+              <Button
                 v-if="mode === 'edit' && q.id && q.status === 'ACTIVE'"
-                type="button"
+                variant="secondary"
+                size="sm"
                 data-testid="question-close"
                 @click="closeActive"
               >
                 Close
-              </button>
+              </Button>
+              <Button
+                v-if="mode === 'edit' && q.id"
+                variant="secondary"
+                size="sm"
+                data-testid="question-copy-snippet"
+                @click="copySnippet(q)"
+              >
+                Copy snippet
+              </Button>
+              <span
+                v-if="copiedQuestionId === q.id"
+                class="pe__copied"
+                role="status"
+                data-testid="question-copy-snippet-confirm"
+              >
+                Copied!
+              </span>
               <Button v-if="i !== expandedIndex" variant="ghost" size="sm" @click="expandedIndex = i">Edit</Button>
               <Button v-if="questions.length > 1" variant="ghost" size="sm" data-testid="question-remove" @click="removeQuestion(i)">×</Button>
             </div>
@@ -497,4 +544,28 @@ onMounted(() => {
   cursor: pointer;
 }
 .pe__add-opt:hover { background: var(--sp-bg-muted); }
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--sp-radius);
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+  text-decoration: none;
+  transition: background var(--sp-dur) var(--sp-ease);
+}
+.btn-link:hover { background: var(--sp-bg-muted); }
+
+.pe__copied {
+  font-size: 11px;
+  color: var(--sp-success-fg, #1b7a1b);
+  background: var(--sp-success-bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+}
 </style>

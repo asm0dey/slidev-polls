@@ -40,7 +40,10 @@
   --sp-border-strong: #3f3f46;
   --sp-accent: #a78bfa;
   --sp-accent-fg: #0a0a0a;
-  --sp-accent-soft: #3f3f46;
+  /* Translucent accent so non-leader bars in ResultsPanel sit visibly above
+     the row background (--sp-bg-subtle = #27272a). The previous flat #3f3f46
+     was within ~10% lightness of the row and disappeared on dark slides. */
+  --sp-accent-soft: rgba(167, 139, 250, 0.28);
   --sp-accent-ring: rgba(167, 139, 250, 0.4);
   --sp-success: #22c55e;
   --sp-success-bg: rgba(34, 197, 94, 0.15);

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import type { CreatePollRequest, PollDetail } from "@polls/shared";
@@ -238,6 +238,60 @@ describe("PollEditorPage — edit mode", () => {
     await wrapper.find('[data-testid="question-close"]').trigger("click");
     await flushPromises();
     expect(closeActiveQuestion).toHaveBeenCalledWith("p1");
+  });
+
+  describe("copy snippet", () => {
+    let writeText: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true
+      });
+    });
+
+    it("copiesSnippetWithSlugPollIdAndQuestionIdNoDeckToken", async () => {
+      const mintDeckToken = vi.fn();
+      const client = makeFake({ mintDeckToken });
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      // Deck token must NOT be in the markup — PollPanel reads it from the
+      // in-deck auth control and warns in dev if a deckToken prop is present.
+      expect(mintDeckToken).not.toHaveBeenCalled();
+      expect(writeText).toHaveBeenCalledTimes(1);
+      const snippet = writeText.mock.calls[0][0] as string;
+      expect(snippet).toContain('slug="quickstart-demo"');
+      expect(snippet).toContain('pollId="p1"');
+      expect(snippet).toContain('questionId="q1"');
+      expect(snippet).not.toContain("deckToken");
+      expect(snippet).toContain("<PollResults");
+    });
+
+    it("showsCopiedConfirmationAfterSuccess", async () => {
+      const client = makeFake({});
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="question-copy-snippet-confirm"]').exists()).toBe(true);
+    });
+
+    it("surfacesClipboardErrorInFormError", async () => {
+      writeText.mockRejectedValueOnce(new Error("clipboard blocked"));
+      const client = makeFake({});
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      const error = wrapper.find('[data-testid="poll-form-error"]');
+      expect(error.exists()).toBe(true);
+    });
   });
 
   it("deletes the poll on confirmation and navigates back to /polls", async () => {

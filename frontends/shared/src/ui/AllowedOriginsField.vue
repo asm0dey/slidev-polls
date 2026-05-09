@@ -63,8 +63,9 @@ function remove(idx: number) {
       <input
         v-model="draft"
         class="sp-aof-input"
-        placeholder="https://… (Enter to add)"
+        placeholder="https://… (Enter or Tab to add)"
         @keydown.enter.prevent="commit"
+        @blur="commit"
       >
     </div>
     <div v-if="error" class="sp-aof-error" data-testid="aof-error" role="alert">

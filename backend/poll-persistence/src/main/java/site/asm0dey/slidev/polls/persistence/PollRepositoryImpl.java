@@ -27,7 +27,6 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
-import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
@@ -258,9 +257,7 @@ public class PollRepositoryImpl implements PollRepository {
   @Override
   public boolean isOriginAllowedByAnyPoll(String origin) {
     return dsl.fetchExists(
-        dsl.selectOne()
-            .from(POLLS)
-            .where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));
+        dsl.selectOne().from(POLLS).where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));
   }
 
   @Override
@@ -293,37 +290,37 @@ public class PollRepositoryImpl implements PollRepository {
       return List.of();
     }
     List<Question> ordered = new ArrayList<>(questions.size());
-      for (Question q : questions) {
-          UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
-          dsl.insertInto(POLL_QUESTIONS)
-              .set(POLL_QUESTIONS.ID, qid)
-              .set(POLL_QUESTIONS.POLL_ID, pollId)
-              .set(POLL_QUESTIONS.PROMPT, q.prompt())
-              .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
-              .set(POLL_QUESTIONS.STATUS, q.status().name())
-              .execute();
-          List<Option> insertedOptions = new ArrayList<>(q.options().size());
-          for (Option o : q.options()) {
-              UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
-              dsl.insertInto(POLL_OPTIONS)
-                  .set(POLL_OPTIONS.ID, oid)
-                  .set(POLL_OPTIONS.QUESTION_ID, qid)
-                  .set(POLL_OPTIONS.LABEL, o.label())
-                  .set(POLL_OPTIONS.POSITION, o.position())
-                  .execute();
-              insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
-          }
-          ordered.add(
-              new Question(
-                  qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
+    for (Question q : questions) {
+      UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
+      dsl.insertInto(POLL_QUESTIONS)
+          .set(POLL_QUESTIONS.ID, qid)
+          .set(POLL_QUESTIONS.POLL_ID, pollId)
+          .set(POLL_QUESTIONS.PROMPT, q.prompt())
+          .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
+          .set(POLL_QUESTIONS.STATUS, q.status().name())
+          .execute();
+      List<Option> insertedOptions = new ArrayList<>(q.options().size());
+      for (Option o : q.options()) {
+        UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
+        dsl.insertInto(POLL_OPTIONS)
+            .set(POLL_OPTIONS.ID, oid)
+            .set(POLL_OPTIONS.QUESTION_ID, qid)
+            .set(POLL_OPTIONS.LABEL, o.label())
+            .set(POLL_OPTIONS.POSITION, o.position())
+            .execute();
+        insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
       }
+      ordered.add(
+          new Question(
+              qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
+    }
     return ordered;
   }
 
   /**
    * Inner multiset that materialises every {@link Option} for the surrounding {@link Question} row
-   * — correlated by {@code POLL_OPTIONS.QUESTION_ID = POLL_QUESTIONS.ID}. Used inside
-   * {@link #QUESTIONS_FIELD}; never emitted on its own.
+   * — correlated by {@code POLL_OPTIONS.QUESTION_ID = POLL_QUESTIONS.ID}. Used inside {@link
+   * #QUESTIONS_FIELD}; never emitted on its own.
    */
   private static final Field<List<Option>> OPTIONS_FIELD =
       multiset(
@@ -335,8 +332,7 @@ public class PollRepositoryImpl implements PollRepository {
                   .from(POLL_OPTIONS)
                   .where(POLL_OPTIONS.QUESTION_ID.eq(POLL_QUESTIONS.ID))
                   .orderBy(POLL_OPTIONS.POSITION.asc()))
-          .convertFrom(
-              r -> r.map(o -> new Option(o.value1(), o.value2(), o.value3(), o.value4())));
+          .convertFrom(r -> r.map(o -> new Option(o.value1(), o.value2(), o.value3(), o.value4())));
 
   /**
    * Outer multiset that materialises every {@link Question} (with its nested options) for the poll
@@ -369,8 +365,12 @@ public class PollRepositoryImpl implements PollRepository {
                               q.get(POLL_QUESTIONS.ORDINAL),
                               QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
                               q.get(OPTIONS_FIELD),
-                              q.get(POLL_QUESTIONS.ACTIVATED_AT) == null ? null : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
-                              q.get(POLL_QUESTIONS.CLOSED_AT) == null ? null : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
+                              q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
+                                  ? null
+                                  : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
+                              q.get(POLL_QUESTIONS.CLOSED_AT) == null
+                                  ? null
+                                  : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
 
   private Poll toPoll(Record row) {
     String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);

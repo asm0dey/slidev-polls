@@ -124,12 +124,17 @@ export type ProblemCode =
   | "SLUG_RESERVED"
   | "DECK_TOKEN_INVALID"
   | "DECK_TOKEN_POLL_MISMATCH"
+  | "ORIGIN_INVALID"
+  | "SETUP_LOCKED"
+  | "USERNAME_TAKEN"
   | "TRANSPORT_FAILURE";
 
 export interface Problem {
   code: ProblemCode;
   message: string;
   correlationId?: string;
+  /** Per-field validation messages, populated only on VALIDATION_FAILED. */
+  errors?: Record<string, string[]>;
 }
 
 /** Deck token as listed in the backoffice (GET /api/admin/polls/{id}/deck-tokens). */

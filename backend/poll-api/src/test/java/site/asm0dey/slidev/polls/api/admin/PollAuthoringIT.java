@@ -16,15 +16,19 @@ import com.google.zxing.common.HybridBinarizer;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import javax.imageio.ImageIO;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -49,6 +53,15 @@ class PollAuthoringIT {
 
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private DSLContext dsl;
+  @Autowired private PasswordEncoder encoder;
+
+  @BeforeEach
+  void seedAlice() {
+    // V6 dropped the seed migration. Use the idempotent helper because polls from earlier tests
+    // (in the reused Spring context) hold a FK to admin_user.username — wiping would fail.
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+  }
 
   // @TS-002 — the whole happy path: login as alice, create a poll with two questions, confirm it
   // appears in her list with the right shape, then fetch its QR as a real PNG.

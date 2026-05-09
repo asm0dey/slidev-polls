@@ -38,6 +38,32 @@ export interface AdminApiOptions {
   cookieReader?: () => string;
 }
 
+/** First-run setup status (GET /api/admin/setup/status). */
+export interface SetupStatus {
+  setupRequired: boolean;
+}
+
+/** First-run setup payload (POST /api/admin/setup). */
+export interface SetupRequestBody {
+  username: string;
+  password: string;
+  displayName: string;
+}
+
+/** Create-user payload (POST /api/admin/users). */
+export interface CreateUserRequestBody {
+  username: string;
+  password: string;
+  displayName: string;
+}
+
+/** Admin user view returned by setup + user-management endpoints. */
+export interface AdminUserView {
+  username: string;
+  displayName: string;
+  createdAt: string;
+}
+
 const CSRF_COOKIE = "XSRF-TOKEN";
 const CSRF_HEADER = "X-XSRF-TOKEN";
 const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
@@ -153,6 +179,22 @@ export class AdminApiClient {
     );
   }
 
+  getSetupStatus(): Promise<SetupStatus> {
+    return this.send<SetupStatus>("GET", "/api/admin/setup/status");
+  }
+
+  runSetup(body: SetupRequestBody): Promise<AdminUserView> {
+    return this.send<AdminUserView>("POST", "/api/admin/setup", body);
+  }
+
+  listUsers(): Promise<AdminUserView[]> {
+    return this.send<AdminUserView[]>("GET", "/api/admin/users");
+  }
+
+  createUser(body: CreateUserRequestBody): Promise<AdminUserView> {
+    return this.send<AdminUserView>("POST", "/api/admin/users", body);
+  }
+
   private async send<T>(
     method: string,
     path: string,
@@ -165,7 +207,11 @@ export class AdminApiClient {
     // The backend sets XSRF-TOKEN on every response; we must echo it as X-XSRF-TOKEN on every
     // state-changing call or Spring's CsrfFilter rejects with AccessDeniedException, which the
     // ProblemAccessDeniedHandler maps to HTTP 403 + code FORBIDDEN.
-    if (!CSRF_SAFE_METHODS.has(method.toUpperCase()) && path !== "/api/admin/login") {
+    if (
+      !CSRF_SAFE_METHODS.has(method.toUpperCase()) &&
+      path !== "/api/admin/login" &&
+      path !== "/api/admin/setup"
+    ) {
       const token = readCookie(this.cookieReader(), CSRF_COOKIE);
       if (token) headers[CSRF_HEADER] = token;
     }
@@ -218,7 +264,8 @@ async function toAdminError(res: Response): Promise<AdminApiError> {
         const problem: Problem = {
           code: body.code as ProblemCode,
           message: body.message,
-          correlationId: body.correlationId
+          correlationId: body.correlationId,
+          errors: body.errors
         };
         return new AdminApiError(res.status, problem, problem.message);
       }

@@ -35,6 +35,20 @@
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
+        <!--
+          spring-security-crypto carries the PasswordEncoder interface that
+          AdminUserService depends on (so the bootstrap and create-admin flows
+          can hash passwords without leaking algorithm choice into core).
+          We pull only the crypto module — the full spring-security-core /
+          spring-boot-starter-security stack stays out of poll-core to keep
+          the module web/auth-free. Recorded under Constitution §VIII:
+          justified by the admin-credentials redesign at
+          docs/superpowers/specs/2026-05-09-replace-hardcoded-admin-credentials-design.md.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

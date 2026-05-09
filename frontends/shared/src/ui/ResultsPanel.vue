@@ -26,10 +26,19 @@ const total = computed(() =>
 const leaderId = computed(() => {
   if (total.value === 0) return null;
   let best: { id: string; count: number } | null = null;
+  let tied = false;
   for (const o of props.question.options) {
     const c = props.question.tally.find(t => t.optionId === o.id)?.count ?? 0;
-    if (!best || c > best.count) best = { id: o.id, count: c };
+    if (!best || c > best.count) {
+      best = { id: o.id, count: c };
+      tied = false;
+    } else if (c === best.count) {
+      tied = true;
+    }
   }
+  // No leader on a tie — the bright accent on a single bar would imply that
+  // option is winning when it actually isn't.
+  if (tied) return null;
   return best?.id ?? null;
 });
 

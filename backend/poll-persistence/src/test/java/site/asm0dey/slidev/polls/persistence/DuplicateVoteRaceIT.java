@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "race-owner")
         .set(ADMIN_USER.DISPLAY_NAME, "Race Owner")
-        .set(ADMIN_USER.BCRYPT_HASH, "n/a")
+        .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()
         .execute();
@@ -60,12 +61,12 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
   void concurrent_duplicate_submissions_yield_exactly_one_recorded_vote() throws Exception {
     Poll seeded = seedActivatedPoll();
     UUID questionId = seeded.activeQuestionId();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
 
     CountDownLatch ready = new CountDownLatch(2);
     CountDownLatch go = new CountDownLatch(1);
-    ExecutorService pool = Executors.newFixedThreadPool(2);
-    try {
+
+    try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
       Callable<Object> submit =
           () -> {
             ready.countDown();
@@ -87,9 +88,8 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
       Object r1 = f1.get();
       Object r2 = f2.get();
 
-      long successes = List.of(r1, r2).stream().filter(r -> r instanceof Vote).count();
-      long conflicts =
-          List.of(r1, r2).stream().filter(r -> r instanceof AlreadyVotedException).count();
+      long successes = Stream.of(r1, r2).filter(Vote.class::isInstance).count();
+      long conflicts = Stream.of(r1, r2).filter(AlreadyVotedException.class::isInstance).count();
 
       assertThat(successes)
           .as("exactly one submission wins the (question_id, voter_token) index")
@@ -103,8 +103,6 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
       assertThat(rows)
           .as("votes has a single row for (question_id, v-123) after the race")
           .isEqualTo(1L);
-    } finally {
-      pool.shutdownNow();
     }
   }
 

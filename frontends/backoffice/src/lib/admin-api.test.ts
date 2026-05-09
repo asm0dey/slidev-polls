@@ -122,3 +122,89 @@ describe("AdminApiClient CSRF handling (BUG-004 regression)", () => {
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });
+
+describe("AdminApiClient setup + user management", () => {
+  it("getSetupStatus calls GET /api/admin/setup/status", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { setupRequired: true }));
+    const client = new AdminApiClient({ fetchImpl: fetchImpl as unknown as typeof fetch });
+    const status = await client.getSetupStatus();
+    expect(status).toEqual({ setupRequired: true });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/admin/setup/status",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("runSetup posts to /api/admin/setup without CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(201, { username: "alice", displayName: "Alice", createdAt: "2026-05-09T00:00:00Z" })
+    );
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok-123"
+    });
+    const result = await client.runSetup({
+      username: "alice",
+      password: "correct-horse-battery",
+      displayName: "Alice"
+    });
+    expect(result.username).toBe("alice");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    // Setup happens before any session exists; CSRF cookie must NOT be echoed.
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    expect(headers["X-XSRF-TOKEN"]).toBeUndefined();
+  });
+
+  it("listUsers calls GET /api/admin/users", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = new AdminApiClient({ fetchImpl: fetchImpl as unknown as typeof fetch });
+    await client.listUsers();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/admin/users",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("createUser posts to /api/admin/users with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(201, { username: "bob", displayName: "Bob", createdAt: "2026-05-09T00:00:00Z" })
+    );
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok-456"
+    });
+    const result = await client.createUser({
+      username: "bob",
+      password: "another-strong-pw",
+      displayName: "Bob"
+    });
+    expect(result.username).toBe("bob");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    const headers = init.headers as Record<string, string>;
+    // /api/admin/users is authenticated → CSRF token MUST be echoed.
+    expect(headers["X-XSRF-TOKEN"]).toBe("tok-456");
+  });
+
+  it("createUser surfaces USERNAME_TAKEN as a typed AdminApiError", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(409, {
+        code: "USERNAME_TAKEN",
+        message: "username already taken: alice",
+        correlationId: "corr-1"
+      })
+    );
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=t"
+    });
+    await expect(
+      client.createUser({ username: "alice", password: "another-strong-pw", displayName: "Alice" })
+    ).rejects.toMatchObject({
+      name: "AdminApiError",
+      status: 409,
+      problem: { code: "USERNAME_TAKEN" }
+    });
+  });
+});

@@ -9,15 +9,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
 import tools.jackson.databind.JsonNode;
@@ -46,6 +50,13 @@ class DeckActivationIT {
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private PollRepository pollRepository;
+  @Autowired private DSLContext dsl;
+  @Autowired private PasswordEncoder encoder;
+
+  @BeforeEach
+  void seedAlice() {
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+  }
 
   // @TS-050 — mounting activates the declared question.
   @Test

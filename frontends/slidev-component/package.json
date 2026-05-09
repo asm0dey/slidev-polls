@@ -18,7 +18,11 @@
     "@polls/shared": "workspace:*",
     "vue": "^3.5.0"
   },
+  "peerDependencies": {
+    "@slidev/client": ">=0.49.0"
+  },
   "devDependencies": {
+    "@slidev/client": "^52.15.1",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/test-utils": "^2.4.6",
     "jsdom": "^26.0.0",

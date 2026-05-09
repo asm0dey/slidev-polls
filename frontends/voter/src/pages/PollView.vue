@@ -53,16 +53,23 @@ async function load() {
 }
 
 function applyServerView(view: PublicPollView) {
+  // Open the SSE stream up front. Pre-vote voters must observe live
+  // active-question rotations (presenter advances slides) and live tally
+  // updates while reviewing the options; without this, the form would
+  // freeze on whichever question was active at page-load.
+  ensureStream();
   if (view.state === "ACTIVE" && view.activeQuestion) {
-    if (view.alreadyVoted || hasAlreadyVoted(props.slug)) {
-      markAlreadyVoted(props.slug);
+    const qid = view.activeQuestion.id;
+    if (view.alreadyVoted || hasAlreadyVoted(props.slug, qid)) {
+      markAlreadyVoted(props.slug, qid);
       status.value = "voted";
-      ensureStream();
       return;
     }
     status.value = "active";
     return;
   }
+  // No active question — drop any cached flags for this slug so the next
+  // activate (possibly a re-opened earlier question) starts clean.
   clearAlreadyVoted(props.slug);
   status.value = "waiting";
 }
@@ -72,6 +79,42 @@ function ensureStream() {
   stopStream = openPollStream(props.serverBase, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
       liveTally.value = ev.tally.slice();
+      // The presenter can rotate the active question (Q1 → Q2, then back to
+      // Q1 after re-OPEN). Each snapshot carries the current activeQuestion;
+      // when its id changes we have to swap PollView's local model in place
+      // so the form re-renders with the new prompt and options.
+      const next = ev.activeQuestion;
+      const current = poll.value;
+      if (!current) return;
+      const prevId = current.activeQuestion?.id ?? null;
+      const nextId = next?.id ?? null;
+      if (prevId === nextId) return;
+      if (next) {
+        poll.value = {
+          ...current,
+          state: "ACTIVE",
+          activeQuestion: {
+            id: next.id,
+            prompt: next.prompt,
+            ordinal: next.ordinal,
+            status: "ACTIVE",
+            options: next.options.map(o => ({ id: o.id, label: o.label, position: o.position }))
+          },
+          alreadyVoted: undefined
+        };
+        selectedOptionId.value = null;
+        // Per-question alreadyVoted check: the voter may have answered this
+        // question on a previous open; the cookie + cached flag both fire.
+        if (hasAlreadyVoted(props.slug, next.id)) {
+          status.value = "voted";
+        } else {
+          status.value = "active";
+        }
+      } else {
+        poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
+        selectedOptionId.value = null;
+        status.value = "waiting";
+      }
     },
     onTally: (ev: TallyDeltaEvent) => {
       const entry = liveTally.value.find(t => t.optionId === ev.optionId);
@@ -89,6 +132,8 @@ function ensureStream() {
 
 async function submit() {
   if (!selectedOptionId.value || submitting.value) return;
+  const qid = poll.value?.activeQuestion?.id;
+  if (!qid) return;
   submitting.value = true;
   errorMessage.value = null;
   try {
@@ -96,12 +141,12 @@ async function submit() {
       optionId: selectedOptionId.value,
       voterToken: ""
     });
-    markAlreadyVoted(props.slug);
+    markAlreadyVoted(props.slug, qid);
     status.value = "voted";
     ensureStream();
   } catch (err) {
     if (err instanceof ApiError && err.code === "ALREADY_VOTED") {
-      markAlreadyVoted(props.slug);
+      markAlreadyVoted(props.slug, qid);
       status.value = "voted";
       ensureStream();
       return;

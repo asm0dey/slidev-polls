@@ -9,6 +9,8 @@ import {
 } from "@polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
+import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
+import { slideWidth, useSlideContext } from "@slidev/client";
 
 const props = defineProps<{
   slug: string;
@@ -18,6 +20,26 @@ const props = defineProps<{
 }>();
 
 const auth = useDeckAuth();
+
+// Slidev exposes parsed headmatter via $slidev.configs and per-slide
+// frontmatter via $frontmatter. We accept pollServer in either, and fall
+// through to the legacy configureDeckAuthBackend() call. This composable
+// uses Vue inject under the hood — safe to call here because PollPanel
+// always renders inside a slide's component tree.
+const slideCtx = (() => {
+  try {
+    return useSlideContext();
+  } catch {
+    return null; // outside slidev (unit tests) — fall back to other sources.
+  }
+})();
+const headmatterServer = (() => {
+  const fm = (slideCtx?.$frontmatter ?? {}) as Record<string, unknown>;
+  if (typeof fm.pollServer === "string" && fm.pollServer.length > 0) return fm.pollServer;
+  const cfgs = (slideCtx?.$slidev?.configs ?? {}) as Record<string, unknown>;
+  if (typeof cfgs.pollServer === "string" && cfgs.pollServer.length > 0) return cfgs.pollServer;
+  return "";
+})();
 
 const attrs = useAttrs();
 const isDev =
@@ -36,6 +58,13 @@ const snapshot = ref<SnapshotEvent | null>(null);
 const paused = ref(false);
 const closedNotice = ref<string | null>(null);
 let stop: (() => void) | null = null;
+
+// `layout: center` wraps the slide body in an inline-block whose intrinsic
+// width tracks its content, so a percentage on .sp-pollpanel resolves to
+// content width and shrinks unboundedly. Pin to 85% of slidev's slide
+// canvas (slideWidth from @slidev/client/env, derived from canvasWidth in
+// the headmatter — default 980px).
+const panelWidth = computed(() => `${Math.round(slideWidth.value * 0.85)}px`);
 
 const panelQuestion = computed(() => {
   const s = snapshot.value;
@@ -87,7 +116,12 @@ async function activateFromDeck(base: string) {
 let visibilityObserver: IntersectionObserver | null = null;
 
 onMounted(async () => {
-  const base = props.server ?? "";
+  // Resolve the backend URL in this priority order:
+  //   1. explicit `server="..."` attribute on the tag (per-slide override)
+  //   2. `pollServer:` on the slide's frontmatter or the deck headmatter
+  //   3. URL set via configureDeckAuthBackend() (legacy data.ts side-effect)
+  // All three eventually drive the same auth + SSE + activate routing.
+  const base = (props.server ?? "") || headmatterServer || getConfiguredBackend();
   await activateFromDeck(base);
   watch(
     () => auth.status.value,
@@ -143,7 +177,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="sp-pollpanel" data-testid="poll-results" :data-theme="theme.mode">
+  <div
+    ref="root"
+    class="sp-pollpanel"
+    data-testid="poll-results"
+    :data-theme="theme.mode"
+    :style="{ width: panelWidth }"
+  >
     <div v-if="paused" class="sp-pollpanel__paused" data-testid="poll-paused">
       live updates paused
     </div>
@@ -164,9 +204,11 @@ onUnmounted(() => {
 <style scoped>
 .sp-pollpanel {
   position: relative;
-  width: 80vw;
-  max-width: 1200px;
-  min-width: min(85vw, 700px);
+  /* Width is set inline (style binding) to 85% of slidev's slide canvas,
+     since `layout: center` makes a `width: %` resolve against intrinsic
+     content width and collapse the panel. Margin auto centres it within
+     the slide. */
+  max-width: 100%;
   margin: 0 auto;
   font-family: var(--sp-font-sans);
 }

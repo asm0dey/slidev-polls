@@ -15,17 +15,16 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
  * Per-poll CORS resolver. Three URI families:
  *
  * <ul>
- *   <li>{@code /api/polls/{slug}/...} — the public surface and the SSE stream;
- *       resolve poll by slug, return its allowed_origins.
- *   <li>{@code /api/deck/polls/{pollId}/...} — deck-token-authenticated mutations;
- *       resolve poll by id.
- *   <li>{@code /api/deck/auth/...} — pre-auth login/me; resolve by Origin header
- *       across all polls.
+ *   <li>{@code /api/polls/{slug}/...} — the public surface and the SSE stream; resolve poll by
+ *       slug, return its allowed_origins.
+ *   <li>{@code /api/deck/polls/{pollId}/...} — deck-token-authenticated mutations; resolve poll by
+ *       id.
+ *   <li>{@code /api/deck/auth/...} — pre-auth login/me; resolve by Origin header across all polls.
  * </ul>
  *
- * Anything else (admin, static SPA shells, …) returns {@code null} which
- * disables CORS for that path; the request is treated as same-origin or
- * blocked by the browser per the user agent's policy.
+ * Anything else (admin, static SPA shells, …) returns {@code null} which disables CORS for that
+ * path; the request is treated as same-origin or blocked by the browser per the user agent's
+ * policy.
  */
 @Component
 public class PerPollCorsConfigurationSource implements CorsConfigurationSource {
