@@ -2,7 +2,9 @@ package site.asm0dey.slidev.polls.core.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -13,7 +15,12 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
@@ -22,14 +29,20 @@ class AdminUserServiceTest {
 
   AdminUserRepository repo;
   PasswordEncoder encoder;
+  PlatformTransactionManager txManager;
   AdminUserService service;
 
   @BeforeEach
   void setUp() {
     repo = mock(AdminUserRepository.class);
     encoder = mock(PasswordEncoder.class);
+    txManager = mock(PlatformTransactionManager.class);
+    // Pass-through transaction: TransactionTemplate.execute calls getTransaction first;
+    // returning a plain status lets the lambda run as if inside a real transaction. The mock
+    // ignores commit/rollback so the test never fails on missing JDBC resources.
+    when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     when(encoder.encode("password-twelve")).thenReturn("$argon2id$encoded");
-    service = new AdminUserService(repo, encoder);
+    service = new AdminUserService(repo, encoder, txManager);
   }
 
   @Test
@@ -121,5 +134,51 @@ class AdminUserServiceTest {
                     new CreateAdminCommand("Alice", "password-twelve", "Alice")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("username");
+  }
+
+  @Test
+  void createInitialAdminTranslatesSerializationFailureToSetupLocked() {
+    when(repo.count()).thenReturn(0L);
+    // Postgres reports SERIALIZABLE conflicts at COMMIT, not during the insert; the service's
+    // try/catch wraps the whole TransactionTemplate so the translation still fires.
+    doThrow(new CannotSerializeTransactionException("could not serialize access"))
+        .when(txManager)
+        .commit(any(TransactionStatus.class));
+
+    assertThatThrownBy(
+            () ->
+                service.createInitialAdmin(
+                    new CreateAdminCommand("alice", "password-twelve", "Alice")))
+        .isInstanceOf(SetupLockedException.class);
+  }
+
+  @Test
+  void createInitialAdminTranslatesPkCollisionToSetupLocked() {
+    when(repo.count()).thenReturn(0L);
+    // Two setups racing with the SAME username — the loser's insert hits the PK before commit.
+    doThrow(new DataIntegrityViolationException("admin_user_pkey"))
+        .when(repo)
+        .insert(anyString(), anyString(), anyString());
+
+    assertThatThrownBy(
+            () ->
+                service.createInitialAdmin(
+                    new CreateAdminCommand("alice", "password-twelve", "Alice")))
+        .isInstanceOf(SetupLockedException.class);
+  }
+
+  @Test
+  void createAdminTranslatesPkCollisionToUsernameTaken() {
+    // The check passes (existsByUsername returns false), but a concurrent insert races us to
+    // the PK. The service must translate the late-detected violation into the same 409
+    // UsernameTakenException the pre-check would have produced.
+    when(repo.existsByUsername("bob")).thenReturn(false);
+    doThrow(new DataIntegrityViolationException("admin_user_pkey"))
+        .when(repo)
+        .insert(anyString(), anyString(), anyString());
+
+    assertThatThrownBy(
+            () -> service.createAdmin(new CreateAdminCommand("bob", "password-twelve", "Bob")))
+        .isInstanceOf(UsernameTakenException.class);
   }
 }

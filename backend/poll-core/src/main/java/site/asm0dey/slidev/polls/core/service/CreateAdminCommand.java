@@ -27,4 +27,18 @@ public record CreateAdminCommand(String username, String password, String displa
     }
     displayName = trimmed;
   }
+
+  /**
+   * Records auto-generate {@code toString()} from every component, which would dump the plaintext
+   * password into any log line that captured the command (Spring Boot DEBUG of validation errors,
+   * exception messages built with concatenation, etc.). Override to mask.
+   */
+  @Override
+  public String toString() {
+    return "CreateAdminCommand[username="
+        + username
+        + ", password=***, displayName="
+        + displayName
+        + "]";
+  }
 }
