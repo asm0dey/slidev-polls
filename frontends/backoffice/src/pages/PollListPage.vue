@@ -163,13 +163,14 @@ function statusLabel(s: string): string {
           <div class="pl__row-actions">
             <RouterLink
               :to="{ name: 'poll-edit', params: { pollId: poll.id } }"
+              class="btn-link"
               data-testid="poll-edit"
             >
               Edit
             </RouterLink>
-            <button type="button" data-testid="poll-delete" @click="onDelete(poll)">
+            <Button variant="danger" size="sm" data-testid="poll-delete" @click="onDelete(poll)">
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -291,4 +292,19 @@ function statusLabel(s: string): string {
   color: var(--sp-fg-subtle);
   font-size: 13px;
 }
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--sp-radius);
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+  text-decoration: none;
+  transition: background var(--sp-dur) var(--sp-ease);
+}
+.btn-link:hover { background: var(--sp-bg-muted); }
 </style>

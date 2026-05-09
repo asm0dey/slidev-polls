@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
-import type { CreatePollRequest, PollDetail } from "@polls/shared";
+import type { CreatePollRequest, DeckTokenMinted, PollDetail } from "@polls/shared";
 import PollEditorPage from "./PollEditorPage.vue";
 import type { AdminApiClient } from "../lib/admin-api";
 import { AdminApiError } from "../lib/admin-api";
@@ -238,6 +238,79 @@ describe("PollEditorPage — edit mode", () => {
     await wrapper.find('[data-testid="question-close"]').trigger("click");
     await flushPromises();
     expect(closeActiveQuestion).toHaveBeenCalledWith("p1");
+  });
+
+  describe("copy snippet", () => {
+    let writeText: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true
+      });
+    });
+
+    function mintedToken(over: Partial<DeckTokenMinted> = {}): DeckTokenMinted {
+      return {
+        id: "tok-id",
+        pollId: "p1",
+        label: "snippet for Which JVM?",
+        plaintext: "plain-tok-123",
+        createdAt: "2025-01-01T00:00:00Z",
+        revokedAt: null,
+        ...over
+      };
+    }
+
+    it("mintsTokenAndCopiesSnippetWithAllFourValues", async () => {
+      const mintDeckToken = vi.fn().mockResolvedValue(mintedToken());
+      const client = makeFake({ mintDeckToken });
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      expect(mintDeckToken).toHaveBeenCalledTimes(1);
+      expect(mintDeckToken.mock.calls[0][0]).toBe("p1");
+      expect(writeText).toHaveBeenCalledTimes(1);
+      const snippet = writeText.mock.calls[0][0] as string;
+      expect(snippet).toContain('slug="quickstart-demo"');
+      expect(snippet).toContain('pollId="p1"');
+      expect(snippet).toContain('questionId="q1"');
+      expect(snippet).toContain('deckToken="plain-tok-123"');
+      expect(snippet).toContain("<PollResults");
+    });
+
+    it("showsCopiedConfirmationAfterSuccess", async () => {
+      const mintDeckToken = vi.fn().mockResolvedValue(mintedToken());
+      const client = makeFake({ mintDeckToken });
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="question-copy-snippet-confirm"]').exists()).toBe(true);
+    });
+
+    it("surfacesMintErrorInFormError", async () => {
+      const mintDeckToken = vi.fn().mockRejectedValue(
+        new AdminApiError(
+          403,
+          { code: "FORBIDDEN", message: "Forbidden" },
+          "Forbidden"
+        )
+      );
+      const client = makeFake({ mintDeckToken });
+      const { wrapper } = await mountEdit(client);
+
+      await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
+      await flushPromises();
+
+      expect(writeText).not.toHaveBeenCalled();
+      const error = wrapper.find('[data-testid="poll-form-error"]');
+      expect(error.exists()).toBe(true);
+    });
   });
 
   it("deletes the poll on confirmation and navigates back to /polls", async () => {
