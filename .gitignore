@@ -31,3 +31,4 @@ backend/poll-api/src/main/resources/static/
 # with a fresh slug / pollId / questionIds / deck token. Run seed before
 # `bun run slidev` on a fresh clone.
 frontends/slidev-demo/data.ts
+.superpowers/
