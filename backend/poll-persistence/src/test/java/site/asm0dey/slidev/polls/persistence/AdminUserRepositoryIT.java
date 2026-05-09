@@ -14,7 +14,9 @@ class AdminUserRepositoryIT extends AbstractPostgresTest {
 
   @BeforeEach
   void cleanAdminUser() {
-    dsl().deleteFrom(Tables.ADMIN_USER).execute();
+    // CASCADE through polls (FK admin_user) and its dependents so sibling ITs that
+    // seed an owner row don't block deletion.
+    dsl().execute("truncate table " + Tables.ADMIN_USER.getName() + " cascade");
   }
 
   @Test
