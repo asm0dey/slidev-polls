@@ -58,7 +58,8 @@ public class SecurityConfig {
       HttpSecurity http,
       ProblemAuthenticationEntryPoint entryPoint,
       ProblemAccessDeniedHandler accessDeniedHandler,
-      DeckTokenAuthenticationFilter deckTokenFilter)
+      DeckTokenAuthenticationFilter deckTokenFilter,
+      PerPollCorsConfigurationSource corsSource)
       throws Exception {
     // CSRF tokens live in a cookie the backoffice SPA can read (CookieCsrfTokenRepository
     // withHttpOnlyFalse), so a JSON POST from the SPA can echo them on a header. The raw-value
@@ -68,7 +69,8 @@ public class SecurityConfig {
     CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
     csrfHandler.setCsrfRequestAttributeName(null);
 
-    http.authorizeHttpRequests(
+    http.cors(cors -> cors.configurationSource(corsSource))
+        .authorizeHttpRequests(
             auth ->
                 auth
                     // Login must be reachable before the caller holds a session.
