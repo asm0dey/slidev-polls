@@ -41,6 +41,26 @@ async function loginAsAlice(request: APIRequestContext) {
   expect(res.status(), "alice login").toBeLessThan(300);
 }
 
+// V6 dropped the seeded `alice` admin in favour of first-run setup. Run the setup endpoint once
+// per test process if `admin_user` is empty so the existing loginAsAlice() helper keeps working.
+async function ensureAdminBootstrapped(request: APIRequestContext) {
+  const status = await request.get("/api/admin/setup/status");
+  expect(status.status(), "setup status probe").toBe(200);
+  const { setupRequired } = (await status.json()) as { setupRequired: boolean };
+  if (!setupRequired) return;
+  const res = await request.post("/api/admin/setup", {
+    headers: { "content-type": "application/json" },
+    data: {
+      username: "alice",
+      password: "correct-horse",
+      displayName: "Alice Presenter"
+    }
+  });
+  if (!res.ok()) {
+    throw new Error(`first-run setup failed: ${res.status()} ${await res.text()}`);
+  }
+}
+
 async function seedPoll(request: APIRequestContext, baseURL: string): Promise<Fixture> {
   // A unique slug per run avoids collisions across re-runs against the same DB.
   const slug = `e2e-voter-${Date.now().toString(36)}`;
@@ -87,6 +107,7 @@ test.describe("voter happy path", () => {
 
   test.beforeAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
+    await ensureAdminBootstrapped(request);
     await loginAsAlice(request);
     fixture = await seedPoll(request, baseURL!);
     await request.dispose();
