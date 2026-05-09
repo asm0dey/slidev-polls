@@ -51,6 +51,12 @@ async function onSubmit() {
 
 function describeError(err: unknown): string {
   if (err instanceof AdminApiError) {
+    const fieldErrors = err.problem?.errors;
+    if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+      return Object.entries(fieldErrors)
+        .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
+        .join("; ");
+    }
     return err.problem?.message ?? `Request failed (HTTP ${err.status}).`;
   }
   if (err instanceof Error) return err.message;

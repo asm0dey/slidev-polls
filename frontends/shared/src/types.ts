@@ -133,6 +133,8 @@ export interface Problem {
   code: ProblemCode;
   message: string;
   correlationId?: string;
+  /** Per-field validation messages, populated only on VALIDATION_FAILED. */
+  errors?: Record<string, string[]>;
 }
 
 /** Deck token as listed in the backoffice (GET /api/admin/polls/{id}/deck-tokens). */

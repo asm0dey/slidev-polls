@@ -264,7 +264,8 @@ async function toAdminError(res: Response): Promise<AdminApiError> {
         const problem: Problem = {
           code: body.code as ProblemCode,
           message: body.message,
-          correlationId: body.correlationId
+          correlationId: body.correlationId,
+          errors: body.errors
         };
         return new AdminApiError(res.status, problem, problem.message);
       }

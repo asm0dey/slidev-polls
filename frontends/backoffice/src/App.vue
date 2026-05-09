@@ -4,11 +4,14 @@ import { RouterLink, RouterView, useRoute } from "vue-router";
 import { ThemeToggle } from "@polls/shared/ui";
 
 const route = useRoute();
-const isLogin = computed(() => route.name === "login");
+// Routes that render full-bleed (no sidebar/chrome). Both login and the
+// first-run setup screen own the full viewport; sidebar links would either
+// 401 (no session yet) or fight the centered form layout.
+const isFullBleed = computed(() => route.name === "login" || route.name === "setup");
 </script>
 
 <template>
-  <div v-if="isLogin" class="bo-login-host">
+  <div v-if="isFullBleed" class="bo-login-host">
     <RouterView />
   </div>
   <div v-else class="bo-shell">
