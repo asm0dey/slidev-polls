@@ -15,56 +15,68 @@ pollServer: http://localhost:8080
 
 # Slidev Polls
 
-In-deck auth control + deck-token activation — feature 002 demo.
+In-deck auth control + deck-token activation.
 
-Run `bun run seed` first, then click **sign in** in the Slidev nav bar
-and paste the printed deck token into the popover before navigating
-past this slide.
+To run this deck:
+
+1. Boot the backend (`task up:detached` or `task slidev:demo`).
+2. Open `http://localhost:8080/admin/`, do first-run setup, create a poll
+   with two questions and add `http://localhost:3030` to **Allowed origins**.
+3. On each question hit **Copy snippet** in the editor — paste the resulting
+   `<PollResults />` tags into Q1 / Q2 slides below (replacing the stubs).
+4. Mint a deck token on the **Deck tokens** page; copy the plaintext token.
+5. Click **sign in** in the Slidev nav bar and paste the token. The button
+   flips to *signed in: <label>*.
 
 ---
 
 ## How this deck is wired
 
-- The Slidev addon mounts a **sign-in button in the nav bar** (hover
-  the toolbar to reveal it during play). Pre-sign-in the button reads
-  *sign in*; click to open the token popover.
-- Paste the deck token into the popover; the toolbar button flips to
-  **signed in: demo-deck**.
+- The addon mounts a **sign-in button in the nav bar** (hover the toolbar to
+  reveal it during play). Pre-sign-in the button reads *sign in*; click to
+  open the token popover.
+- Paste the deck token; the toolbar flips to **signed in: <label>**.
 - Poll slides embed `<PollResults />` — on mount they POST
   `/api/deck/polls/{pollId}/activate` **only** if the composable is
   `signed-in`. Anonymous viewers never hijack the active question.
-- Revoke the token from the backoffice → next navigation flips the
-  control back to *not signed in* with *credential not recognised*.
+- Revoke the token from the backoffice → next navigation flips the control
+  back to *not signed in* with *credential not recognised*.
 
 ---
 layout: center
 ---
 
-## Q1 — Which JVM for the workshop?
-
-<PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
-/>
+## Q1 — paste your snippet here
 
 <!--
-Navigate here while **signed in** to activate Q1 on the backend.
-Open a second tab without signing in — you see the same tallies but
-never fire an activation POST.
+Replace the stub below with the snippet copied from the backoffice
+(question editor → Copy snippet). The snippet auto-includes
+slug, pollId, questionId. The deck token is NOT in the markup —
+the in-deck auth control supplies it at runtime.
+
+Example shape:
+
+  <PollResults
+    slug="my-talk"
+    pollId="11111111-1111-1111-1111-111111111111"
+    questionId="22222222-2222-2222-2222-222222222222"
+  />
+-->
+
+<PollResults slug="my-talk" />
+
+<!--
+Navigate here while **signed in** to activate this question on the backend.
+Open a second tab without signing in — same tallies, never fires activate.
 -->
 
 ---
 layout: center
 ---
 
-## Q2 — Favourite build tool?
+## Q2 — paste your second snippet here
 
-<PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
-/>
+<PollResults slug="my-talk" />
 
 ---
 
@@ -72,13 +84,9 @@ layout: center
 
 | URL                                      | What it is           |
 |------------------------------------------|----------------------|
-| `http://localhost:8080/{{ slug }}`       | voter SPA slug route |
+| `http://localhost:8080/<slug>`           | voter SPA slug route |
 | network panel → `/api/polls/…/stream`    | live SSE feed        |
 | network panel → `/api/deck/.../activate` | presenter-only POST  |
-
-<script setup lang="ts">
-import { pollSlug as slug } from "./data";
-</script>
 
 ---
 
@@ -98,4 +106,4 @@ layout: end
 
 # Done.
 
-Keep the `curl` from `scripts/seed.sh` around to mint more tokens.
+Mint more tokens any time from the backoffice **Deck tokens** page.
