@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import type { Poll } from "@polls/shared";
+import { Button, Input, Pill } from "@polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import QrPreview from "../components/QrPreview.vue";
 
@@ -62,14 +63,47 @@ async function onDelete(p: Poll) {
 onMounted(() => {
   void load();
 });
+
+const filterText = ref("");
+const filteredPolls = computed(() =>
+  (polls.value ?? []).filter((p) =>
+    p.title.toLowerCase().includes(filterText.value.toLowerCase())
+  )
+);
+const totalCount = computed(() => polls.value?.length ?? 0);
+const activeCount = computed(
+  () => (polls.value ?? []).filter((p) => p.status === "OPEN").length
+);
+
+function statusTone(s: string): "neutral" | "success" | "danger" {
+  if (s === "OPEN") return "success";
+  return "neutral";
+}
+function statusLabel(s: string): string {
+  if (s === "OPEN") return "live";
+  if (s === "DRAFT") return "draft";
+  return "closed";
+}
 </script>
 
 <template>
-  <section class="poll-list">
-    <header class="poll-list__header">
-      <h2>Your polls</h2>
-      <RouterLink to="/polls/new" class="poll-list__new-btn">New poll</RouterLink>
-    </header>
+  <section class="pl" data-testid="poll-list-page">
+    <div class="pl__head">
+      <div>
+        <h1 class="pl__title">Polls</h1>
+        <p class="pl__sub">{{ totalCount }} polls · {{ activeCount }} active sessions</p>
+      </div>
+      <div class="pl__actions">
+        <Input
+          v-model="filterText"
+          placeholder="Search…"
+          style="width: 200px;"
+        />
+        <RouterLink to="/polls/new" data-testid="new-poll-link">
+          <Button>+ New poll</Button>
+        </RouterLink>
+      </div>
+    </div>
 
     <p v-if="loading" data-testid="poll-list-loading">Loading polls…</p>
 
@@ -77,39 +111,56 @@ onMounted(() => {
       v-else-if="errorMessage"
       data-testid="poll-list-error"
       role="alert"
-      class="poll-list__error"
+      class="pl__error"
     >
       {{ errorMessage }}
     </p>
 
-    <p v-else-if="polls && polls.length === 0" data-testid="poll-list-empty">
+    <p v-else-if="polls && polls.length === 0" data-testid="poll-list-empty" class="pl__empty">
       You don't have any polls yet.
       <RouterLink to="/polls/new">Create the first one.</RouterLink>
     </p>
 
-    <ul v-else-if="polls" class="poll-list__rows">
-      <li v-for="poll in polls" :key="poll.id" data-testid="poll-row" class="poll-list__row">
-        <div class="poll-list__row-main">
-          <h3 class="poll-list__title">{{ poll.title }}</h3>
-          <p class="poll-list__meta">
-            <span class="poll-list__slug">/{{ poll.slug }}</span>
-            <span class="poll-list__status">{{ poll.status }}</span>
-          </p>
-          <p class="poll-list__join">
-            Join link:
-            <a :href="poll.publicUrl" data-testid="poll-join-link" target="_blank" rel="noopener">
-              {{ poll.publicUrl }}
-            </a>
-          </p>
+    <div v-else-if="polls" class="pl__table">
+      <div class="pl__row pl__row--head">
+        <span>Question</span>
+        <span>Status</span>
+        <span>Join link</span>
+        <span>Actions</span>
+      </div>
+      <div
+        v-for="poll in filteredPolls"
+        :key="poll.id"
+        data-testid="poll-row"
+        class="pl__row"
+      >
+        <div class="pl__row-main">
+          <span class="pl__name">{{ poll.title }}</span>
+          <span class="pl__slug">/{{ poll.slug }}</span>
         </div>
-        <div class="poll-list__row-side">
+        <span class="pl__status-cell">
+          <Pill :tone="statusTone(poll.status)" :withDot="poll.status === 'OPEN'">
+            {{ statusLabel(poll.status) }}
+          </Pill>
+          <span class="pl__status-raw" aria-hidden="true">{{ poll.status }}</span>
+        </span>
+        <a
+          :href="poll.publicUrl"
+          data-testid="poll-join-link"
+          class="pl__join"
+          target="_blank"
+          rel="noopener"
+        >
+          {{ poll.publicUrl }}
+        </a>
+        <div class="pl__row-side">
           <QrPreview
             data-testid="poll-qr-img"
             :poll-id="poll.id"
             :slug="poll.slug"
             :size="120"
           />
-          <div class="poll-list__actions">
+          <div class="pl__row-actions">
             <RouterLink
               :to="{ name: 'poll-edit', params: { pollId: poll.id } }"
               data-testid="poll-edit"
@@ -121,71 +172,123 @@ onMounted(() => {
             </button>
           </div>
         </div>
-      </li>
-    </ul>
+      </div>
+
+      <p v-if="filteredPolls.length === 0 && filterText" class="pl__filter-empty">
+        No polls match — try a different search, or create a new one.
+      </p>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.poll-list__header {
+.pl__head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 18px;
 }
-.poll-list__new-btn {
-  padding: 0.4rem 0.75rem;
-  background: #2c7be5;
-  color: white;
-  border-radius: 4px;
+.pl__title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.pl__sub {
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  margin: 2px 0 0;
+}
+.pl__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pl__actions a {
   text-decoration: none;
 }
-.poll-list__error {
-  background: #fdecea;
-  color: #b71c1c;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+
+.pl__table {
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius-lg);
+  overflow: hidden;
 }
-.poll-list__rows {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.pl__row {
+  display: grid;
+  grid-template-columns: 1fr 110px 1fr 160px;
+  padding: 12px 14px;
+  font-size: 13px;
+  align-items: center;
+  border-bottom: 1px solid var(--sp-bg-subtle);
+  color: var(--sp-fg);
+}
+.pl__row--head {
+  background: var(--sp-bg-muted);
+  border-bottom: 1px solid var(--sp-border);
+  font-size: 11px;
+  color: var(--sp-fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  padding: 10px 14px;
+}
+.pl__row:hover:not(.pl__row--head) {
+  background: var(--sp-bg-muted);
+}
+.pl__row:last-child {
+  border-bottom: 0;
+}
+.pl__row-main {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 2px;
 }
-.poll-list__row {
-  display: flex;
-  gap: 1.5rem;
-  padding: 1rem;
-  border: 1px solid #eee;
-  border-radius: 8px;
+.pl__name {
+  font-weight: 500;
 }
-.poll-list__row-main {
-  flex: 1;
-}
-.poll-list__title {
-  margin: 0 0 0.25rem;
-}
-.poll-list__meta {
-  margin: 0 0 0.5rem;
-  display: flex;
-  gap: 0.75rem;
-  color: #555;
-  font-size: 0.875rem;
-}
-.poll-list__slug {
+.pl__slug {
   font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--sp-fg-subtle);
 }
-.poll-list__qr {
-  display: block;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-.poll-list__actions {
+.pl__status-cell {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+.pl__status-raw {
+  font-size: 10px;
+  color: var(--sp-fg-faint, transparent);
+  line-height: 1;
+}
+.pl__join {
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl__row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.pl__row-actions {
+  display: flex;
+  gap: 8px;
+}
+.pl__error {
+  background: var(--sp-danger-subtle, #fdecea);
+  color: var(--sp-danger, #b71c1c);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--sp-radius-lg, 4px);
+}
+.pl__empty,
+.pl__filter-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--sp-fg-subtle);
+  font-size: 13px;
 }
 </style>
