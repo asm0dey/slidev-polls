@@ -58,6 +58,10 @@ class PollAuthoringIT {
 
   @BeforeEach
   void seedAlice() {
+    // Wipe polls first so this class's listing assertions ($.length() == 1) don't see polls
+    // left behind by sibling ITs sharing the JVM-wide Spring context + Postgres container.
+    // POLLS children cascade via FK.
+    dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS).execute();
     // V6 dropped the seed migration. Use the idempotent helper because polls from earlier tests
     // (in the reused Spring context) hold a FK to admin_user.username — wiping would fail.
     AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
