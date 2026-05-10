@@ -190,15 +190,15 @@ test.describe("cross-origin slidev deck activation", () => {
       // body for that specific path so the diagnostic never leaks credentials to
       // CI logs; keep error-status bodies (4xx/5xx) so failures stay debuggable.
       const isLoginSuccess = url.includes("/api/deck/auth/login") && status >= 200 && status < 300;
-      let body = "";
-      if (!isLoginSuccess) {
+      let body: string;
+      if (isLoginSuccess) {
+        body = "<redacted: login success body>";
+      } else {
         try {
           body = (await res.text()).slice(0, 500);
         } catch {
           body = "<unreadable>";
         }
-      } else {
-        body = "<redacted: login success body>";
       }
       authNetwork.push({ method: res.request().method(), url, status, body });
     });
@@ -225,7 +225,8 @@ test.describe("cross-origin slidev deck activation", () => {
         `sign-in did not flip the trigger to "deck"\n` +
           `network=${JSON.stringify(authNetwork, null, 2)}\n` +
           `console=${consoleLines.join("\n")}\n` +
-          `original=${(err as Error).message}`
+          `original=${(err as Error).message}`,
+        { cause: err }
       );
     }
 
