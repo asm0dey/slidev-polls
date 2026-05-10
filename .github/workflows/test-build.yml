@@ -20,21 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: polls
-          POSTGRES_PASSWORD: polls
-          POSTGRES_DB: polls
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U polls"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
+    # No Postgres service needed: the jOOQ codegen step now uses
+    # testcontainers-jooq-codegen-maven-plugin (Docker-on-runner), and
+    # mvn verify integration tests already use Spring Boot's Testcontainers
+    # support.
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

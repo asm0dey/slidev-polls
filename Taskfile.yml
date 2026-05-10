@@ -8,7 +8,7 @@ version: "3"
 #   task up            — "closer to prod" fat-JAR run via compose.dev.yml
 #   task down          — stop everything and remove compose containers
 #   task test          — full suite (backend verify + every frontend vitest + shared bun test)
-#   task codegen       — regenerate jOOQ sources against a running Postgres
+#   task codegen       — regenerate jOOQ sources against a Testcontainers Postgres
 #   task frontends     — build the SPAs into backend/poll-api static
 #   task format        — spotless:apply (java) + prettier --write (frontends)
 #   task hooks:install — install lefthook git hooks (prettier + IIKIT chain)
@@ -47,13 +47,13 @@ tasks:
 
   up:
     desc: Build and run the full fat-JAR stack (Postgres + backend on :8080)
-    deps: [postgres:up, codegen]
+    deps: [codegen]
     cmds:
       - docker compose -f {{.COMPOSE_DEV}} up --build
 
   up:detached:
     desc: Same as `up` but in the background
-    deps: [postgres:up, codegen]
+    deps: [codegen]
     cmds:
       - docker compose -f {{.COMPOSE_DEV}} up --build -d
 
@@ -83,8 +83,7 @@ tasks:
       - bash scripts/build-frontends.sh
 
   codegen:
-    desc: Regenerate jOOQ sources against a running Postgres (needed before mvn package)
-    deps: [postgres:up]
+    desc: Regenerate jOOQ sources against a Testcontainers Postgres (needed before mvn package)
     cmds:
       - ./mvnw -Pcodegen -pl {{.POLL_PERSISTENCE_MODULE}} -am compile -Dspotless.check.skip=true
 
@@ -173,10 +172,9 @@ tasks:
         fi
         echo "[e2e] no backend at {{.E2E_BASE_URL}}; bringing up compose.dev.yml"
         touch {{.E2E_MARKER}}
-      # Invoke codegen + compose build sequentially rather than `up:detached`
-      # so Postgres is brought up once (up:detached lists postgres:up twice
-      # across its parallel dep graph, which races `docker compose up -d
-      # postgres` with itself and fails on container-name conflict).
+      # codegen + compose build run sequentially. codegen spawns its own
+      # ephemeral Testcontainers Postgres for jOOQ generation, then
+      # compose.dev.yml brings up the runtime Postgres + backend.
       - |
         if [ -f {{.E2E_MARKER}} ]; then
           {{.TASK_EXE}} codegen
