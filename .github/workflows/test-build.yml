@@ -195,6 +195,20 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Set up JDK 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: liberica
+          java-version: '25'
+          cache: maven
+
+      - name: jOOQ codegen
+        # The Dockerfile expects target/generated-sources/jooq to already
+        # exist in the build context — codegen uses Testcontainers and so
+        # can't run inside `docker build`. Materialise the sources on the
+        # runner first; .dockerignore lets target/generated-sources through.
+        run: ./mvnw -B -ntp -Pcodegen -pl backend/poll-persistence -am compile -Dspotless.check.skip=true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
