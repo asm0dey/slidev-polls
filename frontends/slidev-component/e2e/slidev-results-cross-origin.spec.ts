@@ -172,32 +172,61 @@ test.describe("cross-origin slidev deck activation", () => {
   test("signed-in deck on cross-origin host activates question and renders SSE results", async ({
     page
   }) => {
-    // Navigate to slide 3 (Q1 — first PollResults slide). This imports data.ts whose
-    // side-effect calls configureDeckAuthBackend("http://localhost:8080"), routing
-    // subsequent auth requests to the backend instead of the Slidev dev server.
-    // page.goto triggers a full page reload so Vite serves the updated data.ts.
+    // Diagnostic capture: collect everything that touches the auth flow so a failure here
+    // surfaces a real signal instead of "trigger never said 'deck'". Cleared once the
+    // assertion passes; left in place so future flakes are debuggable from CI artifacts.
+    const consoleLines: string[] = [];
+    page.on("console", (msg) => consoleLines.push(`[${msg.type()}] ${msg.text()}`));
+    page.on("pageerror", (err) => consoleLines.push(`[pageerror] ${err.message}`));
+    const authNetwork: Array<{ method: string; url: string; status?: number; body?: string }> = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/api/deck/auth/")) {
+        authNetwork.push({ method: req.method(), url: req.url() });
+      }
+    });
+    page.on("response", async (res) => {
+      const url = res.url();
+      if (!url.includes("/api/deck/auth/")) return;
+      let body = "";
+      try {
+        body = (await res.text()).slice(0, 500);
+      } catch {
+        body = "<unreadable>";
+      }
+      authNetwork.push({ method: res.request().method(), url, status: res.status(), body });
+    });
+
     await page.goto(`${SLIDEV}/3`);
-    // Confirm the PollResults component has mounted (anonymous → "waiting" state).
     await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 10_000 });
 
-    // Clear stale auth so the test starts fresh.
+    // Sanity: configureDeckAuthBackend(pollServer) ran via data.ts side-effect.
+    const configuredBackend = await page.evaluate(() => {
+      // Mirror getConfiguredBackend()'s read so we don't need to import the module here.
+      // The composable persists nothing in window; instead we hit the same module path.
+      return (window as unknown as { __slidevPollsBackend?: string }).__slidevPollsBackend ?? null;
+    });
+    consoleLines.push(`[probe] configuredBackend=${configuredBackend ?? "<unset>"}`);
+
     await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
 
-    // ── @TS-C01: Cross-origin sign-in ──────────────────────────────────────────
-    // Open the auth popover from the nav bar and sign in with admin credentials.
-    // This fires a cross-origin POST to http://localhost:8080/api/deck/auth/login
-    // from the Slidev page at http://localhost:3030. The CORS preflight succeeds
-    // because we set allowedOrigins=[http://localhost:3030] when creating the poll.
     await page.getByTestId("deck-auth-nav-trigger").click();
     await page.getByTestId("deck-auth-username").fill("alice");
     await page.getByTestId("deck-auth-password").fill("correct-horse");
-    // Scope to the auth control to avoid ambiguity with the nav trigger button,
-    // which also reads "sign in" while unauthenticated.
     await page.getByTestId("deck-auth-control").getByRole("button", { name: "sign in" }).click();
-    // Trigger flips to "deck" when sign-in succeeds and the token is stored.
-    await expect(page.getByTestId("deck-auth-nav-trigger")).toContainText("deck", {
-      timeout: 8_000
-    });
+
+    try {
+      await expect(page.getByTestId("deck-auth-nav-trigger")).toContainText("deck", {
+        timeout: 8_000
+      });
+    } catch (err) {
+      // Surface diagnostic data in the failure message so CI artifacts have it inline.
+      throw new Error(
+        `sign-in did not flip the trigger to "deck"\n` +
+          `network=${JSON.stringify(authNetwork, null, 2)}\n` +
+          `console=${consoleLines.join("\n")}\n` +
+          `original=${(err as Error).message}`
+      );
+    }
 
     // ── @TS-C02: Cross-origin deck activation POST ─────────────────────────────
     // Slidev v52 keeps all slides in the DOM simultaneously and does not remount
