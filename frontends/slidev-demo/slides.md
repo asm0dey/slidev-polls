@@ -43,8 +43,6 @@ To run this deck:
 - Revoke the token from the backoffice → next navigation flips the control
   back to _not signed in_ with _credential not recognised_.
 
----
-
 ## layout: center
 
 ## Q1 — paste your snippet here
@@ -110,8 +108,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 | _live updates paused_ on SSE drop        | kill the SSE from devtools     |
 
 ---
-
-## layout: end
+layout: end
+---
 
 # Done.
 

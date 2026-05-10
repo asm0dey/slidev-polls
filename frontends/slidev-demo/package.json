@@ -8,6 +8,7 @@
   "scripts": {
     "slidev": "slidev slides.md --open",
     "dev": "slidev slides.md",
+    "dev:e2e": "slidev e2e-deck.md",
     "build": "slidev build slides.md"
   },
   "dependencies": {
