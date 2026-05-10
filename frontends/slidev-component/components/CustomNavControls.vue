@@ -1,7 +1,37 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useSlideContext } from "@slidev/client";
 import DeckAuthControl from "./DeckAuthControl.vue";
 import { useDeckAuth } from "../composables/useDeckAuth";
+import { configureDeckAuthBackend } from "../composables/configureDeckAuthBackend";
+
+// Slidev exposes parsed headmatter via $slidev.configs and per-slide frontmatter
+// via $frontmatter. Read pollServer from either source so the in-deck auth flow
+// hits the backend origin (typically cross-origin from the Slidev dev server),
+// mirroring how PollPanel.vue resolves its backend URL. useSlideContext throws
+// outside a slidev context (e.g. unit tests), so it is wrapped defensively.
+const slideCtx = (() => {
+  try {
+    return useSlideContext();
+  } catch {
+    return null;
+  }
+})();
+const headmatterServer = (() => {
+  const fm = (slideCtx?.$frontmatter ?? {}) as Record<string, unknown>;
+  if (typeof fm.pollServer === "string" && fm.pollServer.length > 0) return fm.pollServer;
+  const cfgs = (slideCtx?.$slidev?.configs ?? {}) as Record<string, unknown>;
+  if (typeof cfgs.pollServer === "string" && cfgs.pollServer.length > 0) return cfgs.pollServer;
+  return "";
+})();
+
+// Prime the configured-backend module before the useDeckAuth() singleton makes
+// any fetch — currentBase() reads getConfiguredBackend() dynamically, so this
+// works whether CustomNavControls mounts before or after PollPanel. Skipping
+// when headmatterServer is empty preserves the legacy data.ts side-effect path.
+if (headmatterServer.length > 0) {
+  configureDeckAuthBackend(headmatterServer);
+}
 
 const auth = useDeckAuth();
 const open = ref(false);

@@ -44,30 +44,19 @@ To run this deck:
   back to _not signed in_ with _credential not recognised_.
 
 ---
+layout: center
+---
 
-## layout: center
+<script setup lang="ts">
+import { pollSlug, pollId, q1Id } from "./data";
+</script>
 
-## Q1 — paste your snippet here
-
-<!--
-Replace the stub below with the snippet copied from the backoffice
-(question editor → Copy snippet). The snippet auto-includes
-slug, pollId, questionId. The deck token is NOT in the markup —
-the in-deck auth control supplies it at runtime.
-
-Example shape:
-
-  <PollResults
-    slug="my-talk"
-    pollId="11111111-1111-1111-1111-111111111111"
-    questionId="22222222-2222-2222-2222-222222222222"
-  />
--->
+## Q1 — Which JVM for the workshop?
 
 <PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
+  :slug="pollSlug"
+  :poll-id="pollId"
+  :question-id="q1Id"
 />
 
 <!--
@@ -76,15 +65,19 @@ Open a second tab without signing in — same tallies, never fires activate.
 -->
 
 ---
+layout: center
+---
 
-## layout: center
+<script setup lang="ts">
+import { pollSlug, pollId, q2Id } from "./data";
+</script>
 
-## Q2 — paste your second snippet here
+## Q2 — Favourite build tool?
 
 <PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
+  :slug="pollSlug"
+  :poll-id="pollId"
+  :question-id="q2Id"
 />
 
 ---
@@ -110,8 +103,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 | _live updates paused_ on SSE drop        | kill the SSE from devtools     |
 
 ---
-
-## layout: end
+layout: end
+---
 
 # Done.
 
