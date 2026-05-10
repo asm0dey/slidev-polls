@@ -270,6 +270,12 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Upgrade npm to a Trusted-Publishing-capable version
+        # Node 22 ships npm 10.x; OIDC-based Trusted Publishing needs npm
+        # >=11.5.1 — without it `npm publish` signs provenance but never
+        # attaches the OIDC token and the registry rejects with 404.
+        run: npm install -g npm@latest
+
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
 
