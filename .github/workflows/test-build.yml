@@ -265,16 +265,13 @@ jobs:
           bun-version: latest
 
       - name: Set up Node.js (for npm Trusted Publishing)
+        # Node 24 bundles npm >=11.5.1, which is required for OIDC-based
+        # Trusted Publishing. Node 22 ships npm 10.x — that signs provenance
+        # but silently omits the OIDC token and the registry returns 404.
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Upgrade npm to a Trusted-Publishing-capable version
-        # Node 22 ships npm 10.x; OIDC-based Trusted Publishing needs npm
-        # >=11.5.1 — without it `npm publish` signs provenance but never
-        # attaches the OIDC token and the registry rejects with 404.
-        run: npm install -g npm@latest
 
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
