@@ -36,6 +36,68 @@ it, sign in with the credentials you chose, create a poll, and have your
 audience load the join link on their phones. Add additional presenters
 from **Presenters** in the sidebar.
 
+### Run from the published image (no build)
+
+After every successful `main` build, CI pushes a backend image to GHCR:
+`ghcr.io/asm0dey/slidev-polls-backend` (tags: `latest`, `sha-<commit>`).
+
+Drop the snippet below into a `compose.yml`, fill in the env vars (or supply
+them via a `.env` file next to it / `--env-file`), and `docker compose up -d`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: ghcr.io/asm0dey/slidev-polls-backend:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # `prod` flips the SP_SESSION cookie to Secure — only enable when you
+      # terminate TLS in front of the container.
+      SPRING_PROFILES_ACTIVE: prod
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+```
+
+Example `.env`:
+
+```env
+POSTGRES_DB=polls
+POSTGRES_USER=polls
+POSTGRES_PASSWORD=change-me
+```
+
+The DB user/password are shared between the two services on purpose — Postgres
+provisions the role from `POSTGRES_USER`/`POSTGRES_PASSWORD`, and the backend
+authenticates with the same pair via `SPRING_DATASOURCE_USERNAME`/
+`SPRING_DATASOURCE_PASSWORD`. Application-level credentials (the first
+presenter account) are created interactively at `http://localhost:8080/admin/`
+on first run.
+
+GHCR images are public when the repo is public; if you've made the package
+private, run `docker login ghcr.io` with a PAT that has `read:packages` first.
+
 ### Inner-loop dev (Vite HMR + host spring-boot:run)
 
 ```bash
