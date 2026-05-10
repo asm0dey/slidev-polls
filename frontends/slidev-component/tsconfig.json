@@ -1,4 +1,16 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["index.ts", "components/**/*.ts", "components/**/*.vue", "setup/**/*.ts"]
+  "compilerOptions": {
+    "paths": {
+      "@slidev/client": ["./types/slidev-client.d.ts"]
+    }
+  },
+  "include": [
+    "index.ts",
+    "components/**/*.ts",
+    "components/**/*.vue",
+    "composables/**/*.ts",
+    "setup/**/*.ts",
+    "types/**/*.d.ts"
+  ]
 }
