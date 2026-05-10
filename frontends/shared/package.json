@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Shared types, API client, SSE client, and Vue UI primitives for the slidev-polls suite.",
   "license": "GPL-3.0-or-later",
-  "author": "Pavel Finkelshtein <pavel.finkelshtein@gmail.com>",
+  "author": "Pasha Finkelshteyn <pavel.finkelshtein@gmail.com>",
   "homepage": "https://github.com/asm0dey/slidev-polls#readme",
   "repository": {
     "type": "git",

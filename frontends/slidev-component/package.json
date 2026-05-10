@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Slidev addon that renders live poll results on-slide.",
   "license": "GPL-3.0-or-later",
-  "author": "Pavel Finkelshtein <pavel.finkelshtein@gmail.com>",
+  "author": "Pasha FInkelshteyn <pavel.finkelshtein@gmail.com>",
   "homepage": "https://github.com/asm0dey/slidev-polls#readme",
   "repository": {
     "type": "git",
