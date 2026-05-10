@@ -108,8 +108,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 | _live updates paused_ on SSE drop        | kill the SSE from devtools     |
 
 ---
-layout: end
----
+
+## layout: end
 
 # Done.
 

@@ -148,7 +148,10 @@ test.describe.serial("admin creates poll, voter sees activation live", () => {
     await presenterPage.getByTestId("question-activate").click();
     // The editor reloads detail and the question pill flips to ACTIVE.
     await expect(
-      presenterPage.getByTestId("poll-editor-page").getByText(/active/i).first()
+      presenterPage
+        .getByTestId("poll-editor-page")
+        .getByText(/active/i)
+        .first()
     ).toBeVisible({ timeout: 8_000 });
 
     // ─── 3c. voter receives the SSE snapshot and renders the active question ─

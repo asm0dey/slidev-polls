@@ -10,7 +10,8 @@ version: "3"
 #   task test          — full suite (backend verify + every frontend vitest + shared bun test)
 #   task codegen       — regenerate jOOQ sources against a running Postgres
 #   task frontends     — build the SPAs into backend/poll-api static
-#   task format        — run spotless:apply across the reactor
+#   task format        — spotless:apply (java) + prettier --write (frontends)
+#   task hooks:install — install lefthook git hooks (prettier + IIKIT chain)
 
 vars:
   POLL_API_MODULE: backend/poll-api
@@ -210,9 +211,18 @@ tasks:
   # ---------- Hygiene ------------------------------------------------------
 
   format:
-    desc: Apply spotless (google-java-format) across the reactor
+    desc: Apply spotless (java) and prettier --write (frontends) across the repo
     cmds:
       - ./mvnw spotless:apply
+      - cd frontends && bun run format:write
+
+  hooks:install:
+    desc: Install lefthook git hooks (prettier on commit + IIKIT assertion check)
+    cmds:
+      # lefthook moves any pre-existing .git/hooks/pre-commit aside as
+      # pre-commit.old on first install; lefthook.yml's iikit job re-invokes
+      # that snapshot. Re-running this task is safe — lefthook is idempotent.
+      - cd frontends && bunx lefthook install
 
   clean:
     desc: Clean Maven and frontend build outputs

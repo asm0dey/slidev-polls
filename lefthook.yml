@@ -1,0 +1,24 @@
+# Git hooks (https://lefthook.dev). Install with `task hooks:install`.
+#
+# Runs prettier --write on staged frontend files and re-stages the formatted
+# output, then chains to the IIKIT assertion-integrity hook. On `lefthook
+# install` lefthook moves any pre-existing .git/hooks/pre-commit aside as
+# pre-commit.old; the iikit job below re-invokes that snapshot so the
+# assertion-integrity check still runs on every commit.
+
+pre-commit:
+  parallel: false
+  jobs:
+    - name: prettier
+      root: frontends/
+      glob: "**/*.{ts,vue,json,md,yml,yaml,html,css}"
+      run: bunx prettier --write {staged_files}
+      stage_fixed: true
+
+    - name: iikit
+      run: |
+        if [ -x .git/hooks/pre-commit.old ]; then
+          bash .git/hooks/pre-commit.old
+        else
+          echo "[lefthook] .git/hooks/pre-commit.old not found; IIKIT check skipped" >&2
+        fi
