@@ -26,7 +26,7 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command: "bun run dev",
+    command: "bun run dev:e2e",
     cwd: path.resolve(__dirname, "slidev-demo"),
     url: "http://localhost:3030",
     reuseExistingServer: !process.env.CI,

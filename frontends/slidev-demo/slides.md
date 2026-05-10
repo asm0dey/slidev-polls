@@ -23,12 +23,10 @@ To run this deck:
 1. Boot the backend (`task up:detached` or `task slidev:demo`).
 2. Open `http://localhost:8080/admin/`, do first-run setup, create a poll
    with two questions and add `http://localhost:3030` to **Allowed origins**.
-3. Copy the poll slug, poll ID, and both question IDs from the backoffice.
-4. Navigate to the deck with query params:
-   `http://localhost:3030/3?slug=…&pollId=…&q1Id=…&q2Id=…`
-   The deck reads them from `window.location.search` and passes them to the slides.
-5. Mint a deck token on the **Deck tokens** page; copy the plaintext token.
-6. Click **sign in** in the Slidev nav bar and paste the token. The button
+3. On each question hit **Copy snippet** in the editor — paste the resulting
+   `<PollResults />` tags into Q1 / Q2 slides below (replacing the stubs).
+4. Mint a deck token on the **Deck tokens** page; copy the plaintext token.
+5. Click **sign in** in the Slidev nav bar and paste the token. The button
    flips to _signed in: &lt;label&gt;_.
 
 ---
@@ -45,27 +43,30 @@ To run this deck:
 - Revoke the token from the backoffice → next navigation flips the control
   back to _not signed in_ with _credential not recognised_.
 
----
-layout: center
----
+## layout: center
 
-<script setup lang="ts">
-// Operator workflow: navigate the deck with `?slug=…&pollId=…&q1Id=…&q2Id=…`
-// (one URL covers the whole deck). Falls back to the demo-stub IDs so the
-// deck renders something sensible when run without query params.
-// Note: query params are read from window.location directly to avoid a
-// vue-router dual-instance problem in the Slidev Vite dev server.
-const q = new URLSearchParams(
-  typeof window !== "undefined" ? window.location.search : ""
-);
-const slug = q.get("slug") || "demo";
-const pollId = q.get("pollId") || "00000000-0000-0000-0000-000000000000";
-const questionId = q.get("q1Id") || "00000000-0000-0000-0000-000000000001";
-</script>
+## Q1 — paste your snippet here
 
-## Q1 — Which JVM for the workshop?
+<!--
+Replace the stub below with the snippet copied from the backoffice
+(question editor → Copy snippet). The snippet auto-includes
+slug, pollId, questionId. The deck token is NOT in the markup —
+the in-deck auth control supplies it at runtime.
 
-<PollResults :slug="slug" :poll-id="pollId" :question-id="questionId" />
+Example shape:
+
+  <PollResults
+    slug="my-talk"
+    pollId="11111111-1111-1111-1111-111111111111"
+    questionId="22222222-2222-2222-2222-222222222222"
+  />
+-->
+
+<PollResults
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
+/>
 
 <!--
 Navigate here while **signed in** to activate this question on the backend.
@@ -73,26 +74,16 @@ Open a second tab without signing in — same tallies, never fires activate.
 -->
 
 ---
-layout: center
----
 
-<script setup lang="ts">
-// Operator workflow: navigate the deck with `?slug=…&pollId=…&q1Id=…&q2Id=…`
-// (one URL covers the whole deck). Falls back to the demo-stub IDs so the
-// deck renders something sensible when run without query params.
-// Note: query params are read from window.location directly to avoid a
-// vue-router dual-instance problem in the Slidev Vite dev server.
-const q = new URLSearchParams(
-  typeof window !== "undefined" ? window.location.search : ""
-);
-const slug = q.get("slug") || "demo";
-const pollId = q.get("pollId") || "00000000-0000-0000-0000-000000000000";
-const questionId = q.get("q2Id") || "00000000-0000-0000-0000-000000000002";
-</script>
+## layout: center
 
-## Q2 — Favourite build tool?
+## Q2 — paste your second snippet here
 
-<PollResults :slug="slug" :poll-id="pollId" :question-id="questionId" />
+<PollResults
+  slug="liqui-way-1"
+  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
+  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
+/>
 
 ---
 
