@@ -112,10 +112,10 @@ tasks:
       - ./mvnw verify -Dspotless.check.skip=true
 
   test:shared:
-    desc: Run bun test for @polls/shared (plain TS unit tests)
+    desc: Run vitest for @slidev-polls/shared
     dir: frontends/shared
     cmds:
-      - bun test
+      - bun run test
 
   test:voter:
     desc: Run Vitest for the voter SPA
