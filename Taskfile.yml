@@ -103,8 +103,7 @@ tasks:
       - task: test:voter
       - task: test:backoffice
       - task: test:slidev
-      - task: test:e2e:voter
-      - task: test:e2e:slidev
+      - task: test:e2e
 
   test:backend:
     desc: Run the Maven reactor tests (unit + integration)
@@ -147,21 +146,16 @@ tasks:
       - bun install --cwd ..
       - bun run slidev
 
-  test:e2e:voter:
-    desc: Run Playwright voter happy-path (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
-    dir: frontends/voter
+  test:e2e:
+    desc: Run Playwright across voter + slidev projects against one compose.dev.yml backend (auto-starts if :8080 is idle; tears down what it started)
+    dir: frontends
     cmds:
       - task: e2e:backend-up
       - defer: { task: e2e:backend-down }
-      - bun run e2e
-
-  test:e2e:slidev:
-    desc: Run Playwright slidev SSE smoke (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started)
-    dir: frontends/slidev-component
-    cmds:
-      - task: e2e:backend-up
-      - defer: { task: e2e:backend-down }
-      - bun run e2e
+      # Both projects share frontends/playwright.config.ts. Running playwright
+      # without --project picks up every project (voter-chromium + slidev-chromium)
+      # and reuses the single webServer (the slidev demo dev server).
+      - bunx playwright test --config=./playwright.config.ts
 
   e2e:backend-up:
     desc: (internal) Bring up compose.dev.yml iff nothing is already listening on PW_BASE_URL
