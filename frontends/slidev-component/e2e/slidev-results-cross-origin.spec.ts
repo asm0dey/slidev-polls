@@ -58,6 +58,27 @@ async function loginAsAlice(request: APIRequestContext) {
   expect(res.status(), "alice login").toBeLessThan(300);
 }
 
+// V6 dropped the seeded `alice` admin in favour of first-run setup. Run the setup endpoint
+// once per test process if `admin_user` is empty so loginAsAlice() keeps working against a
+// fresh compose.dev.yml DB.
+async function ensureAdminBootstrapped(request: APIRequestContext) {
+  const status = await request.get("/api/admin/setup/status");
+  expect(status.status(), "setup status probe").toBe(200);
+  const { setupRequired } = (await status.json()) as { setupRequired: boolean };
+  if (!setupRequired) return;
+  const res = await request.post("/api/admin/setup", {
+    headers: { "content-type": "application/json" },
+    data: {
+      username: "alice",
+      password: "correct-horse",
+      displayName: "Alice Presenter"
+    }
+  });
+  if (!res.ok()) {
+    throw new Error(`first-run setup failed: ${res.status()} ${await res.text()}`);
+  }
+}
+
 /**
  * Create a fresh poll with two questions (Q1 = "Which JVM for the workshop?") and
  * allowedOrigins already set to the Slidev dev-server origin.  Writes data.ts so
@@ -135,6 +156,7 @@ test.describe("cross-origin slidev deck activation", () => {
 
   test.beforeAll(async ({ playwright, baseURL }) => {
     const request = await playwright.request.newContext({ baseURL });
+    await ensureAdminBootstrapped(request);
     await loginAsAlice(request);
     seededData = await seedPoll(request, baseURL!);
     await request.dispose();
