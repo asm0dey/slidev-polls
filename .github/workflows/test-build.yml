@@ -102,3 +102,66 @@ jobs:
           path: frontends/*/dist
           if-no-files-found: ignore
           retention-days: 7
+
+  e2e:
+    name: E2E (Playwright voter + slidev)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontends]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: liberica
+          java-version: '25'
+          cache: maven
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install go-task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install frontend dependencies
+        working-directory: frontends
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: frontends
+        # --with-deps installs the apt packages chromium needs on a clean ubuntu-latest
+        # image. We pin to chromium because both projects in playwright.config.ts use
+        # devices["Desktop Chrome"] — adding firefox/webkit here just inflates the cache.
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run e2e suite
+        # task test:e2e runs `task e2e:backend-up` (which runs jOOQ codegen via mvnw on
+        # the host, then `docker compose -f compose.dev.yml up --build -d`) and then
+        # invokes Playwright across both projects against http://localhost:8080.
+        run: task test:e2e
+        env:
+          # Force colourised reporter output off — github runners don't render it cleanly.
+          FORCE_COLOR: '0'
+
+      - name: Dump backend logs on failure
+        if: failure()
+        run: docker compose -f compose.dev.yml logs --tail=400 backend || true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            frontends/playwright-report/**
+            frontends/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
