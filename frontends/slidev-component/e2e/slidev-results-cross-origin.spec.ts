@@ -185,28 +185,28 @@ test.describe("cross-origin slidev deck activation", () => {
     page.on("response", async (res) => {
       const url = res.url();
       if (!url.includes("/api/deck/auth/")) return;
+      const status = res.status();
+      // 2xx responses on /login may contain freshly minted deck tokens. Drop the
+      // body for that specific path so the diagnostic never leaks credentials to
+      // CI logs; keep error-status bodies (4xx/5xx) so failures stay debuggable.
+      const isLoginSuccess = url.includes("/api/deck/auth/login") && status >= 200 && status < 300;
       let body = "";
-      try {
-        body = (await res.text()).slice(0, 500);
-      } catch {
-        body = "<unreadable>";
+      if (!isLoginSuccess) {
+        try {
+          body = (await res.text()).slice(0, 500);
+        } catch {
+          body = "<unreadable>";
+        }
+      } else {
+        body = "<redacted: login success body>";
       }
-      authNetwork.push({ method: res.request().method(), url, status: res.status(), body });
+      authNetwork.push({ method: res.request().method(), url, status, body });
     });
 
     // seedPoll wrote data.ts with the seeded UUIDs; Vite picks up the fresh module
     // on this full page reload. e2e-deck.md's Q1/Q2 slides import from ./data.ts.
     await page.goto(`${SLIDEV}/3`);
     await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 10_000 });
-
-    // Sanity: pollServer in the e2e-deck.md headmatter was read by CustomNavControls
-    // and stored on window.__slidevPollsBackend (commit 45edc16).
-    const configuredBackend = await page.evaluate(() => {
-      // Mirror getConfiguredBackend()'s read so we don't need to import the module here.
-      // The composable persists nothing in window; instead we hit the same module path.
-      return (window as unknown as { __slidevPollsBackend?: string }).__slidevPollsBackend ?? null;
-    });
-    consoleLines.push(`[probe] configuredBackend=${configuredBackend ?? "<unset>"}`);
 
     await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
 
