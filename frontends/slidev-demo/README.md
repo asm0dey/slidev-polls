@@ -51,6 +51,5 @@ You provision the demo poll yourself via the backoffice:
 
 | File           | Role                                                    |
 | -------------- | ------------------------------------------------------- |
-| `slides.md`    | Deck markdown; imports poll config from `./data.ts`.    |
-| `data.ts`      | Local-only config stub for slug / pollId / questionIds. |
+| `slides.md`    | Deck markdown with hardcoded slug / pollId / questions. |
 | `package.json` | Workspace member; depends on `@slidev-polls/component`. |
