@@ -10,10 +10,10 @@ STATIC="$ROOT/backend/poll-api/src/main/resources/static"
 cd "$ROOT/frontends"
 bun install
 
-bun run --filter '@polls/shared'          build
-bun run --filter '@polls/voter'           build
-bun run --filter '@polls/backoffice'      build
-bun run --filter '@polls/slidev-addon'    build
+bun run --filter '@slidev-polls/shared'     build
+bun run --filter '@slidev-polls/voter'      build
+bun run --filter '@slidev-polls/backoffice' build
+bun run --filter '@slidev-polls/component'  build
 
 mkdir -p "$STATIC" "$STATIC/admin"
 rm -rf "$STATIC"/* "$STATIC/admin"/*
