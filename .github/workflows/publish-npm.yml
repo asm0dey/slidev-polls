@@ -92,18 +92,17 @@ jobs:
         run: |
           (cd shared && npm pkg set version="$V")
           (cd slidev-component && npm pkg set version="$V")
+          # npm publish does not rewrite workspace:* like bun/pnpm do, so pin
+          # the cross-package dependency to the concrete release version.
+          (cd slidev-component && npm pkg set "dependencies.@slidev-polls/shared"="$V")
 
       - name: Publish @slidev-polls/shared
         working-directory: frontends/shared
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --access public
+        run: npm publish --access public --provenance
 
       - name: Publish @slidev-polls/component
         working-directory: frontends/slidev-component
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --access public
+        run: npm publish --access public --provenance
 
       - name: Job summary
         if: always()
