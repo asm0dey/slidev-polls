@@ -1,15 +1,17 @@
 name: Publish backend image
 
 # Builds the backend image from the repo Dockerfile and pushes it to GHCR
-# after the Test & Build workflow finishes successfully on main. The
-# workflow_run trigger fires off the default branch's workflow runs, so PRs
-# never publish; manual dispatch is provided as an escape hatch.
+# AFTER Test & Build finishes successfully on the same commit. Two release
+# modes are gated through that same upstream:
+#   * main branch    -> tags :latest, :sha-<sha>
+#   * vX.Y.Z tag     -> tags :X.Y.Z, :X.Y, :sha-<sha>
+# Manual workflow_dispatch is provided as an escape hatch and tags
+# :sha-<sha> only.
 
 on:
   workflow_run:
     workflows: ["Test & Build"]
     types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -17,7 +19,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -25,15 +27,61 @@ jobs:
     name: Build and push image to GHCR
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Only publish when the upstream Test & Build succeeded (or on manual dispatch),
+    # and only for refs we recognise: main branch or a vX.Y.Z tag.
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          (
+            github.event.workflow_run.head_branch == 'main' ||
+            startsWith(github.event.workflow_run.head_branch, 'v')
+          )
+        )
+      }}
 
     steps:
+      - name: Resolve target ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/slidev-polls-backend
+          SHA: ${{ steps.ref.outputs.sha }}
+          HEAD: ${{ steps.ref.outputs.head }}
+        run: |
+          tags=("${IMAGE}:sha-${SHA}")
+          if [[ "${HEAD}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+            tags+=("${IMAGE}:${major}.${minor}.${patch}")
+            tags+=("${IMAGE}:${major}.${minor}")
+          elif [ "${HEAD}" = "main" ]; then
+            tags+=("${IMAGE}:latest")
+          fi
+          {
+            echo "list<<EOF"
+            printf '%s\n' "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # workflow_run runs decoupled from the triggering commit; pin the
-          # checkout to that SHA so the image we publish matches what passed CI.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # workflow_run runs decoupled from the triggering commit; pin to the
+          # same SHA that passed CI so the image we publish matches.
+          ref: ${{ steps.ref.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
@@ -45,22 +93,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image metadata
-        id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/slidev-polls-backend
-          tags: |
-            type=raw,value=latest
-            type=sha,format=long,prefix=sha-
-
       - name: Build and push
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
