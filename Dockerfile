@@ -24,7 +24,7 @@ RUN bun run --filter '@polls/shared'     build \
 
 # ---------------------------------------------------------------------------
 
-FROM eclipse-temurin:25-jdk AS backend-builder
+FROM bellsoft/liberica-runtime-container:jdk-25-glibc AS backend-builder
 WORKDIR /src
 
 # Maven wrapper + reactor POM must land before the modules so
@@ -45,7 +45,7 @@ RUN ./mvnw -pl backend/poll-api -am package -DskipTests -Dspotless.check.skip=tr
 
 # ---------------------------------------------------------------------------
 
-FROM eclipse-temurin:25-jre AS runtime
+FROM bellsoft/liberica-runtime-container:jre-25-glibc AS runtime
 WORKDIR /app
 COPY --from=backend-builder /src/backend/poll-api/target/poll-api-0.0.1-SNAPSHOT.jar /app/app.jar
 EXPOSE 8080
