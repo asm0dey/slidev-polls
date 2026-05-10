@@ -18,9 +18,9 @@ COPY frontends/backoffice ./backoffice
 COPY frontends/slidev-component ./slidev-component
 COPY frontends/slidev-demo ./slidev-demo
 RUN bun install
-RUN bun run --filter '@polls/shared'     build \
- && bun run --filter '@polls/voter'      build \
- && bun run --filter '@polls/backoffice' build
+RUN bun run --filter '@slidev-polls/shared'     build \
+ && bun run --filter '@slidev-polls/voter'      build \
+ && bun run --filter '@slidev-polls/backoffice' build
 
 # ---------------------------------------------------------------------------
 
