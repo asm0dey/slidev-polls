@@ -1,17 +1,23 @@
----
 theme: default
 title: Slidev Polls — Auth-Gated Demo
 addons:
-  - "@slidev-polls/component"
-colorSchema: dark
-drawings:
+
+- "@slidev-polls/component"
+  colorSchema: dark
+  drawings:
   persist: false
-transition: slide-left
+  transition: slide-left
+
 # Custom — read by PollPanel via useSlideContext().$slidev.configs and
+
 # routed at the in-deck auth control + SSE + activate calls. Drop this
+
 # if the deck runs same-origin with the backend, or override per slide
+
 # by adding `pollServer: ...` to that slide's own frontmatter block.
+
 pollServer: http://localhost:8080
+
 ---
 
 # Slidev Polls
@@ -43,7 +49,9 @@ To run this deck:
 - Revoke the token from the backoffice → next navigation flips the control
   back to _not signed in_ with _credential not recognised_.
 
-## layout: center
+---
+layout: center
+---
 
 ## Q1 — paste your snippet here
 
@@ -74,8 +82,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 -->
 
 ---
-
-## layout: center
+layout: center
+---
 
 ## Q2 — paste your second snippet here
 
@@ -108,8 +116,8 @@ Open a second tab without signing in — same tallies, never fires activate.
 | _live updates paused_ on SSE drop        | kill the SSE from devtools     |
 
 ---
-
-## layout: end
+layout: end
+---
 
 # Done.
 
