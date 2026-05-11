@@ -9,13 +9,11 @@ version: "3"
 #   task down          — stop everything and remove compose containers
 #   task test          — full suite (backend verify + every frontend vitest + shared bun test)
 #   task codegen       — regenerate jOOQ sources against a Testcontainers Postgres
-#   task frontends     — build the SPAs into backend/poll-api static
+#   task frontends     — build the SPAs into src/main/resources/static
 #   task format        — spotless:apply (java) + prettier --write (frontends)
 #   task hooks:install — install lefthook git hooks (prettier + IIKIT chain)
 
 vars:
-  POLL_API_MODULE: backend/poll-api
-  POLL_PERSISTENCE_MODULE: backend/poll-persistence
   COMPOSE_BASE: docker-compose.yml
   COMPOSE_DEV: compose.dev.yml
 
@@ -78,20 +76,20 @@ tasks:
   # ---------- Build surfaces ----------------------------------------------
 
   frontends:
-    desc: Build the voter + backoffice SPAs into backend poll-api static
+    desc: Build the voter + backoffice SPAs into src/main/resources/static
     cmds:
       - bash scripts/build-frontends.sh
 
   codegen:
     desc: Regenerate jOOQ sources against a Testcontainers Postgres (needed before mvn package)
     cmds:
-      - ./mvnw -Pcodegen -pl {{.POLL_PERSISTENCE_MODULE}} -am compile -Dspotless.check.skip=true
+      - ./mvnw -Pcodegen compile -Dspotless.check.skip=true
 
   package:
     desc: Build the fat JAR on the host (runs codegen first)
     deps: [codegen, frontends]
     cmds:
-      - ./mvnw -pl {{.POLL_API_MODULE}} -am package -DskipTests -Dspotless.check.skip=true
+      - ./mvnw package -DskipTests -Dspotless.check.skip=true
 
   # ---------- Tests --------------------------------------------------------
 
@@ -227,4 +225,4 @@ tasks:
     cmds:
       - ./mvnw clean
       - rm -rf frontends/*/dist
-      - rm -rf backend/poll-api/src/main/resources/static
+      - rm -rf src/main/resources/static
