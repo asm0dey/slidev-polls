@@ -1,7 +1,8 @@
 # Keep the Docker build context slim and reproducible.
-# We deliberately DO include backend/**/target/generated-sources/jooq because
-# the backend-builder stage expects codegen to have run on the host first
-# (see scripts/dev-up.sh and the README "Run everything in Docker" section).
+# We deliberately DO include target/generated-sources/jooq because the
+# backend-builder stage expects codegen to have run on the host first
+# (see Taskfile `codegen` target and the README "Run everything in Docker"
+# section).
 
 # Node / bun artefacts — regenerated inside the frontends-builder stage.
 **/node_modules/
@@ -10,16 +11,16 @@
 **/dist/
 
 # Maven build outputs — regenerated inside the backend-builder stage.
-backend/*/target/classes/
-backend/*/target/test-classes/
-backend/*/target/maven-archiver/
-backend/*/target/maven-status/
-backend/*/target/surefire-reports/
-backend/*/target/failsafe-reports/
-backend/*/target/spotless-index
-backend/*/target/generated-test-sources/
-backend/*/target/*.jar
-backend/*/target/*.original
+target/classes/
+target/test-classes/
+target/maven-archiver/
+target/maven-status/
+target/surefire-reports/
+target/failsafe-reports/
+target/spotless-index
+target/generated-test-sources/
+target/*.jar
+target/*.original
 
 # IDE / OS cruft
 .idea/
