@@ -1,10 +1,7 @@
 # Git hooks (https://lefthook.dev). Install with `task hooks:install`.
 #
-# Runs prettier --write on staged frontend files and re-stages the formatted
-# output, then chains to the IIKIT assertion-integrity hook. On `lefthook
-# install` lefthook moves any pre-existing .git/hooks/pre-commit aside as
-# pre-commit.old; the iikit job below re-invokes that snapshot so the
-# assertion-integrity check still runs on every commit.
+# Runs prettier --write on staged frontend files and spotless:apply on staged
+# Java files, re-staging anything the formatters rewrite.
 
 pre-commit:
   parallel: false
@@ -15,10 +12,7 @@ pre-commit:
       run: bunx prettier --write {staged_files}
       stage_fixed: true
 
-    - name: iikit
-      run: |
-        if [ -x .git/hooks/pre-commit.old ]; then
-          bash .git/hooks/pre-commit.old
-        else
-          echo "[lefthook] .git/hooks/pre-commit.old not found; IIKIT check skipped" >&2
-        fi
+    - name: spotless
+      glob: "**/*.java"
+      run: ./mvnw -q spotless:apply -DspotlessFiles="$(printf '%s\n' {staged_files} | sed "s|^|$PWD/|" | paste -sd,)"
+      stage_fixed: true
