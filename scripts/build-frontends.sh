@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build every frontend package and copy the built SPA bundles into
-# poll-api's static resources so the single-JAR deployment serves them.
+# Build every frontend package and copy the built SPA bundles into the
+# application's static resources so the single-JAR deployment serves them.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STATIC="$ROOT/backend/poll-api/src/main/resources/static"
+STATIC="$ROOT/src/main/resources/static"
 
 cd "$ROOT/frontends"
 bun install
