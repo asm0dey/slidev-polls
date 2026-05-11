@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+// Slidev's addon loader does not execute the package's `index.ts`, so the
+// side-effect tokens.css import there never runs in a deck. Pulling it in
+// from the nav-control component (mounted on every slide) guarantees that
+// `--sp-*` custom properties are defined before any sp-* styled component.
+import "@slidev-polls/shared/tokens.css";
 import { useSlideContext } from "@slidev/client";
 import DeckAuthControl from "./DeckAuthControl.vue";
 import { useDeckAuth } from "../composables/useDeckAuth";
