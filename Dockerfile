@@ -2,8 +2,8 @@
 #   1. frontends-builder — bun install + build the voter / backoffice SPAs
 #      (the Slidev addon is consumed in-deck; its dist is irrelevant for the
 #      single-JAR runtime).
-#   2. backend-builder   — mvnw package against the Maven reactor, with the
-#      frontend dists staged under poll-api/src/main/resources/static. jOOQ
+#   2. backend-builder   — mvnw package against the unified project, with
+#      the frontend dists staged under src/main/resources/static. jOOQ
 #      generated sources must already exist in the context — `task codegen`
 #      runs the codegen profile against a running Postgres before the compose
 #      build is invoked by `task up`.
@@ -27,27 +27,26 @@ RUN bun run --filter '@slidev-polls/shared'     build \
 FROM bellsoft/liberica-runtime-container:jdk-25.0.3_11-glibc AS backend-builder
 WORKDIR /src
 
-# Maven wrapper + reactor POM must land before the modules so
-# `./mvnw dependency:go-offline` could be wired in later without rearranging.
 COPY mvnw ./
 COPY .mvn ./.mvn
 COPY pom.xml ./
-COPY backend ./backend
+COPY src ./src
+COPY target/generated-sources ./target/generated-sources
 RUN chmod +x mvnw
 
 # Stage the built SPAs into the locations SpaForwardingConfig expects.
-COPY --from=frontends-builder /build/voter/dist/      backend/poll-api/src/main/resources/static/
-COPY --from=frontends-builder /build/backoffice/dist/ backend/poll-api/src/main/resources/static/admin/
+COPY --from=frontends-builder /build/voter/dist/      src/main/resources/static/
+COPY --from=frontends-builder /build/backoffice/dist/ src/main/resources/static/admin/
 
-# Package the fat JAR. -am rebuilds sibling modules in-reactor; skip tests and
-# spotless — CI and `./mvnw verify` cover those on the host.
-RUN ./mvnw -pl backend/poll-api -am package -DskipTests -Dspotless.check.skip=true
+# Package the fat JAR. Skip tests and spotless — CI and `./mvnw verify` cover
+# those on the host.
+RUN ./mvnw package -DskipTests -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 
 FROM bellsoft/liberica-runtime-container:jre-25.0.3_11-glibc AS runtime
 WORKDIR /app
-COPY --from=backend-builder /src/backend/poll-api/target/poll-api-0.0.1-SNAPSHOT.jar /app/app.jar
+COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /app/app.jar
 EXPOSE 8080
 ENV JAVA_OPTS=""
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
