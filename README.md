@@ -131,12 +131,17 @@ full feature specification, plan, data model, and HTTP contract.
 ## Repository layout
 
 ```
-pom.xml                  # reactor parent (spring-boot-starter-parent 4.0.5)
-backend/
-  poll-core/             # domain + services, no web, no JDBC
-  poll-persistence/      # jOOQ + Flyway migrations
-  poll-realtime/         # SSE hub + tally broadcaster
-  poll-api/              # Spring Boot entrypoint, controllers, SPA hosting
+pom.xml                  # single Spring Boot application (spring-boot-starter-parent 4.0.6)
+src/main/java/site/asm0dey/slidev/polls/
+  core/                  # domain + services, no web, no JDBC
+  persistence/           # jOOQ + Flyway migrations
+  realtime/              # SSE hub + tally broadcaster
+  api/                   # Spring Boot entrypoint, controllers, SPA hosting
+src/main/resources/
+  application.yml
+  db/migration/          # Flyway V1..V6
+  static/                # built voter + backoffice SPAs (gitignored)
+src/test/java/...        # unit + integration tests (mirrors main packages)
 frontends/               # bun workspace
   shared/                # @slidev-polls/shared — DTOs, api-client, sse-client
   voter/                 # @slidev-polls/voter — public SPA at /
