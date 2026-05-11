@@ -1,23 +1,17 @@
+---
 theme: default
 title: Slidev Polls — Auth-Gated Demo
 addons:
-
-- "@slidev-polls/component"
-  colorSchema: dark
-  drawings:
+  - "@slidev-polls/component"
+colorSchema: dark
+drawings:
   persist: false
-  transition: slide-left
-
+transition: slide-left
 # Custom — read by PollPanel via useSlideContext().$slidev.configs and
-
 # routed at the in-deck auth control + SSE + activate calls. Drop this
-
 # if the deck runs same-origin with the backend, or override per slide
-
 # by adding `pollServer: ...` to that slide's own frontmatter block.
-
 pollServer: http://localhost:8080
-
 ---
 
 # Slidev Polls
@@ -71,9 +65,9 @@ Example shape:
 -->
 
 <PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
+  slug="e2e-fullflow-mp07iyr7"
+  pollId="2120e829-eafc-4182-b59d-7ee9bfed94e0"
+  questionId="be3785ab-8bb2-4546-8020-dbe4f4613fae"
 />
 
 <!--
@@ -86,12 +80,6 @@ layout: center
 ---
 
 ## Q2 — paste your second snippet here
-
-<PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
-/>
 
 ---
 

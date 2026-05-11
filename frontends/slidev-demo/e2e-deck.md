@@ -27,8 +27,8 @@ spec's TS-C02 step (`page.evaluate(fetch)`) so the activation does not depend
 on a Vue lifecycle hook racing the auth status flip.
 
 ---
-
-## layout: center
+layout: center
+---
 
 <script setup lang="ts">
 import { pollSlug, pollId, q1Id } from "./data";
@@ -39,8 +39,8 @@ import { pollSlug, pollId, q1Id } from "./data";
 <PollResults :slug="pollSlug" :poll-id="pollId" :question-id="q1Id" />
 
 ---
-
-## layout: center
+layout: center
+---
 
 <script setup lang="ts">
 import { pollSlug, pollId, q2Id } from "./data";
