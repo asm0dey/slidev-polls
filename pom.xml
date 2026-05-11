@@ -12,11 +12,11 @@
     </parent>
 
     <groupId>site.asm0dey.slidev.polls</groupId>
-    <artifactId>slidev-polls-parent</artifactId>
+    <artifactId>slidev-polls</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>pom</packaging>
-    <name>slidev-polls-parent</name>
-    <description>Slidev Polls — reactor parent</description>
+    <packaging>jar</packaging>
+    <name>slidev-polls</name>
+    <description>Slidev Polls — unified Spring Boot application</description>
     <url>https://github.com/asm0dey/slidev-polls</url>
 
     <licenses>
@@ -41,87 +41,152 @@
         <url>https://github.com/asm0dey/slidev-polls</url>
     </scm>
 
-    <modules>
-        <module>backend</module>
-    </modules>
-
     <properties>
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <db.codegen.schema>polls_codegen</db.codegen.schema>
+        <postgresql.version>42.7.11</postgresql.version>
+        <testcontainers-jooq-codegen-maven-plugin.version>1.0.0</testcontainers-jooq-codegen-maven-plugin.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>site.asm0dey.slidev.polls</groupId>
-                <artifactId>poll-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>site.asm0dey.slidev.polls</groupId>
-                <artifactId>poll-persistence</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>site.asm0dey.slidev.polls</groupId>
-                <artifactId>poll-realtime</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.zxing</groupId>
-                <artifactId>core</artifactId>
-                <version>3.5.4</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.zxing</groupId>
-                <artifactId>javase</artifactId>
-                <version>3.5.4</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+    <dependencies>
+        <!-- Web + security + validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!--
+          Argon2PasswordEncoder (SecurityConfig#passwordEncoder) delegates
+          to org.bouncycastle.crypto.generators.Argon2BytesGenerator.
+          Spring Security ships the encoder but not the BC primitive.
+          Recorded under Constitution §VIII: justified by the
+          password-hashing upgrade documented in
+          docs/superpowers/specs/2026-05-09-replace-hardcoded-admin-credentials-design.md.
+        -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.84</version>
+        </dependency>
+
+        <!-- Persistence -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+
+        <!-- QR generation -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.4</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.4</version>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-maven-plugin</artifactId>
-                </plugin>
-                <plugin>
-                    <groupId>com.diffplug.spotless</groupId>
-                    <artifactId>spotless-maven-plugin</artifactId>
-                    <version>3.4.0</version>
-                    <configuration>
-                        <java>
-                            <googleJavaFormat>
-                                <version>1.28.0</version>
-                                <style>GOOGLE</style>
-                                <reflowLongStrings>true</reflowLongStrings>
-                            </googleJavaFormat>
-                            <removeUnusedImports/>
-                            <formatAnnotations/>
-                        </java>
-                    </configuration>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>check</goal>
-                            </goals>
-                            <phase>verify</phase>
-                        </execution>
-                    </executions>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>site.asm0dey.slidev.polls.api.PollApiApplication</mainClass>
+                </configuration>
+            </plugin>
+
             <!--
-              Bind failsafe to integration-test / verify so Maven's standard
-              `*IT.java` naming convention (PollAuthoringIT, OneActivePerPollIT,
-              StreamIT, …) actually runs. Spring Boot's parent POM only manages
-              the version; execution binding has to live here. Kept at reactor
-              root so every module inherits the same contract without per-
-              module duplication.
+              Spotless: google-java-format on every Java source, applied at
+              `verify` so reactor goals fail loud on a drifted format.
+            -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.28.0</version>
+                            <style>GOOGLE</style>
+                            <reflowLongStrings>true</reflowLongStrings>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                        <formatAnnotations/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Failsafe runs `*IT.java` at integration-test / verify. Spring
+              Boot's parent only manages the version; binding lives here.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -136,6 +201,128 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!--
+              build-helper attaches the on-disk jOOQ codegen output to every
+              invocation's compile source roots. The `codegen` profile produces
+              the sources; this plugin wires them to the compiler so a plain
+              `./mvnw compile` picks them up without re-running codegen each
+              time.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>add-jooq-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/jooq</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>codegen</id>
+            <build>
+                <plugins>
+                    <!--
+                      testcontainers-jooq-codegen-maven-plugin spins up a
+                      throwaway Postgres, runs Flyway, then jOOQ codegen.
+                      Docker on PATH is the only prerequisite.
+                    -->
+                    <plugin>
+                        <groupId>dev.sivalabs</groupId>
+                        <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+                        <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.testcontainers</groupId>
+                                <artifactId>testcontainers-postgresql</artifactId>
+                                <version>${testcontainers.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.postgresql</groupId>
+                                <artifactId>postgresql</artifactId>
+                                <version>${postgresql.version}</version>
+                            </dependency>
+                            <!--
+                              Pin jOOQ tooling to the runtime BOM (3.19.32).
+                              The plugin defaults to a newer codegen that
+                              emits symbols absent from the runtime jar.
+                            -->
+                            <dependency>
+                                <groupId>org.jooq</groupId>
+                                <artifactId>jooq</artifactId>
+                                <version>${jooq.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.jooq</groupId>
+                                <artifactId>jooq-meta</artifactId>
+                                <version>${jooq.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.jooq</groupId>
+                                <artifactId>jooq-codegen</artifactId>
+                                <version>${jooq.version}</version>
+                            </dependency>
+                        </dependencies>
+                        <executions>
+                            <execution>
+                                <id>codegen-generate</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>generate</goal>
+                                </goals>
+                                <configuration>
+                                    <database>
+                                        <type>POSTGRES</type>
+                                        <containerImage>postgres:18</containerImage>
+                                    </database>
+                                    <flyway>
+                                        <defaultSchema>${db.codegen.schema}</defaultSchema>
+                                        <schemas>
+                                            <schema>${db.codegen.schema}</schema>
+                                        </schemas>
+                                        <createSchemas>true</createSchemas>
+                                        <locations>
+                                            <location>filesystem:src/main/resources/db/migration</location>
+                                        </locations>
+                                    </flyway>
+                                    <jooq>
+                                        <generator>
+                                            <database>
+                                                <name>org.jooq.meta.postgres.PostgresDatabase</name>
+                                                <includes>admin_user|polls|poll_questions|poll_options|votes|deck_tokens</includes>
+                                                <schemata>
+                                                    <schema>
+                                                        <inputSchema>${db.codegen.schema}</inputSchema>
+                                                        <outputSchemaToDefault>true</outputSchemaToDefault>
+                                                    </schema>
+                                                </schemata>
+                                            </database>
+                                            <target>
+                                                <packageName>site.asm0dey.slidev.polls.persistence.jooq</packageName>
+                                                <directory>${project.build.directory}/generated-sources/jooq</directory>
+                                            </target>
+                                        </generator>
+                                    </jooq>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

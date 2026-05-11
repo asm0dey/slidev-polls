@@ -9,8 +9,10 @@ node_modules/
 .bun/
 frontends/*/dist/
 
-# Built SPA bundles copied into backend
+# Built SPA bundles copied into backend (pre-unification path kept for Task 6 cleanup)
 backend/poll-api/src/main/resources/static/
+# Built SPA bundles in unified app layout
+src/main/resources/static/
 
 # IDE
 .idea/
