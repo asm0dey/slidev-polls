@@ -36,7 +36,7 @@ jobs:
           cache: maven
 
       - name: jOOQ codegen
-        run: ./mvnw -B -ntp -Pcodegen -pl backend/poll-persistence -am compile -Dspotless.check.skip=true
+        run: ./mvnw -B -ntp -Pcodegen compile -Dspotless.check.skip=true
 
       - name: Maven verify (unit + integration tests)
         run: ./mvnw -B -ntp verify -Dspotless.check.skip=true
@@ -47,8 +47,8 @@ jobs:
         with:
           name: backend-test-reports
           path: |
-            backend/**/target/surefire-reports/**
-            backend/**/target/failsafe-reports/**
+            target/surefire-reports/**
+            target/failsafe-reports/**
           if-no-files-found: ignore
           retention-days: 7
 
@@ -207,7 +207,7 @@ jobs:
         # exist in the build context — codegen uses Testcontainers and so
         # can't run inside `docker build`. Materialise the sources on the
         # runner first; .dockerignore lets target/generated-sources through.
-        run: ./mvnw -B -ntp -Pcodegen -pl backend/poll-persistence -am compile -Dspotless.check.skip=true
+        run: ./mvnw -B -ntp -Pcodegen compile -Dspotless.check.skip=true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
