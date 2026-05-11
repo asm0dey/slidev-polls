@@ -14,7 +14,7 @@ trap cleanup EXIT
 
 docker compose -f "$ROOT/docker-compose.yml" up -d postgres
 
-(cd "$ROOT" && ./mvnw -pl backend/poll-api -am spring-boot:run) &
+(cd "$ROOT" && ./mvnw spring-boot:run) &
 (cd "$ROOT/frontends" && bun run --filter '@slidev-polls/voter'      dev --port 5173) &
 (cd "$ROOT/frontends" && bun run --filter '@slidev-polls/backoffice' dev --port 5174) &
 
