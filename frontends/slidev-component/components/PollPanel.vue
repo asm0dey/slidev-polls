@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useAttrs, watch } from "vue";
+// Slidev's addon loader does not execute the package's `index.ts`, so the
+// side-effect tokens.css import from there never runs in a deck. Re-import
+// it from this top-level component so `--sp-*` custom properties resolve
+// (without it, every `background: var(--sp-*)` collapses to transparent).
+import "@slidev-polls/shared/tokens.css";
 import {
   openPollStream,
   ResultsPanel,
