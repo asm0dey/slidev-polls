@@ -157,7 +157,7 @@
 
             <!--
               Spotless: google-java-format on every Java source, applied at
-              `verify` so reactor goals fail loud on a drifted format.
+              `verify` so `./mvnw verify` fails loud on a drifted format.
             -->
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
