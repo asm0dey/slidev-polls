@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_.dto;
+package site.asm0dey.slidev.polls.api.pub.dto;
 
 import java.time.Instant;
 import java.util.UUID;

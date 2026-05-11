@@ -43,6 +43,7 @@ class PollServiceTest {
   void setUp() {
     repository = new FakePollRepository();
     service = new PollService(repository, new RecordingEventPublisher());
+    service.setPollService(service);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title

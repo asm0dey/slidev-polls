@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_;
+package site.asm0dey.slidev.polls.api.pub;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;

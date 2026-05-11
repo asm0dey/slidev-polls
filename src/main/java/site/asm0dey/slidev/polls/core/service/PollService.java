@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,12 @@ public class PollService {
 
   private final PollRepository repository;
   private final ApplicationEventPublisher events;
+  private PollService pollService;
+
+  @Autowired
+  public void setPollService(PollService pollService) {
+    this.pollService = pollService;
+  }
 
   public PollService(PollRepository repository, ApplicationEventPublisher events) {
     this.repository = repository;
@@ -84,7 +91,7 @@ public class PollService {
 
   @Transactional
   public Poll updateForOwner(UUID pollId, String ownerUsername, UpdatePollCommand command) {
-    Poll existing = getForOwner(pollId, ownerUsername);
+    Poll existing = pollService.getForOwner(pollId, ownerUsername);
     String title = command.title() != null ? command.title() : existing.title();
     String slug = existing.slug();
     if (command.slug() != null && !command.slug().equals(existing.slug())) {
@@ -104,25 +111,25 @@ public class PollService {
 
   @Transactional
   public Poll updateStyleForOwner(UUID pollId, String ownerUsername, Map<String, Object> style) {
-    getForOwner(pollId, ownerUsername);
+    pollService.getForOwner(pollId, ownerUsername);
     return repository.updateStyle(pollId, style == null ? Map.of() : style);
   }
 
   @Transactional
   public void deleteForOwner(UUID pollId, String ownerUsername) {
-    getForOwner(pollId, ownerUsername);
+    pollService.getForOwner(pollId, ownerUsername);
     repository.delete(pollId);
   }
 
   @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
-    getForOwner(pollId, ownerUsername);
-    return activateQuestion(pollId, questionId);
+    pollService.getForOwner(pollId, ownerUsername);
+    return pollService.activateQuestion(pollId, questionId);
   }
 
   @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    Poll before = getForOwner(pollId, ownerUsername);
+    Poll before = pollService.getForOwner(pollId, ownerUsername);
     UUID wasActive = before.activeQuestionId();
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {
@@ -171,7 +178,7 @@ public class PollService {
     if (ReservedSlugs.isReserved(candidate)) {
       throw new SlugReservedException(candidate);
     }
-    if (candidate == null || !SlugValidator.isValidFormat(candidate)) {
+    if (!SlugValidator.isValidFormat(candidate)) {
       throw new SlugInvalidException(candidate == null ? "" : candidate);
     }
     if (repository.slugTaken(candidate, excludingPollId)) {

@@ -2,6 +2,7 @@ package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,14 +53,7 @@ public class VoteService {
   @Transactional
   public Vote recordVote(String slug, UUID optionId, String voterToken) {
     Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
-    UUID activeQuestionId = poll.activeQuestionId();
-    if (activeQuestionId == null) {
-      // Early-exit before the wasted round-trip to VoteRepository.insert. The repo-level
-      // INSERT ... SELECT would also return zero rows and throw QuestionNotActiveException,
-      // but catching the trivial case here keeps error classification cheap and avoids a
-      // misleading stack trace from a query that never had a chance to succeed.
-      throw new QuestionNotActiveException("poll " + slug + " has no active question");
-    }
+    UUID activeQuestionId = getActiveQuestionId(slug, poll);
     Question activeQuestion =
         poll.questions().stream()
             .filter(q -> q.id().equals(activeQuestionId))
@@ -84,6 +78,18 @@ public class VoteService {
     events.publishEvent(
         new VoteCastEvent(poll.id(), activeQuestionId, optionId, newCount, stored.createdAt()));
     return stored;
+  }
+
+  private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {
+    UUID activeQuestionId = poll.activeQuestionId();
+    if (activeQuestionId == null) {
+      // Early-exit before the wasted round-trip to VoteRepository.insert. The repo-level
+      // INSERT ... SELECT would also return zero rows and throw QuestionNotActiveException,
+      // but catching the trivial case here keeps error classification cheap and avoids a
+      // misleading stack trace from a query that never had a chance to succeed.
+      throw new QuestionNotActiveException("poll " + slug + " has no active question");
+    }
+    return activeQuestionId;
   }
 
   /** Best-effort hint used to populate {@code PublicPollView.alreadyVoted}. */

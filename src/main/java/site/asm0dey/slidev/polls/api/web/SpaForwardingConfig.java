@@ -108,7 +108,7 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
       return null;
     }
 
-    private static Resource readable(Resource r) throws IOException {
+    private static Resource readable(Resource r) {
       return (r.exists() && r.isReadable()) ? r : null;
     }
 

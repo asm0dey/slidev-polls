@@ -69,7 +69,7 @@ public class VoteRepositoryImpl implements VoteRepository {
                               .eq(vote.questionId())
                               .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))))
               .execute();
-    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException e) {
+    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException _) {
       throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
     }
     if (inserted == 0) {

@@ -13,10 +13,10 @@ class CreateAdminCommandTest {
   void toStringMasksPassword() {
     var cmd = new CreateAdminCommand("alice", "correct-horse-battery", "Alice");
 
-    String s = cmd.toString();
-
-    assertThat(s).contains("password=***");
-    assertThat(s).doesNotContain("correct-horse-battery");
-    assertThat(s).contains("alice").contains("Alice");
+    assertThat(cmd.toString())
+        .contains("password=***")
+        .doesNotContain("correct-horse-battery")
+        .contains("alice")
+        .contains("Alice");
   }
 }

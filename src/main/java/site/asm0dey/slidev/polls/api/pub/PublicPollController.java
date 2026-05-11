@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_;
+package site.asm0dey.slidev.polls.api.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import site.asm0dey.slidev.polls.api.public_.dto.PublicPollView;
+import site.asm0dey.slidev.polls.api.pub.dto.PublicPollView;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
@@ -45,7 +45,7 @@ public class PublicPollController {
   public ResponseEntity<PublicPollView> getBySlug(
       @PathVariable String slug, HttpServletRequest request) {
     // @TS-045 — reject an unparseable slug at the edge; do not hit the repository.
-    if (slug == null || !SlugValidator.isValidFormat(slug)) {
+    if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
     Poll poll =

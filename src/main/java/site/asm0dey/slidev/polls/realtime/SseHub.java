@@ -102,16 +102,16 @@ public class SseHub {
   @Scheduled(fixedDelay = 15_000L)
   public void heartbeat() {
     for (UUID pollId : byPoll.keySet()) {
-      broadcastComment(pollId, "keep-alive");
+      keepAlive(pollId);
     }
   }
 
-  private void broadcastComment(UUID pollId, String comment) {
+  private void keepAlive(UUID pollId) {
     Set<SseEmitter> subs = byPoll.get(pollId);
     if (subs == null || subs.isEmpty()) {
       return;
     }
-    SseEventBuilder event = SseEmitter.event().comment(comment);
+    SseEventBuilder event = SseEmitter.event().comment("keep-alive");
     for (SseEmitter emitter : subs) {
       try {
         emitter.send(event);

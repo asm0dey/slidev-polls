@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_;
+package site.asm0dey.slidev.polls.api.pub;
 
 import java.io.IOException;
 import java.lang.System.Logger;
@@ -53,7 +53,7 @@ public class StreamController {
 
   @GetMapping("/{slug}/stream")
   public SseEmitter stream(@PathVariable String slug) {
-    if (slug == null || !SlugValidator.isValidFormat(slug)) {
+    if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
     Poll poll =

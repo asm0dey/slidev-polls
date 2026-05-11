@@ -12,6 +12,7 @@ import org.jooq.Record;
 import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.DeckToken;
 import site.asm0dey.slidev.polls.core.service.DeckTokenRepository;
+import site.asm0dey.slidev.polls.core.service.DeckTokenService;
 
 /**
  * jOOQ-backed implementation of {@link DeckTokenRepository}. Only the SHA-256 hash lands in

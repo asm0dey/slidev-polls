@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_;
+package site.asm0dey.slidev.polls.api.pub;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;

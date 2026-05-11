@@ -44,12 +44,12 @@ public class GlobalExceptionHandler {
   private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   @ExceptionHandler(AuthenticationException.class)
-  ResponseEntity<Problem> handleAuth(AuthenticationException ex) {
+  ResponseEntity<Problem> handleAuth() {
     return respond(HttpStatus.UNAUTHORIZED, ProblemCode.AUTH_REQUIRED, "authentication required");
   }
 
   @ExceptionHandler(AccessDeniedException.class)
-  ResponseEntity<Problem> handleForbidden(AccessDeniedException ex) {
+  ResponseEntity<Problem> handleForbidden() {
     return respond(HttpStatus.FORBIDDEN, ProblemCode.FORBIDDEN, "access denied");
   }
 
@@ -143,7 +143,7 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
-  ResponseEntity<Problem> handleUnreadableBody(HttpMessageNotReadableException ex) {
+  ResponseEntity<Problem> handleUnreadableBody() {
     return respond(
         HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, "request body is invalid");
   }
@@ -152,7 +152,7 @@ public class GlobalExceptionHandler {
   // 404, not a transport fault. Without this handler the catch-all {@link Exception} branch
   // below maps it to 500 and the browser sees a JSON Problem envelope in place of the asset.
   @ExceptionHandler(NoResourceFoundException.class)
-  ResponseEntity<Problem> handleResourceMissing(NoResourceFoundException ex) {
+  ResponseEntity<Problem> handleResourceMissing() {
     return respond(HttpStatus.NOT_FOUND, ProblemCode.NOT_FOUND, "resource not found");
   }
 

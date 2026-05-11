@@ -2,8 +2,8 @@ package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
 import java.util.List;
-import org.springframework.dao.CannotSerializeTransactionException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,7 +50,7 @@ public class AdminUserService {
    * <ul>
    *   <li>both pass the in-tx {@code count()} check at their MVCC snapshot,
    *   <li>both insert,
-   *   <li>one commit succeeds, the other fails with {@link CannotSerializeTransactionException} (or
+   *   <li>one commit succeeds, the other fails with {@link PessimisticLockingFailureException} (or
    *       {@link DataIntegrityViolationException} if usernames collide on the PK).
    * </ul>
    *
@@ -61,7 +61,7 @@ public class AdminUserService {
   public AdminUser createInitialAdmin(CreateAdminCommand command) {
     try {
       return serializableTx.execute(
-          status -> {
+          _ -> {
             if (repository.count() != 0L) {
               throw new SetupLockedException("setup already complete");
             }
@@ -69,7 +69,7 @@ public class AdminUserService {
             repository.insert(command.username(), hash, command.displayName());
             return new AdminUser(command.username(), command.displayName(), Instant.now());
           });
-    } catch (CannotSerializeTransactionException | DataIntegrityViolationException ex) {
+    } catch (PessimisticLockingFailureException | DataIntegrityViolationException _) {
       throw new SetupLockedException("setup already complete");
     }
   }
@@ -90,7 +90,7 @@ public class AdminUserService {
     String hash = passwordEncoder.encode(command.password());
     try {
       repository.insert(command.username(), hash, command.displayName());
-    } catch (DataIntegrityViolationException ex) {
+    } catch (DataIntegrityViolationException _) {
       throw new UsernameTakenException(command.username());
     }
     return new AdminUser(command.username(), command.displayName(), Instant.now());

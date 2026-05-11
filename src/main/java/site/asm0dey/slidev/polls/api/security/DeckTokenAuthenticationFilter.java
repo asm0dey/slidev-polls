@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -83,6 +84,19 @@ public class DeckTokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     public DeckPrincipal getPrincipal() {
       return principal;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (getClass() != o.getClass()) return false;
+      if (!super.equals(o)) return false;
+      DeckAuthenticationToken that = (DeckAuthenticationToken) o;
+      return Objects.equals(principal, that.principal);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(super.hashCode(), principal);
     }
   }
 }

@@ -27,7 +27,7 @@ public final class SlugDeriver {
       }
       boolean alnum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
       if (alnum) {
-        if (dashPending && out.length() > 0) {
+        if (dashPending && !out.isEmpty()) {
           out.append('-');
         }
         out.append(c);
@@ -36,14 +36,14 @@ public final class SlugDeriver {
         dashPending = true;
       }
     }
-    if (out.length() == 0) {
+    if (out.isEmpty()) {
       return null;
     }
     if (out.length() > SlugValidator.MAX_LENGTH) {
       out.setLength(SlugValidator.MAX_LENGTH);
       // Dropping mid-token may leave a trailing dash — shouldn't happen given
       // our accumulator, but guard anyway to keep the post-condition tight.
-      while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+      while (!out.isEmpty() && out.charAt(out.length() - 1) == '-') {
         out.setLength(out.length() - 1);
       }
     }

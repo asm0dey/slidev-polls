@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.public_;
+package site.asm0dey.slidev.polls.api.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import site.asm0dey.slidev.polls.api.public_.dto.VoteAccepted;
-import site.asm0dey.slidev.polls.api.public_.dto.VoteRequest;
+import site.asm0dey.slidev.polls.api.pub.dto.VoteAccepted;
+import site.asm0dey.slidev.polls.api.pub.dto.VoteRequest;
 import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.VoteService;
@@ -47,7 +47,7 @@ public class VoteController {
   @PostMapping("/{slug}/votes")
   public ResponseEntity<VoteAccepted> submit(
       @PathVariable String slug, @Valid @RequestBody VoteRequest body, HttpServletRequest request) {
-    if (slug == null || !SlugValidator.isValidFormat(slug)) {
+    if (!SlugValidator.isValidFormat(slug)) {
       // Match PublicPollController's rejection: unparseable slug at the edge is 404 NOT_FOUND;
       // no point hitting the service only to fail the same way.
       throw new NotFoundException("no poll with slug '" + slug + "'");
