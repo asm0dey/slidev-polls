@@ -260,5 +260,29 @@ test.describe("cross-origin slidev deck activation", () => {
     await expect(
       page.getByTestId("poll-results").first().getByText("Which JVM for the workshop?")
     ).toBeVisible({ timeout: 8_000 });
+
+    // ── @TS-C04: tokens.css applied ────────────────────────────────────────────
+    // Slidev's addon loader does not execute the package's `index.ts`, so a
+    // side-effect `import "@slidev-polls/shared/tokens.css"` there never runs
+    // in a deck. When it stops running, every `background: var(--sp-*)`
+    // collapses to transparent and `<PollResults>` renders as plain text on
+    // black. Assert two things directly:
+    //   1. `--sp-accent-soft` resolves to a non-empty value on the panel root
+    //      (catches "tokens.css never loaded").
+    //   2. The 100%-fill bar paints — its background-color is not the default
+    //      rgba(0, 0, 0, 0) (catches "tokens.css loaded but scope is wrong").
+    const panel = page.getByTestId("poll-results").first();
+    const accentSoft = await panel.evaluate((el) =>
+      getComputedStyle(el).getPropertyValue("--sp-accent-soft").trim()
+    );
+    expect(accentSoft, "--sp-accent-soft must resolve on .sp-pollpanel").not.toBe("");
+
+    const fillBg = await panel
+      .locator(".sp-rp__fill")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(fillBg, ".sp-rp__fill backgroundColor must not be transparent").not.toMatch(
+      /^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$|^transparent$/
+    );
   });
 });
