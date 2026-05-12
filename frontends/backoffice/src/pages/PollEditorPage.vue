@@ -13,7 +13,14 @@ import type {
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import SlugField from "../components/SlugField.vue";
 import { checkSlug } from "../lib/slug-rules";
-import { AllowedOriginsField, Button, Input, Pill, IconChevronDown } from "@slidev-polls/shared/ui";
+import {
+  AllowedOriginsField,
+  Button,
+  ConfirmDialog,
+  Input,
+  Pill,
+  IconChevronDown
+} from "@slidev-polls/shared/ui";
 
 type Mode = "create" | "edit";
 
@@ -317,6 +324,24 @@ async function deletePoll() {
   }
 }
 
+const showClearVotesDialog = ref(false);
+
+function openClearVotesDialog() {
+  if (!props.pollId) return;
+  showClearVotesDialog.value = true;
+}
+
+async function confirmClearVotes() {
+  showClearVotesDialog.value = false;
+  if (!props.pollId) return;
+  try {
+    const updated = await client.clearVotes(props.pollId);
+    loadFromDetail(updated);
+  } catch (err) {
+    formError.value = describeError(err);
+  }
+}
+
 watch(
   () => props.pollId,
   () => {
@@ -330,203 +355,233 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="pe" data-testid="poll-editor-page">
-    <p v-if="loading" data-testid="poll-editor-loading">Loading…</p>
+  <div>
+    <section class="pe" data-testid="poll-editor-page">
+      <p v-if="loading" data-testid="poll-editor-loading">Loading…</p>
 
-    <template v-else>
-      <header class="pe__header">
-        <div>
-          <div class="pe__crumb">{{ mode === "create" ? "New poll" : "Poll" }}</div>
-          <h1 class="pe__title">{{ title || "Untitled" }}</h1>
-          <p v-if="detail" class="pe__sub">
-            Code <code class="pe__code">{{ detail.slug }}</code> · {{ questions.length }} question{{
-              questions.length === 1 ? "" : "s"
-            }}
-          </p>
-        </div>
-        <div class="pe__header-actions">
-          <router-link
-            v-if="mode === 'edit' && pollId"
-            :to="{ name: 'deck-tokens', params: { pollId } }"
-            class="btn-link"
-            data-testid="deck-tokens-link"
-          >
-            Deck tokens
-          </router-link>
-          <button
-            v-if="mode === 'edit'"
-            type="button"
-            data-testid="poll-delete"
-            class="pe__delete"
-            @click="deletePoll"
-          >
-            Delete poll
-          </button>
-          <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
-            {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
-          </Button>
-        </div>
-      </header>
-
-      <!-- inline error after a submit failure -->
-      <div v-if="formError" role="alert" data-testid="poll-form-error" class="pe__error">
-        {{ formError }}
-      </div>
-
-      <details open class="pe__settings">
-        <summary class="pe__summary">
-          <span>Poll settings</span>
-          <IconChevronDown />
-        </summary>
-        <div class="pe__settings-body">
-          <div class="pe__field">
-            <label class="pe__label">Title</label>
-            <Input v-model="title" placeholder="Poll title" data-testid="poll-title" />
-            <!-- keep legacy testid alias for test compatibility -->
-            <input type="hidden" data-testid="poll-editor-title" :value="title" />
-          </div>
-
-          <div class="pe__field">
-            <label class="pe__label">Slug</label>
-            <SlugField
-              v-model="slug"
-              :mode="mode"
-              @update:valid="(v: boolean) => (slugValid = v)"
-            />
-            <input type="hidden" data-testid="poll-slug" :value="slug" />
-          </div>
-
-          <div class="pe__field">
-            <div class="pe__row">
-              <label class="pe__label">Allowed origins (CORS)</label>
-              <span class="pe__hint-inline">applies to entire poll</span>
-            </div>
-            <AllowedOriginsField v-model="allowedOrigins" />
-            <p class="pe__hint">
-              Browsers from these origins can vote &amp; subscribe to live results. Use
-              <code>*</code> for any origin.
+      <template v-else>
+        <header class="pe__header">
+          <div>
+            <div class="pe__crumb">{{ mode === "create" ? "New poll" : "Poll" }}</div>
+            <h1 class="pe__title">{{ title || "Untitled" }}</h1>
+            <p v-if="detail" class="pe__sub">
+              Code <code class="pe__code">{{ detail.slug }}</code> ·
+              {{ questions.length }} question{{ questions.length === 1 ? "" : "s" }}
             </p>
           </div>
-        </div>
-      </details>
+          <div class="pe__header-actions">
+            <router-link
+              v-if="mode === 'edit' && pollId"
+              :to="{ name: 'deck-tokens', params: { pollId } }"
+              class="btn-link"
+              data-testid="deck-tokens-link"
+            >
+              Deck tokens
+            </router-link>
+            <button
+              v-if="mode === 'edit'"
+              type="button"
+              data-testid="poll-clear-votes"
+              class="pe__clear-votes"
+              @click="openClearVotesDialog"
+            >
+              Clear votes
+            </button>
+            <button
+              v-if="mode === 'edit'"
+              type="button"
+              data-testid="poll-delete"
+              class="pe__delete"
+              @click="deletePoll"
+            >
+              Delete poll
+            </button>
+            <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
+              {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
+            </Button>
+          </div>
+        </header>
 
-      <div class="pe__qhead">
-        <span class="pe__qhead-label"
-          >Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span
-        >
-        <Button data-testid="add-question" @click="addQuestion">+ Add question</Button>
-      </div>
-      <div class="pe__qlist">
-        <div
-          v-for="(q, i) in questions"
-          :key="(q.id ?? '') + ':' + i"
-          class="pe__qrow"
-          :data-active="q.status === 'ACTIVE' ? '' : undefined"
-          :data-expanded="i === expandedIndex ? '' : undefined"
-          :data-testid="`poll-editor-question-${i}`"
-        >
-          <!-- legacy testid for tests that use question-block -->
-          <span style="display: none" data-testid="question-block" />
-          <div class="pe__qhdr">
-            <span class="pe__qhdr-meta">
-              {{ i + 1 }} · multi-choice
-              <Pill
-                v-if="q.status"
-                :tone="q.status === 'ACTIVE' ? 'success' : 'neutral'"
-                :withDot="q.status === 'ACTIVE'"
-              >
-                {{ q.status.toLowerCase() }}
-              </Pill>
-            </span>
-            <div class="pe__qhdr-actions">
-              <Button
-                v-if="mode === 'edit' && q.id && q.status === 'DRAFT'"
-                variant="secondary"
-                size="sm"
-                data-testid="question-activate"
-                @click="activate(q)"
-              >
-                Activate
-              </Button>
-              <Button
-                v-if="mode === 'edit' && q.id && q.status === 'ACTIVE'"
-                variant="secondary"
-                size="sm"
-                data-testid="question-close"
-                @click="closeActive"
-              >
-                Close
-              </Button>
-              <Button
-                v-if="mode === 'edit' && q.id && !dirty"
-                variant="secondary"
-                size="sm"
-                data-testid="question-copy-snippet"
-                @click="copySnippet(q)"
-              >
-                Copy snippet
-              </Button>
-              <span
-                v-else-if="mode === 'edit' && q.id && dirty"
-                class="pe__hint pe__hint--inline"
-                data-testid="copy-snippet-disabled-hint"
-              >
-                Save to copy snippet
-              </span>
-              <span
-                v-if="copiedQuestionId === q.id"
-                class="pe__copied"
-                role="status"
-                data-testid="question-copy-snippet-confirm"
-              >
-                Copied!
-              </span>
-              <Button
-                v-if="i !== expandedIndex"
-                variant="ghost"
-                size="sm"
-                @click="expandedIndex = i"
-                >Edit</Button
-              >
-              <Button
-                v-if="questions.length > 1"
-                variant="ghost"
-                size="sm"
-                data-testid="question-remove"
-                @click="removeQuestion(i)"
-                >×</Button
-              >
+        <!-- inline error after a submit failure -->
+        <div v-if="formError" role="alert" data-testid="poll-form-error" class="pe__error">
+          {{ formError }}
+        </div>
+
+        <details open class="pe__settings">
+          <summary class="pe__summary">
+            <span>Poll settings</span>
+            <IconChevronDown />
+          </summary>
+          <div class="pe__settings-body">
+            <div class="pe__field">
+              <label class="pe__label">Title</label>
+              <Input v-model="title" placeholder="Poll title" data-testid="poll-title" />
+              <!-- keep legacy testid alias for test compatibility -->
+              <input type="hidden" data-testid="poll-editor-title" :value="title" />
+            </div>
+
+            <div class="pe__field">
+              <label class="pe__label">Slug</label>
+              <SlugField
+                v-model="slug"
+                :mode="mode"
+                @update:valid="(v: boolean) => (slugValid = v)"
+              />
+              <input type="hidden" data-testid="poll-slug" :value="slug" />
+            </div>
+
+            <div class="pe__field">
+              <div class="pe__row">
+                <label class="pe__label">Allowed origins (CORS)</label>
+                <span class="pe__hint-inline">applies to entire poll</span>
+              </div>
+              <AllowedOriginsField v-model="allowedOrigins" />
+              <p class="pe__hint">
+                Browsers from these origins can vote &amp; subscribe to live results. Use
+                <code>*</code> for any origin.
+              </p>
             </div>
           </div>
-          <template v-if="i === expandedIndex">
-            <Input v-model="q.prompt" placeholder="Question prompt" data-testid="question-prompt" />
-            <div class="pe__opts">
-              <div v-for="(o, oi) in q.options" :key="oi" class="pe__opt" data-testid="option-row">
-                <span class="pe__handle">⋮⋮</span>
-                <Input v-model="o.label" data-testid="option-label" />
+        </details>
+
+        <div class="pe__qhead">
+          <span class="pe__qhead-label"
+            >Questions <span class="pe__qhead-count">· {{ questions.length }}</span></span
+          >
+          <Button data-testid="add-question" @click="addQuestion">+ Add question</Button>
+        </div>
+        <div class="pe__qlist">
+          <div
+            v-for="(q, i) in questions"
+            :key="(q.id ?? '') + ':' + i"
+            class="pe__qrow"
+            :data-active="q.status === 'ACTIVE' ? '' : undefined"
+            :data-expanded="i === expandedIndex ? '' : undefined"
+            :data-testid="`poll-editor-question-${i}`"
+          >
+            <!-- legacy testid for tests that use question-block -->
+            <span style="display: none" data-testid="question-block" />
+            <div class="pe__qhdr">
+              <span class="pe__qhdr-meta">
+                {{ i + 1 }} · multi-choice
+                <Pill
+                  v-if="q.status"
+                  :tone="q.status === 'ACTIVE' ? 'success' : 'neutral'"
+                  :withDot="q.status === 'ACTIVE'"
+                >
+                  {{ q.status.toLowerCase() }}
+                </Pill>
+              </span>
+              <div class="pe__qhdr-actions">
                 <Button
-                  v-if="q.options.length > 2"
+                  v-if="mode === 'edit' && q.id && q.status === 'DRAFT'"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="question-activate"
+                  @click="activate(q)"
+                >
+                  Activate
+                </Button>
+                <Button
+                  v-if="mode === 'edit' && q.id && q.status === 'ACTIVE'"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="question-close"
+                  @click="closeActive"
+                >
+                  Close
+                </Button>
+                <Button
+                  v-if="mode === 'edit' && q.id && !dirty"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="question-copy-snippet"
+                  @click="copySnippet(q)"
+                >
+                  Copy snippet
+                </Button>
+                <span
+                  v-else-if="mode === 'edit' && q.id && dirty"
+                  class="pe__hint pe__hint--inline"
+                  data-testid="copy-snippet-disabled-hint"
+                >
+                  Save to copy snippet
+                </span>
+                <span
+                  v-if="copiedQuestionId === q.id"
+                  class="pe__copied"
+                  role="status"
+                  data-testid="question-copy-snippet-confirm"
+                >
+                  Copied!
+                </span>
+                <Button
+                  v-if="i !== expandedIndex"
                   variant="ghost"
                   size="sm"
-                  data-testid="option-remove"
-                  @click="removeOption(i, oi)"
+                  @click="expandedIndex = i"
+                  >Edit</Button
+                >
+                <Button
+                  v-if="questions.length > 1"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="question-remove"
+                  @click="removeQuestion(i)"
                   >×</Button
                 >
               </div>
-              <button
-                class="pe__add-opt"
-                type="button"
-                data-testid="add-option"
-                @click="addOption(i)"
-              >
-                + Add option
-              </button>
             </div>
-          </template>
+            <template v-if="i === expandedIndex">
+              <Input
+                v-model="q.prompt"
+                placeholder="Question prompt"
+                data-testid="question-prompt"
+              />
+              <div class="pe__opts">
+                <div
+                  v-for="(o, oi) in q.options"
+                  :key="oi"
+                  class="pe__opt"
+                  data-testid="option-row"
+                >
+                  <span class="pe__handle">⋮⋮</span>
+                  <Input v-model="o.label" data-testid="option-label" />
+                  <Button
+                    v-if="q.options.length > 2"
+                    variant="ghost"
+                    size="sm"
+                    data-testid="option-remove"
+                    @click="removeOption(i, oi)"
+                    >×</Button
+                  >
+                </div>
+                <button
+                  class="pe__add-opt"
+                  type="button"
+                  data-testid="add-option"
+                  @click="addOption(i)"
+                >
+                  + Add option
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
-      </div>
-    </template>
-  </section>
+      </template>
+    </section>
+
+    <ConfirmDialog
+      :open="showClearVotesDialog"
+      title="Clear all votes?"
+      :body="`This deletes every vote for &quot;${title}&quot; and resets every question back to draft. Question and option UUIDs stay the same — embedded snippets keep working.`"
+      confirm-label="Clear votes"
+      cancel-label="Cancel"
+      tone="danger"
+      @confirm="confirmClearVotes"
+      @cancel="showClearVotesDialog = false"
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -751,5 +806,17 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: 500;
+}
+
+.pe__clear-votes {
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+  border: 1px solid var(--sp-border);
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.pe__clear-votes:hover {
+  background: var(--sp-bg-muted);
 }
 </style>
