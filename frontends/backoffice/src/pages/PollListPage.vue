@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import type { Poll } from "@slidev-polls/shared";
 import { Button, Input, Pill } from "@slidev-polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
@@ -14,6 +14,7 @@ const props = withDefaults(
 );
 
 const client = props.apiClient ?? defaultAdminClient;
+const router = useRouter();
 
 const polls = ref<Poll[] | null>(null);
 const loading = ref(true);
@@ -55,6 +56,15 @@ async function onDelete(p: Poll) {
     if (polls.value) {
       polls.value = polls.value.filter((row) => row.id !== p.id);
     }
+  } catch (err) {
+    errorMessage.value = describeError(err);
+  }
+}
+
+async function cloneRow(p: Poll) {
+  try {
+    const created = await client.clonePoll(p.id);
+    await router.push({ name: "poll-edit", params: { pollId: created.id } });
   } catch (err) {
     errorMessage.value = describeError(err);
   }
@@ -145,6 +155,9 @@ function statusLabel(s: string): string {
             >
               Edit
             </RouterLink>
+            <Button variant="secondary" size="sm" data-testid="poll-clone" @click="cloneRow(poll)">
+              Clone
+            </Button>
             <Button variant="danger" size="sm" data-testid="poll-delete" @click="onDelete(poll)">
               Delete
             </Button>

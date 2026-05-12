@@ -9,12 +9,13 @@ import { AdminApiError } from "../lib/admin-api";
 // Match @TS-002 ("poll appears in her poll list" + "poll exposes a join link")
 // and @TS-001 (auth-failure surfaces an actionable error, not a stack trace).
 
-type FakeClient = Pick<AdminApiClient, "listPolls" | "deletePoll" | "qrUrl">;
+type FakeClient = Pick<AdminApiClient, "listPolls" | "deletePoll" | "clonePoll" | "qrUrl">;
 
 function makeFake(overrides: Partial<FakeClient> = {}): AdminApiClient {
   const base: FakeClient = {
     listPolls: vi.fn().mockResolvedValue([]),
     deletePoll: vi.fn().mockResolvedValue(undefined),
+    clonePoll: vi.fn().mockResolvedValue(poll()),
     qrUrl: (id: string) => `/api/admin/polls/${id}/qr.png`,
     ...overrides
   };
@@ -161,5 +162,25 @@ describe("PollListPage", () => {
     } finally {
       confirmSpy.mockRestore();
     }
+  });
+
+  it("clones a poll and navigates to the new poll editor", async () => {
+    const polls = [poll({ id: "p1", title: "Original Poll" })];
+    const clonedPoll = poll({ id: "p-cloned", title: "Original Poll (copy)" });
+    const clonePoll = vi.fn().mockResolvedValue(clonedPoll);
+    const client = makeFake({
+      listPolls: vi.fn().mockResolvedValue(polls),
+      clonePoll
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    const cloneButton = wrapper.find('[data-testid="poll-row"] [data-testid="poll-clone"]');
+    await cloneButton.trigger("click");
+    await flushPromises();
+
+    expect(clonePoll).toHaveBeenCalledWith("p1");
+    expect(wrapper.vm.$route.name).toBe("poll-edit");
+    expect(wrapper.vm.$route.params.pollId).toBe("p-cloned");
   });
 });
