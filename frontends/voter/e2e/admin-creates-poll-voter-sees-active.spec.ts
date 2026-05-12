@@ -92,18 +92,11 @@ async function createPollViaUi(page: Page): Promise<SeededPoll> {
   await optionInputs.nth(1).fill("GraalVM 21");
 
   await page.getByTestId("poll-editor-submit").click();
-  // Save returns to the poll list.
-  await expect(page.getByTestId("poll-list-page")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByTestId("poll-row").filter({ hasText: seed.title })).toBeVisible();
-  return seed;
-}
-
-async function openPollEditorFor(page: Page, title: string) {
-  // PollListPage renders a poll-edit link per row (PollListPage.vue:144). Click the row whose
-  // title matches the seeded one to land on the editor for the freshly created poll.
-  const row = page.getByTestId("poll-row").filter({ hasText: title });
-  await row.getByTestId("poll-edit").click();
+  // Editor stays open on save (Task 10) and replaces the URL with /polls/<uuid>.
+  // Wait for the URL transition and confirm the editor is still mounted.
+  await expect(page).toHaveURL(/\/polls\/[0-9a-f-]{36}$/, { timeout: 10_000 });
   await expect(page.getByTestId("poll-editor-page")).toBeVisible();
+  return seed;
 }
 
 test.describe.serial("admin creates poll, voter sees activation live", () => {
@@ -129,10 +122,18 @@ test.describe.serial("admin creates poll, voter sees activation live", () => {
     playwright,
     baseURL
   }) => {
-    const apiRequest = await playwright.request.newContext({ baseURL });
+    // Use an unauthenticated context for the setup-status probe; we'll replace it with an
+    // authenticated one (sharing the presenter's session) once the presenter is signed in.
+    const unauthRequest = await playwright.request.newContext({ baseURL });
 
     // ─── 1. presenter registers or logs in ───────────────────────────────────
-    await ensurePresenterSignedIn(presenterPage, apiRequest);
+    await ensurePresenterSignedIn(presenterPage, unauthRequest);
+    await unauthRequest.dispose();
+
+    // Build an API request context that carries the presenter's session cookie so the
+    // authenticated admin endpoints (/api/admin/…) work without a separate login.
+    const storage = await presenterContext.storageState();
+    const apiRequest = await playwright.request.newContext({ baseURL, storageState: storage });
 
     // ─── 2. presenter creates a poll via the editor UI ───────────────────────
     seed = await createPollViaUi(presenterPage);
@@ -141,16 +142,19 @@ test.describe.serial("admin creates poll, voter sees activation live", () => {
     await voterPage.goto(`/${seed.slug}`);
     await expect(voterPage.getByTestId("poll-waiting")).toBeVisible({ timeout: 10_000 });
 
-    // ─── 3b. presenter activates the question from the editor ────────────────
-    await openPollEditorFor(presenterPage, seed.title);
-    await presenterPage.getByTestId("question-activate").click();
-    // The editor reloads detail and the question pill flips to ACTIVE.
-    await expect(
-      presenterPage
-        .getByTestId("poll-editor-page")
-        .getByText(/active/i)
-        .first()
-    ).toBeVisible({ timeout: 8_000 });
+    // ─── 3b. presenter activates the question via the admin API ─────────────
+    // Manual Activate button removed (Task 15) — open the question via the admin API.
+    // We're already at /polls/<pollId> from createPollViaUi; pull the id from the URL.
+    const pollId = presenterPage.url().split("/").pop()!;
+    const detailRes = await apiRequest.get(`/api/admin/polls/${pollId}`);
+    expect(detailRes.status(), "fetch poll detail").toBe(200);
+    const detail = (await detailRes.json()) as { questions: { id: string }[] };
+    const questionId = detail.questions[0].id;
+
+    const openRes = await apiRequest.post(`/api/admin/polls/${pollId}/open`, {
+      data: { questionId }
+    });
+    expect(openRes.status(), "open question").toBe(200);
 
     // ─── 3c. voter receives the SSE snapshot and renders the active question ─
     await expect(voterPage.getByTestId("poll-active")).toBeVisible({ timeout: 10_000 });
