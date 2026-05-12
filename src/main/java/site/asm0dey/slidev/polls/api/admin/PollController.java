@@ -93,6 +93,13 @@ public class PollController {
         .body(PollDetailDto.from(cloned, PublicUrlBase.of(request)));
   }
 
+  @PostMapping("/{pollId}/votes:clear")
+  public PollDetailDto clearVotes(
+      @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
+    Poll after = pollService.clearVotesForOwner(pollId, owner(authentication));
+    return PollDetailDto.from(after, PublicUrlBase.of(request));
+  }
+
   @DeleteMapping("/{pollId}")
   public ResponseEntity<Void> delete(@PathVariable UUID pollId, Authentication authentication) {
     pollService.deleteForOwner(pollId, owner(authentication));

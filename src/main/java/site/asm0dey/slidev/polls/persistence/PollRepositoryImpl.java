@@ -328,6 +328,24 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   @Override
+  public Poll resetQuestionsToDraft(UUID pollId) {
+    OffsetDateTime now = OffsetDateTime.now();
+    dsl.update(POLL_QUESTIONS)
+        .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
+        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+        .setNull(POLL_QUESTIONS.CLOSED_AT)
+        .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
+        .execute();
+    dsl.update(POLLS)
+        .setNull(POLLS.ACTIVE_QUESTION_ID)
+        .set(POLLS.STATUS, PollStatus.DRAFT.name())
+        .set(POLLS.UPDATED_AT, now)
+        .where(POLLS.ID.eq(pollId))
+        .execute();
+    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+  }
+
+  @Override
   public boolean isOriginAllowedByAnyPoll(String origin) {
     return dsl.fetchExists(
         dsl.selectOne().from(POLLS).where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));

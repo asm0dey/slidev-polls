@@ -22,6 +22,7 @@ import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
+import site.asm0dey.slidev.polls.core.event.PollVotesClearedEvent;
 import site.asm0dey.slidev.polls.core.origin.OriginNormaliser;
 import site.asm0dey.slidev.polls.core.slug.ReservedSlugs;
 import site.asm0dey.slidev.polls.core.slug.SlugDeriver;
@@ -45,14 +46,17 @@ public class PollService {
   // factory, which returns the proxy that `@Transactional` advice is bound to, so
   // self-invocations still cross a transactional boundary.
   private final ObjectProvider<PollService> self;
+  private final VoteRepository voteRepository;
 
   public PollService(
       PollRepository repository,
       ApplicationEventPublisher events,
-      ObjectProvider<PollService> self) {
+      ObjectProvider<PollService> self,
+      VoteRepository voteRepository) {
     this.repository = repository;
     this.events = events;
     this.self = self;
+    this.voteRepository = voteRepository;
   }
 
   @Transactional
@@ -123,6 +127,15 @@ public class PollService {
   public void deleteForOwner(UUID pollId, String ownerUsername) {
     self.getObject().getForOwner(pollId, ownerUsername);
     repository.delete(pollId);
+  }
+
+  @Transactional
+  public Poll clearVotesForOwner(UUID pollId, String ownerUsername) {
+    self.getObject().getForOwner(pollId, ownerUsername);
+    voteRepository.deleteForPoll(pollId);
+    Poll after = repository.resetQuestionsToDraft(pollId);
+    events.publishEvent(new PollVotesClearedEvent(pollId, Instant.now()));
+    return after;
   }
 
   /**

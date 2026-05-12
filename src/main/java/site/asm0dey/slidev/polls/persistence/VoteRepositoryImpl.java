@@ -104,4 +104,9 @@ public class VoteRepositoryImpl implements VoteRepository {
         .forEach(r -> out.put(r.value1(), (long) r.value2()));
     return out;
   }
+
+  @Override
+  public int deleteForPoll(UUID pollId) {
+    return dsl.deleteFrom(VOTES).where(VOTES.POLL_ID.eq(pollId)).execute();
+  }
 }

@@ -68,4 +68,11 @@ public interface PollRepository {
    * question / option hydration on every preflight.
    */
   boolean isOriginAllowedByAnyPoll(String origin);
+
+  /**
+   * Transition every question on {@code pollId} back to {@code DRAFT}, clearing {@code
+   * activated_at} and {@code closed_at}; null {@code polls.active_question_id} and set {@code
+   * polls.status = DRAFT}. Idempotent.
+   */
+  Poll resetQuestionsToDraft(UUID pollId);
 }

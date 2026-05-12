@@ -365,6 +365,11 @@ class TallyBroadcastTest {
     public boolean isOriginAllowedByAnyPoll(String origin) {
       return false;
     }
+
+    @Override
+    public Poll resetQuestionsToDraft(UUID pollId) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   private static final class InMemoryVoteRepository implements VoteRepository {
@@ -382,6 +387,11 @@ class TallyBroadcastTest {
     @Override
     public Map<UUID, Long> tally(UUID questionId) {
       return Map.of();
+    }
+
+    @Override
+    public int deleteForPoll(UUID pollId) {
+      throw new UnsupportedOperationException();
     }
   }
 }

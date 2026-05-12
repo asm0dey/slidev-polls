@@ -288,6 +288,44 @@ class PollAuthoringIT {
         .andExpect(jsonPath("$.questions[0].id").value(org.hamcrest.Matchers.not(srcQId)));
   }
 
+  @Test
+  void clearVotes_returnsPollWithoutVotesAndQuestionIdsPreserved() throws Exception {
+    MockHttpSession session = loginAsAlice();
+
+    String body =
+        "{\"title\":\"t\",\"slug\":\"clear-it\",\"questions\":[{\"prompt\":\"Q?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]}";
+    MvcResult created =
+        mvc.perform(
+                post("/api/admin/polls")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+    JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
+    String pollId = createdJson.get("id").asText();
+    String qId = createdJson.get("questions").get(0).get("id").asText();
+
+    // open the question
+    mvc.perform(
+            post("/api/admin/polls/" + pollId + "/open")
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + qId + "\"}"))
+        .andExpect(status().isOk());
+
+    // clear votes (vote-casting skipped — assertions hold with zero pre-existing votes)
+    mvc.perform(post("/api/admin/polls/" + pollId + "/votes:clear").session(session).with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activeQuestionId").doesNotExist())
+        .andExpect(jsonPath("$.status").value("DRAFT"))
+        .andExpect(jsonPath("$.questions[0].id").value(qId))
+        .andExpect(jsonPath("$.questions[0].status").value("DRAFT"));
+  }
+
   private MockHttpSession loginAsAlice() throws Exception {
     MvcResult login =
         mvc.perform(
