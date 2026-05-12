@@ -15,3 +15,4 @@ export { default as IconChevronDown } from "./IconChevronDown.vue";
 export { default as IconClose } from "./IconClose.vue";
 export { useTheme } from "./useTheme";
 export { validateOrigin, type OriginValidation } from "./origin-validator";
+export { default as ConfirmDialog } from "./ConfirmDialog.vue";
