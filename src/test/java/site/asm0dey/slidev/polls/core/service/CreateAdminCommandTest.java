@@ -11,12 +11,11 @@ class CreateAdminCommandTest {
   // exception built via concatenation) does not surface the plaintext.
   @Test
   void toStringMasksPassword() {
-    var cmd = new CreateAdminCommand("alice", "correct-horse-battery", "Alice");
+    var cmd = new CreateAdminCommand("alice", "correct-horse-battery");
 
     assertThat(cmd.toString())
         .contains("password=***")
         .doesNotContain("correct-horse-battery")
-        .contains("alice")
-        .contains("Alice");
+        .contains("alice");
   }
 }

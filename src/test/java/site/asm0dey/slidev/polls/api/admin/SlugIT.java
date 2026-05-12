@@ -68,7 +68,7 @@ class SlugIT {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-010 — creating without a slug derives one from the title.

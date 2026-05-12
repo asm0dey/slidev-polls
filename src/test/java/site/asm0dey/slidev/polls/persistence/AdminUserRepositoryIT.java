@@ -28,7 +28,7 @@ class AdminUserRepositoryIT extends AbstractPostgresTest {
   @Test
   void insertThenListAllReturnsInsertedRow() {
     AdminUserRepositoryImpl repo = new AdminUserRepositoryImpl(dsl());
-    repo.insert("alice", "$argon2id$v=19$m=65536,t=3,p=4$abc$def", "Alice Presenter");
+    repo.insert("alice", "$argon2id$v=19$m=65536,t=3,p=4$abc$def");
 
     var users = repo.listAll();
 
@@ -37,7 +37,6 @@ class AdminUserRepositoryIT extends AbstractPostgresTest {
         .satisfies(
             u -> {
               assertThat(u.username()).isEqualTo("alice");
-              assertThat(u.displayName()).isEqualTo("Alice Presenter");
               assertThat(u.createdAt()).isAfter(Instant.now().minusSeconds(60));
             });
   }
@@ -45,7 +44,7 @@ class AdminUserRepositoryIT extends AbstractPostgresTest {
   @Test
   void existsByUsernameIsTrueAfterInsertAndFalseOtherwise() {
     AdminUserRepositoryImpl repo = new AdminUserRepositoryImpl(dsl());
-    repo.insert("alice", "$argon2id$...", "Alice");
+    repo.insert("alice", "$argon2id$...");
 
     assertThat(repo.existsByUsername("alice")).isTrue();
     assertThat(repo.existsByUsername("bob")).isFalse();
@@ -54,7 +53,7 @@ class AdminUserRepositoryIT extends AbstractPostgresTest {
   @Test
   void findPasswordHashReturnsStoredHash() {
     AdminUserRepositoryImpl repo = new AdminUserRepositoryImpl(dsl());
-    repo.insert("alice", "$argon2id$abc", "Alice");
+    repo.insert("alice", "$argon2id$abc");
 
     assertThat(repo.findPasswordHash("alice")).contains("$argon2id$abc");
     assertThat(repo.findPasswordHash("nope")).isEmpty();

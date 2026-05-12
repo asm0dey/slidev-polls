@@ -59,7 +59,7 @@ class VoteSubmissionIT {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-022 — happy path. The server sets sp_voter on the first GET; we then POST a vote with

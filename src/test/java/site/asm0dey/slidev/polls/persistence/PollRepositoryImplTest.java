@@ -33,7 +33,6 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
     repo = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "repo-test-owner")
-        .set(ADMIN_USER.DISPLAY_NAME, "Repo Test Owner")
         .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()

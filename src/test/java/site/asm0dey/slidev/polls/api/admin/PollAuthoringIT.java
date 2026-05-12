@@ -64,7 +64,7 @@ class PollAuthoringIT {
     dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS).execute();
     // V6 dropped the seed migration. Use the idempotent helper because polls from earlier tests
     // (in the reused Spring context) hold a FK to admin_user.username — wiping would fail.
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-002 — the whole happy path: login as alice, create a poll with two questions, confirm it

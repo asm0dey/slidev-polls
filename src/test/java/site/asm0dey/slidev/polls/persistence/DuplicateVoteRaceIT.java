@@ -49,7 +49,6 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
     // polls.owner_username FK is added in V3; seed the owner row once per test.
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "race-owner")
-        .set(ADMIN_USER.DISPLAY_NAME, "Race Owner")
         .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()

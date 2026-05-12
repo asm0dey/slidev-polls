@@ -18,16 +18,11 @@ public final class AdminUserTestFixtures {
   private AdminUserTestFixtures() {}
 
   public static void seedAdmin(
-      DSLContext dsl,
-      PasswordEncoder encoder,
-      String username,
-      String password,
-      String displayName) {
+      DSLContext dsl, PasswordEncoder encoder, String username, String password) {
     String hash = encoder.encode(password);
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, username)
         .set(ADMIN_USER.PASSWORD_HASH, hash)
-        .set(ADMIN_USER.DISPLAY_NAME, displayName)
         .execute();
   }
 
@@ -35,24 +30,18 @@ public final class AdminUserTestFixtures {
    * Idempotent upsert variant for ITs that create polls referencing the seeded admin via FK
    * (polls_owner_username_fk). Since polls from earlier tests may still own alice, deleting and
    * reinserting would either FK-fail or PK-collide. The upsert guarantees the row exists with the
-   * requested password hash and display name even if a sibling IT (e.g. AdminUserManagementIT
-   * seeding "correct-horse-battery") has already inserted alice with a different password.
+   * requested password hash even if a sibling IT (e.g. AdminUserManagementIT seeding
+   * "correct-horse-battery") has already inserted alice with a different password.
    */
   public static void ensureAdmin(
-      DSLContext dsl,
-      PasswordEncoder encoder,
-      String username,
-      String password,
-      String displayName) {
+      DSLContext dsl, PasswordEncoder encoder, String username, String password) {
     String hash = encoder.encode(password);
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, username)
         .set(ADMIN_USER.PASSWORD_HASH, hash)
-        .set(ADMIN_USER.DISPLAY_NAME, displayName)
         .onConflict(ADMIN_USER.USERNAME)
         .doUpdate()
         .set(ADMIN_USER.PASSWORD_HASH, hash)
-        .set(ADMIN_USER.DISPLAY_NAME, displayName)
         .execute();
   }
 }

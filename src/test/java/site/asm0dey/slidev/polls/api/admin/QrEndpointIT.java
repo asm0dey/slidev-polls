@@ -51,7 +51,7 @@ class QrEndpointIT {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-026 — the QR PNG decodes to a URL ending in the poll's slug.

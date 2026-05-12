@@ -67,7 +67,7 @@ class StreamIT {
     reading = new AtomicBoolean(true);
     // V6 dropped the seed migration; ensure alice exists. Idempotent because polls from earlier
     // tests reference admin_user via FK.
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   @AfterEach

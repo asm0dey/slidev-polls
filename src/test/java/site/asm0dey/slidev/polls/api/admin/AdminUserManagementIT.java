@@ -34,7 +34,7 @@ class AdminUserManagementIT {
     // ITs (PollAuthoringIT, etc.) leave alice-owned polls in the shared Spring context.
     dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS).execute();
     dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER).execute();
-    AdminUserTestFixtures.seedAdmin(dsl, encoder, "alice", "correct-horse-battery", "Alice");
+    AdminUserTestFixtures.seedAdmin(dsl, encoder, "alice", "correct-horse-battery");
   }
 
   @Test
@@ -49,7 +49,7 @@ class AdminUserManagementIT {
     MockHttpSession session = loginAsAlice();
     String body =
         """
-        { "username": "bob", "password": "another-strong-pw", "displayName": "Bob" }
+        { "username": "bob", "password": "another-strong-pw" }
         """;
     mvc.perform(
             post("/api/admin/users")
@@ -72,7 +72,7 @@ class AdminUserManagementIT {
     MockHttpSession session = loginAsAlice();
     String body =
         """
-        { "username": "alice", "password": "another-strong-pw", "displayName": "Alice 2" }
+        { "username": "alice", "password": "another-strong-pw" }
         """;
     mvc.perform(
             post("/api/admin/users")

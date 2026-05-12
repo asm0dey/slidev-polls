@@ -53,7 +53,7 @@ class QuestionLifecycleIT {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-003 — opening Q2 while Q1 is ACTIVE atomically closes Q1. The poll's active_question

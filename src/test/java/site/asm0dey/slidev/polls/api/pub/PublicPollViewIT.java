@@ -58,7 +58,7 @@ class PublicPollViewIT {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-020 — anonymous GET on a poll with an ACTIVE question returns the live question inline

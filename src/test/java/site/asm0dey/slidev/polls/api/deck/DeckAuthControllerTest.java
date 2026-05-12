@@ -47,7 +47,7 @@ class DeckAuthControllerTest {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-107 — Given a live deck token for poll "my-talk" with label "Laptop", When GET

@@ -42,7 +42,7 @@ class AdminSetupIT {
 
     String body =
         """
-        { "username": "alice", "password": "correct-horse-battery", "displayName": "Alice" }
+        { "username": "alice", "password": "correct-horse-battery" }
         """;
     mvc.perform(post("/api/admin/setup").contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isCreated())
@@ -61,7 +61,7 @@ class AdminSetupIT {
   void rejectsShortPasswordWithValidationFailed() throws Exception {
     String body =
         """
-        { "username": "alice", "password": "short", "displayName": "Alice" }
+        { "username": "alice", "password": "short" }
         """;
     mvc.perform(post("/api/admin/setup").contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isBadRequest())

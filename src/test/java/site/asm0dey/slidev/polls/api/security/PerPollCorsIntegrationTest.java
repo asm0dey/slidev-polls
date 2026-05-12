@@ -46,7 +46,7 @@ class PerPollCorsIntegrationTest {
 
   @BeforeEach
   void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse", "Alice Presenter");
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
   // @TS-A5-010 — preflight from a listed origin must receive the Allow-Origin echo and

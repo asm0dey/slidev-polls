@@ -41,7 +41,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
     // Each test needs an admin_user row to satisfy the polls.owner_username FK added in V3.
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "concurrency-owner")
-        .set(ADMIN_USER.DISPLAY_NAME, "Concurrency Owner")
         .set(ADMIN_USER.PASSWORD_HASH, "n/a")
         .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
         .onConflictDoNothing()
