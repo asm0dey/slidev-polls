@@ -243,7 +243,7 @@ class VoteServiceTest {
     }
 
     @Override
-    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionDraft> questions) {
+    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> questions) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
 

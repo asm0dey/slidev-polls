@@ -353,18 +353,28 @@ class PollServiceTest {
     }
 
     @Override
-    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionDraft> questions) {
+    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming) {
       Poll existing = requirePresent(pollId);
-      List<Question> rebuilt = new ArrayList<>(questions.size());
-      for (int i = 0; i < questions.size(); i++) {
-        CreatePollCommand.QuestionDraft d = questions.get(i);
-        UUID qid = UUID.randomUUID();
-        List<Option> opts = new ArrayList<>(d.options().size());
-        for (int j = 0; j < d.options().size(); j++) {
-          opts.add(new Option(UUID.randomUUID(), qid, d.options().get(j).label(), j));
+      java.util.Map<UUID, Question> existingByQid = new java.util.HashMap<>();
+      for (Question q : existing.questions()) existingByQid.put(q.id(), q);
+      List<Question> rebuilt = new ArrayList<>(incoming.size());
+      for (int i = 0; i < incoming.size(); i++) {
+        CreatePollCommand.QuestionUpdate qu = incoming.get(i);
+        UUID qid =
+            (qu.id() != null && existingByQid.containsKey(qu.id())) ? qu.id() : UUID.randomUUID();
+        java.util.Map<UUID, Option> existingOpts = new java.util.HashMap<>();
+        if (existingByQid.containsKey(qid)) {
+          for (Option o : existingByQid.get(qid).options()) existingOpts.put(o.id(), o);
+        }
+        List<Option> opts = new ArrayList<>();
+        for (int j = 0; j < qu.options().size(); j++) {
+          CreatePollCommand.OptionUpdate ou = qu.options().get(j);
+          UUID oid =
+              (ou.id() != null && existingOpts.containsKey(ou.id())) ? ou.id() : UUID.randomUUID();
+          opts.add(new Option(oid, qid, ou.label(), j));
         }
         rebuilt.add(
-            new Question(qid, pollId, d.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
+            new Question(qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
       }
       Poll updated =
           new Poll(

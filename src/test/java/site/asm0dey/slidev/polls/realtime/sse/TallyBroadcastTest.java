@@ -289,7 +289,7 @@ class TallyBroadcastTest {
     }
 
     @Override
-    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionDraft> drafts) {
+    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> drafts) {
       throw new UnsupportedOperationException();
     }
 
