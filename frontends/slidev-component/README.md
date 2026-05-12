@@ -81,3 +81,37 @@ scan to join without typing. Click the backdrop, the close button, or press
 ## License
 
 GPL-3.0-or-later. See [LICENSE](./LICENSE).
+
+## Reading poll results from other slides
+
+`PollResults` keeps a deck-wide reactive cache of every poll it has seen. Other
+slides can read raw `SnapshotEvent`s by slug and roll their own aggregates:
+
+```vue
+<script setup>
+import { computed } from "vue";
+import { usePollResults } from "@slidev-polls/component";
+
+const q1 = usePollResults("warmup");
+const q2 = usePollResults("vote-feature");
+
+const totals = computed(() => {
+  const out: Record<string, number> = {};
+  for (const snap of [q1.value, q2.value]) {
+    for (const t of snap?.tally ?? []) out[t.optionId] = (out[t.optionId] ?? 0) + t.count;
+  }
+  return out;
+});
+</script>
+
+<template>
+  <ul>
+    <li v-for="(count, id) in totals" :key="id">{{ id }}: {{ count }}</li>
+  </ul>
+</template>
+```
+
+The cache is mirrored to `localStorage` (`slidev-polls:results-cache`), so the
+last-known tally is available immediately on slide nav before the SSE stream
+re-opens. The store only contains polls whose `PollResults` component has
+mounted at least once in the current browser; there is no eager pre-fetch.
