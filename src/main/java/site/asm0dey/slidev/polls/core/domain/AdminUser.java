@@ -6,4 +6,4 @@ import java.time.Instant;
  * Presenter account as projected by the service layer. The hash never leaves the persistence
  * boundary; controllers serialise UserResponse instead.
  */
-public record AdminUser(String username, String displayName, Instant createdAt) {}
+public record AdminUser(String username, Instant createdAt) {}

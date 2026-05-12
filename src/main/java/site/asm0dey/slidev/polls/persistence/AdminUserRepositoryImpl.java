@@ -31,24 +31,22 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
   }
 
   @Override
-  public void insert(String username, String passwordHash, String displayName) {
+  public void insert(String username, String passwordHash) {
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, username)
         .set(ADMIN_USER.PASSWORD_HASH, passwordHash)
-        .set(ADMIN_USER.DISPLAY_NAME, displayName)
         .execute();
   }
 
   @Override
   public List<AdminUser> listAll() {
-    return dsl.select(ADMIN_USER.USERNAME, ADMIN_USER.DISPLAY_NAME, ADMIN_USER.CREATED_AT)
+    return dsl.select(ADMIN_USER.USERNAME, ADMIN_USER.CREATED_AT)
         .from(ADMIN_USER)
         .orderBy(ADMIN_USER.CREATED_AT.asc())
         .fetch(
             r ->
                 new AdminUser(
                     r.get(ADMIN_USER.USERNAME),
-                    r.get(ADMIN_USER.DISPLAY_NAME),
                     r.get(ADMIN_USER.CREATED_AT, OffsetDateTime.class).toInstant()));
   }
 

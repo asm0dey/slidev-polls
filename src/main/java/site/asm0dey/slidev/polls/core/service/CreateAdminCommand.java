@@ -5,7 +5,7 @@ package site.asm0dey.slidev.polls.core.service;
  * compact constructor so controllers can pass the user's body through without writing duplicate
  * guards.
  */
-public record CreateAdminCommand(String username, String password, String displayName) {
+public record CreateAdminCommand(String username, String password) {
 
   // Accept any-case input from the user; we normalise to lowercase before
   // storage so the admin_user.username CHECK constraint (lower(username))
@@ -24,14 +24,6 @@ public record CreateAdminCommand(String username, String password, String displa
     if (password == null || password.length() < 12) {
       throw new IllegalArgumentException("password must be at least 12 characters");
     }
-    if (displayName == null) {
-      throw new IllegalArgumentException("displayName must not be null");
-    }
-    String trimmed = displayName.strip();
-    if (trimmed.isEmpty() || trimmed.length() > 100) {
-      throw new IllegalArgumentException("displayName must be 1-100 characters");
-    }
-    displayName = trimmed;
   }
 
   /**
@@ -41,10 +33,6 @@ public record CreateAdminCommand(String username, String password, String displa
    */
   @Override
   public String toString() {
-    return "CreateAdminCommand[username="
-        + username
-        + ", password=***, displayName="
-        + displayName
-        + "]";
+    return "CreateAdminCommand[username=" + username + ", password=***]";
   }
 }

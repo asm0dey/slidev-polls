@@ -37,9 +37,8 @@ public class AdminSetupController {
   @PostMapping
   public ResponseEntity<UserResponse> setup(@Valid @RequestBody SetupRequest body) {
     var created =
-        service.createInitialAdmin(
-            new CreateAdminCommand(body.username(), body.password(), body.displayName()));
+        service.createInitialAdmin(new CreateAdminCommand(body.username(), body.password()));
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.displayName(), created.createdAt()));
+        .body(new UserResponse(created.username(), created.createdAt()));
   }
 }

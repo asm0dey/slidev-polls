@@ -27,16 +27,14 @@ public class AdminUserController {
   @GetMapping
   public List<UserResponse> list() {
     return service.listAdmins().stream()
-        .map(u -> new UserResponse(u.username(), u.displayName(), u.createdAt()))
+        .map(u -> new UserResponse(u.username(), u.createdAt()))
         .toList();
   }
 
   @PostMapping
   public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest body) {
-    var created =
-        service.createAdmin(
-            new CreateAdminCommand(body.username(), body.password(), body.displayName()));
+    var created = service.createAdmin(new CreateAdminCommand(body.username(), body.password()));
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.displayName(), created.createdAt()));
+        .body(new UserResponse(created.username(), created.createdAt()));
   }
 }

@@ -66,8 +66,8 @@ public class AdminUserService {
               throw new SetupLockedException("setup already complete");
             }
             String hash = passwordEncoder.encode(command.password());
-            repository.insert(command.username(), hash, command.displayName());
-            return new AdminUser(command.username(), command.displayName(), Instant.now());
+            repository.insert(command.username(), hash);
+            return new AdminUser(command.username(), Instant.now());
           });
     } catch (PessimisticLockingFailureException | DataIntegrityViolationException _) {
       throw new SetupLockedException("setup already complete");
@@ -89,11 +89,11 @@ public class AdminUserService {
     }
     String hash = passwordEncoder.encode(command.password());
     try {
-      repository.insert(command.username(), hash, command.displayName());
+      repository.insert(command.username(), hash);
     } catch (DataIntegrityViolationException _) {
       throw new UsernameTakenException(command.username());
     }
-    return new AdminUser(command.username(), command.displayName(), Instant.now());
+    return new AdminUser(command.username(), Instant.now());
   }
 
   public List<AdminUser> listAdmins() {
