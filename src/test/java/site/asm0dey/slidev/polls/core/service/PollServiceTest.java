@@ -281,6 +281,38 @@ class PollServiceTest {
     assertThat(p.allowedOrigins()).containsExactly("http://demo.example.com:443");
   }
 
+  @Test
+  void updateForOwner_preservesQuestionAndOptionIds() {
+    Poll created =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "t", "preserve", null, List.of(questionDraft("Q?", "A", "B")), null));
+    UUID qid = created.questions().get(0).id();
+    UUID oA = created.questions().get(0).options().get(0).id();
+    UUID oB = created.questions().get(0).options().get(1).id();
+
+    Poll after =
+        service.updateForOwner(
+            created.id(),
+            "alice",
+            new UpdatePollCommand(
+                null,
+                null,
+                List.of(
+                    new CreatePollCommand.QuestionUpdate(
+                        qid,
+                        "Q renamed?",
+                        List.of(
+                            new CreatePollCommand.OptionUpdate(oA, "A2"),
+                            new CreatePollCommand.OptionUpdate(oB, "B")))),
+                null));
+
+    assertThat(after.questions().get(0).id()).isEqualTo(qid);
+    assertThat(after.questions().get(0).options()).extracting(Option::id).containsExactly(oA, oB);
+    assertThat(after.questions().get(0).prompt()).isEqualTo("Q renamed?");
+  }
+
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
     List<CreatePollCommand.OptionDraft> opts = new ArrayList<>();
     for (String o : options) {
