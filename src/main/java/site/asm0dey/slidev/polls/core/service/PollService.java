@@ -181,6 +181,23 @@ public class PollService {
   }
 
   /**
+   * Close path that skips the ownership check — intended for the deck. The {@code
+   * DeckTokenAuthenticationFilter} has already validated the token/poll binding by the time we get
+   * here. Idempotent: closing when no question is ACTIVE is a no-op.
+   */
+  @Transactional
+  public Poll closeActiveQuestion(UUID pollId) {
+    Poll before =
+        repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    UUID wasActive = before.activeQuestionId();
+    Poll after = repository.closeActiveQuestion(pollId);
+    if (wasActive != null) {
+      events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
+    }
+    return after;
+  }
+
+  /**
    * Activation path that skips the ownership check — intended for callers that have already
    * authorised by some other mechanism (the deck-token filter on {@code /api/deck/**}). FR-004
    * atomicity and the ≥2-option precondition are still enforced here.

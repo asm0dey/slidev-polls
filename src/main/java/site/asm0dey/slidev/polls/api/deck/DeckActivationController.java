@@ -45,6 +45,17 @@ public class DeckActivationController {
     return new DeckActivatedResponse(pollId, after.activeQuestionId());
   }
 
+  @PostMapping("/close")
+  public DeckActivatedResponse close(
+      @PathVariable UUID pollId, @AuthenticationPrincipal DeckPrincipal principal) {
+    if (!principal.pollId().equals(pollId)) {
+      throw new DeckTokenPollMismatchException(
+          "deck token " + principal.tokenId() + " is not scoped to poll " + pollId);
+    }
+    Poll after = pollService.closeActiveQuestion(pollId);
+    return new DeckActivatedResponse(pollId, after.activeQuestionId());
+  }
+
   public record ActivateRequest(UUID questionId) {}
 
   public record DeckActivatedResponse(UUID pollId, UUID activeQuestionId) {}
