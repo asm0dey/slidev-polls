@@ -1,17 +1,13 @@
 import { computed, reactive, readonly, type ComputedRef } from "vue";
 import type { SnapshotEvent } from "@slidev-polls/shared";
 
-// Deck-wide reactive cache of the latest SnapshotEvent per poll slug, optionally
-// scoped to a specific questionId so multiple PollPanels on the same slug (one
-// per question) don't overwrite each other. PollPanel auto-registers via
-// setPollResults on every SSE update. Other slides read via usePollResults and
-// compose their own aggregates.
+// Deck-wide reactive cache of the latest SnapshotEvent, keyed by an
+// author-chosen string. PollPanel auto-registers via setPollResults on every
+// SSE update — typically passing its `name` prop, falling back to slug or
+// slug+questionId when no name is given. Other slides read via
+// usePollResults(key) and compose their own aggregates.
 
 const STORAGE_KEY = "slidev-polls:results-cache";
-
-function keyFor(slug: string, questionId?: string): string {
-  return questionId ? `${slug}::${questionId}` : slug;
-}
 
 function hydrate(): Record<string, SnapshotEvent> {
   if (typeof window === "undefined") return {};
@@ -21,8 +17,8 @@ function hydrate(): Record<string, SnapshotEvent> {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
     const out: Record<string, SnapshotEvent> = {};
-    for (const [slug, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (isSnapshot(value)) out[slug] = value;
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (isSnapshot(value)) out[key] = value;
     }
     return out;
   } catch {
@@ -57,8 +53,8 @@ function persist(): void {
   }
 }
 
-export function setPollResults(slug: string, snapshot: SnapshotEvent, questionId?: string): void {
-  store[keyFor(slug, questionId)] = snapshot;
+export function setPollResults(key: string, snapshot: SnapshotEvent): void {
+  store[key] = snapshot;
   persist();
 }
 
@@ -67,12 +63,8 @@ export function clearPollResults(): void {
   persist();
 }
 
-export function usePollResults(
-  slug: string,
-  questionId?: string
-): ComputedRef<SnapshotEvent | null> {
-  const k = keyFor(slug, questionId);
-  return computed(() => store[k] ?? null);
+export function usePollResults(key: string): ComputedRef<SnapshotEvent | null> {
+  return computed(() => store[key] ?? null);
 }
 
 export function usePollResultsMap(): Readonly<Record<string, SnapshotEvent>> {

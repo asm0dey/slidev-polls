@@ -84,27 +84,26 @@ GPL-3.0-or-later. See [LICENSE](./LICENSE).
 
 ## Reading poll results from other slides
 
-`PollResults` keeps a deck-wide reactive cache of every poll it has seen. Other
-slides can read raw `SnapshotEvent`s by slug — and, when multiple slides target
-different questions of the same poll, by `(slug, questionId)` — then compose
-their own aggregates:
+`PollResults` keeps a deck-wide reactive cache of every poll it has seen, keyed
+by an author-chosen `name`. Tag each panel with a short, human-readable name and
+read it back from any other slide:
+
+```markdown
+<PollResults slug="my-talk" pollId="…" questionId="…" name="q1" />
+<PollResults slug="my-talk" pollId="…" questionId="…" name="q2" />
+```
 
 ```vue
 <script setup>
 import { computed } from "vue";
 import { usePollResults } from "@slidev-polls/component";
 
-// One slug, one question per slide → just pass the slug.
-const warmup = usePollResults("warmup");
-
-// Same slug, multiple questions on separate slides → pass the questionId
-// so each slide's snapshot keeps its own slot in the store.
-const q1 = usePollResults("main-talk", "<question-id-1>");
-const q2 = usePollResults("main-talk", "<question-id-2>");
+const q1 = usePollResults("q1");
+const q2 = usePollResults("q2");
 
 const totals = computed(() => {
   const out: Record<string, number> = {};
-  for (const snap of [warmup.value, q1.value, q2.value]) {
+  for (const snap of [q1.value, q2.value]) {
     for (const t of snap?.tally ?? []) out[t.optionId] = (out[t.optionId] ?? 0) + t.count;
   }
   return out;
@@ -117,6 +116,10 @@ const totals = computed(() => {
   </ul>
 </template>
 ```
+
+If you omit `name`, the panel registers under its `slug` (or `slug::questionId`
+when several questions share a slug) — handy for one-off lookups, but a `name`
+keeps aggregator slides free of UUIDs.
 
 The cache is mirrored to `localStorage` (`slidev-polls:results-cache`), so the
 last-known tally is available immediately on slide nav before the SSE stream

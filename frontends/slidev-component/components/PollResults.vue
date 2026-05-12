@@ -6,6 +6,7 @@ defineProps<{
   server?: string;
   questionId?: string;
   pollId?: string;
+  name?: string;
 }>();
 </script>
 

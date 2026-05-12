@@ -24,7 +24,16 @@ const props = defineProps<{
   server?: string;
   questionId?: string;
   pollId?: string;
+  name?: string;
 }>();
+
+// Key under which this panel publishes into the shared poll-results store.
+// Authors set `name` for ergonomic lookups (`usePollResults("q1")`); when
+// omitted, fall back to a deterministic key so multiple panels on the same
+// slug — one per question — don't overwrite each other.
+const resultsKey = computed(
+  () => props.name ?? (props.questionId ? `${props.slug}::${props.questionId}` : props.slug)
+);
 
 const auth = useDeckAuth();
 
@@ -173,20 +182,20 @@ onMounted(async () => {
       snapshot.value = ev;
       paused.value = false;
       closedNotice.value = null;
-      setPollResults(props.slug, ev, props.questionId);
+      setPollResults(resultsKey.value, ev);
     },
     onTally: (ev: TallyDeltaEvent) => {
       if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
       const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
-      setPollResults(props.slug, snapshot.value, props.questionId);
+      setPollResults(resultsKey.value, snapshot.value);
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         closedNotice.value = snapshot.value.activeQuestion.prompt;
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
-        setPollResults(props.slug, snapshot.value, props.questionId);
+        setPollResults(resultsKey.value, snapshot.value);
       }
     },
     onConnectionStateChange: (state) => {

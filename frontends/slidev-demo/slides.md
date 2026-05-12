@@ -68,6 +68,7 @@ Example shape:
   slug="test-talk"
   pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
   questionId="bc81b41a-0306-401b-9f81-4d98c1226580"
+  name="q1"
 />
 
 <!--
@@ -85,6 +86,7 @@ layout: center
   slug="test-talk"
   pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
   questionId="7d0a8041-8836-4414-b66c-4baf70249b70"
+  name="q2"
 />
 
 ---
@@ -127,10 +129,10 @@ layout: center
 import { computed } from "vue";
 import { usePollResults } from "@slidev-polls/component";
 
-// Same slug, distinct questionIds — the store keys by slug + questionId so
-// each PollPanel keeps its own entry. Mirror the Q1 / Q2 frontmatter above.
-const q1 = usePollResults("test-talk", "bc81b41a-0306-401b-9f81-4d98c1226580");
-const q2 = usePollResults("test-talk", "7d0a8041-8836-4414-b66c-4baf70249b70");
+// Each PollResults above declared `name="q1"` / `name="q2"`. The store keys
+// by that name, so the aggregator never has to hold a UUID.
+const q1 = usePollResults("q1");
+const q2 = usePollResults("q2");
 
 function rowsFor(snap) {
   const tally = snap?.tally ?? [];

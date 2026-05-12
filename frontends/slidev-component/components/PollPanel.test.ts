@@ -141,4 +141,14 @@ describe("PollPanel", () => {
     (sharedMod as { openPollStream: unknown }).openPollStream = original;
     w.unmount();
   });
+
+  it("registers under the `name` prop when provided", async () => {
+    authState.value = "anonymous";
+    const w = mount(PollPanel, { props: { slug: "named-slug", name: "q-warmup" } });
+    await flushPromises();
+    const { usePollResults } = await import("../composables/usePollResults");
+    expect(usePollResults("q-warmup").value?.activeQuestion?.id).toBe("q1");
+    expect(usePollResults("named-slug").value).toBeNull();
+    w.unmount();
+  });
 });
