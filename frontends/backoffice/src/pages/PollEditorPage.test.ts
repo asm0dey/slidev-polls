@@ -103,7 +103,7 @@ describe("PollEditorPage — create mode", () => {
     expect(wrapper.findAll('[data-testid="option-row"]')).toHaveLength(2);
   });
 
-  it("submits the form and redirects to /polls on success", async () => {
+  it("submits the form and navigates to the edit page (not /polls) on success", async () => {
     const createPoll = vi.fn(async (req: CreatePollRequest) => pollDetail({ title: req.title }));
     const client = makeFake({ createPoll });
     const { wrapper, router } = await mountCreate(client);
@@ -123,7 +123,9 @@ describe("PollEditorPage — create mode", () => {
     expect(sent.questions).toHaveLength(1);
     expect(sent.questions[0].prompt).toBe("Which JVM?");
     expect(sent.questions[0].options.map((o) => o.label)).toEqual(["OpenJDK", "GraalVM"]);
-    expect(router.currentRoute.value.path).toBe("/polls");
+    // After create, router.replace to the edit page — NOT /polls
+    expect(router.currentRoute.value.name).toBe("poll-edit");
+    expect(router.currentRoute.value.params.pollId).toBe("p1");
   });
 
   it("surfaces server-issued SLUG_TAKEN as a readable error, not a stack trace", async () => {
@@ -308,5 +310,71 @@ describe("PollEditorPage — edit mode", () => {
     } finally {
       confirmSpy.mockRestore();
     }
+  });
+
+  it("does not redirect to /polls after saving an edit", async () => {
+    const updatePoll = vi.fn(async (_id: string, _req) => pollDetail());
+    const client = makeFake({ updatePoll });
+    const { wrapper, router } = await mountEdit(client);
+
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
+    await flushPromises();
+
+    expect(updatePoll).toHaveBeenCalledTimes(1);
+    // Must stay on the edit page, not redirect away
+    expect(router.currentRoute.value.path).toBe("/polls/p1");
+  });
+
+  it("sends question and option ids in PATCH payload (so backend preserves them)", async () => {
+    const updatePoll = vi.fn(async (_pollId: string, _body: unknown) => pollDetail());
+    const client = makeFake({ updatePoll });
+    const { wrapper } = await mountEdit(client);
+
+    // Edit the prompt so the form is dirty but keep options intact
+    await wrapper.find('input[data-testid="question-prompt"]').setValue("edited");
+
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
+    await flushPromises();
+
+    expect(updatePoll).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({
+        questions: [
+          expect.objectContaining({
+            id: "q1",
+            prompt: "edited",
+            options: [
+              expect.objectContaining({ id: "o1", label: "OpenJDK" }),
+              expect.objectContaining({ id: "o2", label: "GraalVM" })
+            ]
+          })
+        ]
+      })
+    );
+  });
+
+  it("hides Copy snippet while there are unsaved edits and re-shows after save", async () => {
+    const updatePoll = vi.fn(async (_id: string, _req: unknown) => pollDetail());
+    const client = makeFake({ updatePoll });
+    const { wrapper } = await mountEdit(client);
+
+    // Initially clean — Copy snippet button should be visible, hint absent
+    expect(wrapper.find('[data-testid="question-copy-snippet"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="copy-snippet-disabled-hint"]').exists()).toBe(false);
+
+    // Make a dirty edit
+    await wrapper.find('input[data-testid="question-prompt"]').setValue("changed prompt");
+
+    // Snippet button should now be hidden; hint should appear
+    expect(wrapper.find('[data-testid="question-copy-snippet"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="copy-snippet-disabled-hint"]').exists()).toBe(true);
+
+    // Save — update returns the original detail (same data, so becomes clean again)
+    await wrapper.find('[data-testid="poll-editor-submit"]').trigger("click");
+    await flushPromises();
+
+    // After save snippet button should be back, hint gone
+    expect(wrapper.find('[data-testid="question-copy-snippet"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="copy-snippet-disabled-hint"]').exists()).toBe(false);
   });
 });
