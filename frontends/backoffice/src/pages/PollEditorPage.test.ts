@@ -6,6 +6,20 @@ import PollEditorPage from "./PollEditorPage.vue";
 import type { AdminApiClient } from "../lib/admin-api";
 import { AdminApiError } from "../lib/admin-api";
 
+// jsdom does not implement HTMLDialogElement showModal()/close() — shim them.
+beforeEach(() => {
+  if (!HTMLDialogElement.prototype.showModal) {
+    HTMLDialogElement.prototype.showModal = function () {
+      this.setAttribute("open", "");
+    };
+  }
+  if (!HTMLDialogElement.prototype.close) {
+    HTMLDialogElement.prototype.close = function () {
+      this.removeAttribute("open");
+    };
+  }
+});
+
 // Backs the editor side of @TS-002 (create poll w/ questions), @TS-003
 // (activate atomically closes any prior ACTIVE question), @TS-005 (close
 // active question), @TS-006 (delete poll), and the @TS-013 "slug taken"
@@ -351,6 +365,43 @@ describe("PollEditorPage — edit mode", () => {
         ]
       })
     );
+  });
+
+  it("opens the confirm dialog when Clear votes is clicked", async () => {
+    const clearVotes = vi.fn().mockResolvedValue(pollDetail());
+    const client = makeFake({ clearVotes });
+    const { wrapper } = await mountEdit(client);
+
+    await wrapper.find('[data-testid="poll-clear-votes"]').trigger("click");
+    await flushPromises();
+
+    const dialog = wrapper.find('[data-testid="confirm-dialog"]').element as HTMLDialogElement;
+    expect(dialog.open || dialog.hasAttribute("open")).toBe(true);
+    expect(clearVotes).not.toHaveBeenCalled();
+  });
+
+  it("calls clearVotes and reloads the poll when the modal confirm fires", async () => {
+    const clearedDetail = pollDetail({
+      activeQuestionId: null,
+      questions: [{ ...pollDetail().questions[0], status: "DRAFT" }]
+    });
+    const clearVotes = vi.fn().mockResolvedValue(clearedDetail);
+    const client = makeFake({ clearVotes });
+    const { wrapper } = await mountEdit(client);
+
+    // Open the dialog
+    await wrapper.find('[data-testid="poll-clear-votes"]').trigger("click");
+    await flushPromises();
+
+    // Click the confirm button inside the dialog
+    await wrapper.find('[data-testid="confirm-dialog-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(clearVotes).toHaveBeenCalledWith("p1");
+
+    // Dialog should now be closed
+    const dialog = wrapper.find('[data-testid="confirm-dialog"]').element as HTMLDialogElement;
+    expect(dialog.open || dialog.hasAttribute("open")).toBe(false);
   });
 
   it("hides Copy snippet while there are unsaved edits and re-shows after save", async () => {
