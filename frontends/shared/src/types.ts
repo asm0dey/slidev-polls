@@ -84,11 +84,24 @@ export interface CreatePollRequest {
   allowedOrigins?: string[];
 }
 
+/** Option payload for PATCH /api/admin/polls/{id}; id present means in-place update. */
+export interface UpdateOptionBody {
+  id?: string;
+  label: string;
+}
+
+/** Question payload for PATCH /api/admin/polls/{id}; id present means in-place update. */
+export interface UpdateQuestionRequest {
+  id?: string;
+  prompt: string;
+  options: UpdateOptionBody[];
+}
+
 /** Patch-style update payload (PATCH /api/admin/polls/{id}). */
 export interface UpdatePollRequest {
   title?: string;
   slug?: string;
-  questions?: CreateQuestionRequest[];
+  questions?: UpdateQuestionRequest[];
   allowedOrigins?: string[];
 }
 
