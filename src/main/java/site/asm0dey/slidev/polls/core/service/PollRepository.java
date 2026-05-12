@@ -30,8 +30,14 @@ public interface PollRepository {
   /** Replace poll header fields (title, slug) — not questions. */
   Poll updateHeader(UUID pollId, String title, String slug);
 
-  /** Replace the questions/options list for {@code pollId} in one transaction. */
-  Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionDraft> questions);
+  /**
+   * Reconcile the questions list for {@code pollId}: questions with an {@code id} already on the
+   * poll are updated in place (prompt, ordinal, options diffed), questions with a null id are
+   * inserted with a fresh UUID, and any existing question whose id is not in {@code incoming} is
+   * deleted. Cascades onto {@code poll_options} and {@code votes} via FK ON DELETE CASCADE — that
+   * is intended only for explicit removals, never for unchanged questions.
+   */
+  Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming);
 
   Poll updateStyle(UUID pollId, Map<String, Object> style);
 
