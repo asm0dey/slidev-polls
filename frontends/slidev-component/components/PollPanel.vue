@@ -74,6 +74,10 @@ const paused = ref(false);
 const closedNotice = ref<string | null>(null);
 let stop: (() => void) | null = null;
 
+// Tracks the most recent intent we successfully posted. The server is idempotent already,
+// but this skips the wasted round-trip when a slide jitter fires the same edge twice.
+let lastSentIntent: "open" | "closed" | null = null;
+
 // `layout: center` wraps the slide body in an inline-block whose intrinsic
 // width tracks its content, so a percentage on .sp-pollpanel resolves to
 // content width and shrinks unboundedly. Pin to 85% of slidev's slide
@@ -116,6 +120,7 @@ function isElementVisible(el: HTMLElement): boolean {
 async function activateFromDeck(base: string) {
   if (auth.status.value !== "signed-in") return;
   if (!props.questionId || !props.pollId) return;
+  if (lastSentIntent === "open") return;
   const token = auth.state.value.token;
   if (!token) return;
   const url = `${base.replace(/\/$/, "")}/api/deck/polls/${encodeURIComponent(props.pollId)}/activate`;
@@ -135,9 +140,34 @@ async function activateFromDeck(base: string) {
       } catch {
         /* noop */
       }
+    } else if (res.ok) {
+      lastSentIntent = "open";
     }
   } catch {
     /* noop — paused indicator covers this */
+  }
+}
+
+async function closeFromDeck(base: string) {
+  if (auth.status.value !== "signed-in") return;
+  if (!props.pollId) return;
+  if (lastSentIntent === "closed") return;
+  const token = auth.state.value.token;
+  if (!token) return;
+  const url = `${base.replace(/\/$/, "")}/api/deck/polls/${encodeURIComponent(props.pollId)}/close`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "X-Deck-Token": token },
+      // Server figures out which question is active — no body needed.
+      // keepalive lets the request survive navigation / unmount.
+      keepalive: true
+    });
+    if (res.ok) {
+      lastSentIntent = "closed";
+    }
+  } catch {
+    /* noop — best-effort */
   }
 }
 
@@ -161,12 +191,16 @@ onMounted(async () => {
     visibilityObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting && e.intersectionRatio > 0.5) {
+          if (e.isIntersecting && e.intersectionRatio >= 0.5) {
             void activateFromDeck(base);
+          } else if (e.intersectionRatio < 0.1) {
+            // Slide left the viewport: close so attendees see "waiting" until it returns.
+            // Re-entry triggers the open branch above.
+            void closeFromDeck(base);
           }
         }
       },
-      { threshold: [0.5, 0.95] }
+      { threshold: [0, 0.1, 0.5, 0.95] }
     );
     visibilityObserver.observe(root.value);
   }
@@ -205,6 +239,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  const base = (props.server ?? "") || headmatterServer || getConfiguredBackend();
+  void closeFromDeck(base);
   stop?.();
   visibilityObserver?.disconnect();
 });

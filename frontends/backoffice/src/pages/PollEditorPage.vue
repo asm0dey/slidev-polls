@@ -265,26 +265,6 @@ function removeOption(qIdx: number, oIdx: number) {
   questions[qIdx].options.splice(oIdx, 1);
 }
 
-async function activate(q: DraftQuestion) {
-  if (!props.pollId || !q.id) return;
-  try {
-    const updated = await client.activateQuestion(props.pollId, { questionId: q.id });
-    loadFromDetail(updated);
-  } catch (err) {
-    formError.value = describeError(err);
-  }
-}
-
-async function closeActive() {
-  if (!props.pollId) return;
-  try {
-    const updated = await client.closeActiveQuestion(props.pollId);
-    loadFromDetail(updated);
-  } catch (err) {
-    formError.value = describeError(err);
-  }
-}
-
 const copiedQuestionId = ref<string | null>(null);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -473,24 +453,6 @@ onMounted(() => {
                 </Pill>
               </span>
               <div class="pe__qhdr-actions">
-                <Button
-                  v-if="mode === 'edit' && q.id && q.status === 'DRAFT'"
-                  variant="secondary"
-                  size="sm"
-                  data-testid="question-activate"
-                  @click="activate(q)"
-                >
-                  Activate
-                </Button>
-                <Button
-                  v-if="mode === 'edit' && q.id && q.status === 'ACTIVE'"
-                  variant="secondary"
-                  size="sm"
-                  data-testid="question-close"
-                  @click="closeActive"
-                >
-                  Close
-                </Button>
                 <Button
                   v-if="mode === 'edit' && q.id && !dirty"
                   variant="secondary"

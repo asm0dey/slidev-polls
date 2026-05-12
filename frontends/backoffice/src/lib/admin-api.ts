@@ -1,5 +1,4 @@
 import type {
-  ActivateQuestionRequest,
   CreatePollRequest,
   DeckToken,
   DeckTokenMinted,
@@ -129,18 +128,6 @@ export class AdminApiClient {
       undefined,
       false
     );
-  }
-
-  activateQuestion(pollId: string, body: ActivateQuestionRequest): Promise<PollDetail> {
-    return this.send<PollDetail>(
-      "POST",
-      `/api/admin/polls/${encodeURIComponent(pollId)}/open`,
-      body
-    );
-  }
-
-  closeActiveQuestion(pollId: string): Promise<PollDetail> {
-    return this.send<PollDetail>("POST", `/api/admin/polls/${encodeURIComponent(pollId)}/close`);
   }
 
   updateStyle(pollId: string, body: PollStyle): Promise<PollDetail> {
