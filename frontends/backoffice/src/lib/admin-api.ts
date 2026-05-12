@@ -111,6 +111,10 @@ export class AdminApiClient {
     return this.send<PollDetail>("PATCH", `/api/admin/polls/${encodeURIComponent(pollId)}`, body);
   }
 
+  clonePoll(pollId: string): Promise<PollDetail> {
+    return this.send<PollDetail>("POST", `/api/admin/polls/${encodeURIComponent(pollId)}/clone`);
+  }
+
   deletePoll(pollId: string): Promise<void> {
     return this.send<void>(
       "DELETE",
