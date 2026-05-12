@@ -173,20 +173,20 @@ onMounted(async () => {
       snapshot.value = ev;
       paused.value = false;
       closedNotice.value = null;
-      setPollResults(props.slug, ev);
+      setPollResults(props.slug, ev, props.questionId);
     },
     onTally: (ev: TallyDeltaEvent) => {
       if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
       const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
-      setPollResults(props.slug, snapshot.value);
+      setPollResults(props.slug, snapshot.value, props.questionId);
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         closedNotice.value = snapshot.value.activeQuestion.prompt;
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
-        setPollResults(props.slug, snapshot.value);
+        setPollResults(props.slug, snapshot.value, props.questionId);
       }
     },
     onConnectionStateChange: (state) => {

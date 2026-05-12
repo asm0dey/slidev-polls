@@ -93,4 +93,14 @@ describe("usePollResults", () => {
     expect(mod.usePollResultsMap()).toEqual({});
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
+
+  it("keeps separate entries per questionId on the same slug", async () => {
+    const mod = await loadFresh();
+    mod.setPollResults("poll", makeSnapshot("poll", 3), "q1");
+    mod.setPollResults("poll", makeSnapshot("poll", 9), "q2");
+
+    expect(mod.usePollResults("poll", "q1").value?.tally[0].count).toBe(3);
+    expect(mod.usePollResults("poll", "q2").value?.tally[0].count).toBe(9);
+    expect(mod.usePollResults("poll").value).toBeNull();
+  });
 });

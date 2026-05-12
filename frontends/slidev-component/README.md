@@ -85,19 +85,26 @@ GPL-3.0-or-later. See [LICENSE](./LICENSE).
 ## Reading poll results from other slides
 
 `PollResults` keeps a deck-wide reactive cache of every poll it has seen. Other
-slides can read raw `SnapshotEvent`s by slug and roll their own aggregates:
+slides can read raw `SnapshotEvent`s by slug — and, when multiple slides target
+different questions of the same poll, by `(slug, questionId)` — then compose
+their own aggregates:
 
 ```vue
 <script setup>
 import { computed } from "vue";
 import { usePollResults } from "@slidev-polls/component";
 
-const q1 = usePollResults("warmup");
-const q2 = usePollResults("vote-feature");
+// One slug, one question per slide → just pass the slug.
+const warmup = usePollResults("warmup");
+
+// Same slug, multiple questions on separate slides → pass the questionId
+// so each slide's snapshot keeps its own slot in the store.
+const q1 = usePollResults("main-talk", "<question-id-1>");
+const q2 = usePollResults("main-talk", "<question-id-2>");
 
 const totals = computed(() => {
   const out: Record<string, number> = {};
-  for (const snap of [q1.value, q2.value]) {
+  for (const snap of [warmup.value, q1.value, q2.value]) {
     for (const t of snap?.tally ?? []) out[t.optionId] = (out[t.optionId] ?? 0) + t.count;
   }
   return out;

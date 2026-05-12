@@ -1,11 +1,17 @@
 import { computed, reactive, readonly, type ComputedRef } from "vue";
 import type { SnapshotEvent } from "@slidev-polls/shared";
 
-// Deck-wide reactive cache of the latest SnapshotEvent per poll slug.
-// PollPanel auto-registers via setPollResults on every SSE update. Other
-// slides read via usePollResults(slug) and compose their own aggregates.
+// Deck-wide reactive cache of the latest SnapshotEvent per poll slug, optionally
+// scoped to a specific questionId so multiple PollPanels on the same slug (one
+// per question) don't overwrite each other. PollPanel auto-registers via
+// setPollResults on every SSE update. Other slides read via usePollResults and
+// compose their own aggregates.
 
 const STORAGE_KEY = "slidev-polls:results-cache";
+
+function keyFor(slug: string, questionId?: string): string {
+  return questionId ? `${slug}::${questionId}` : slug;
+}
 
 function hydrate(): Record<string, SnapshotEvent> {
   if (typeof window === "undefined") return {};
@@ -51,8 +57,8 @@ function persist(): void {
   }
 }
 
-export function setPollResults(slug: string, snapshot: SnapshotEvent): void {
-  store[slug] = snapshot;
+export function setPollResults(slug: string, snapshot: SnapshotEvent, questionId?: string): void {
+  store[keyFor(slug, questionId)] = snapshot;
   persist();
 }
 
@@ -61,8 +67,12 @@ export function clearPollResults(): void {
   persist();
 }
 
-export function usePollResults(slug: string): ComputedRef<SnapshotEvent | null> {
-  return computed(() => store[slug] ?? null);
+export function usePollResults(
+  slug: string,
+  questionId?: string
+): ComputedRef<SnapshotEvent | null> {
+  const k = keyFor(slug, questionId);
+  return computed(() => store[k] ?? null);
 }
 
 export function usePollResultsMap(): Readonly<Record<string, SnapshotEvent>> {

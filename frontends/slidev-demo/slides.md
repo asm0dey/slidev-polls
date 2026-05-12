@@ -121,31 +121,44 @@ Mint more tokens any time from the backoffice **Deck tokens** page.
 layout: center
 ---
 
-# Live results — read from the shared store
+# Live results — combined from Q1 and Q2
 
 <script setup>
 import { computed } from "vue";
 import { usePollResults } from "@slidev-polls/component";
 
-// Same slug as Q1 / Q2 above. The store keeps the latest snapshot for the
-// slug, so this slide always reflects whichever question is currently active
-// (or was last seen). For aggregating across distinct slugs, see the README.
-const live = usePollResults("test-talk");
+// Same slug, distinct questionIds — the store keys by slug + questionId so
+// each PollPanel keeps its own entry. Mirror the Q1 / Q2 frontmatter above.
+const q1 = usePollResults("test-talk", "bc81b41a-0306-401b-9f81-4d98c1226580");
+const q2 = usePollResults("test-talk", "7d0a8041-8836-4414-b66c-4baf70249b70");
 
-const rows = computed(() => {
-  const tally = live.value?.tally ?? [];
-  const opts = live.value?.activeQuestion?.options ?? [];
+function rowsFor(snap) {
+  const tally = snap?.tally ?? [];
+  const opts = snap?.activeQuestion?.options ?? [];
   return tally.map((t) => ({
     label: opts.find((o) => o.id === t.optionId)?.label ?? t.optionId,
     count: t.count
   }));
-});
+}
+
+const q1Rows = computed(() => rowsFor(q1.value));
+const q2Rows = computed(() => rowsFor(q2.value));
 </script>
 
-<div v-if="live" data-testid="aggregate-rows">
-  <p>Prompt: {{ live.activeQuestion?.prompt ?? "(question closed)" }}</p>
-  <ul>
-    <li v-for="r in rows" :key="r.label">{{ r.label }} — {{ r.count }}</li>
-  </ul>
+<div data-testid="aggregate-rows">
+  <div v-if="q1">
+    <p><strong>Q1:</strong> {{ q1.activeQuestion?.prompt ?? "(closed)" }}</p>
+    <ul>
+      <li v-for="r in q1Rows" :key="'q1-' + r.label">{{ r.label }} — {{ r.count }}</li>
+    </ul>
+  </div>
+  <p v-else>Q1: no snapshot yet — visit the Q1 slide first.</p>
+
+  <div v-if="q2">
+    <p><strong>Q2:</strong> {{ q2.activeQuestion?.prompt ?? "(closed)" }}</p>
+    <ul>
+      <li v-for="r in q2Rows" :key="'q2-' + r.label">{{ r.label }} — {{ r.count }}</li>
+    </ul>
+  </div>
+  <p v-else>Q2: no snapshot yet — visit the Q2 slide first.</p>
 </div>
-<p v-else>No snapshot yet — visit Q1 or Q2 first.</p>
