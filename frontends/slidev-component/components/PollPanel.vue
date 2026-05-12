@@ -77,6 +77,12 @@ let stop: (() => void) | null = null;
 // Tracks the most recent intent we successfully posted. The server is idempotent already,
 // but this skips the wasted round-trip when a slide jitter fires the same edge twice.
 let lastSentIntent: "open" | "closed" | null = null;
+// Slidev keeps every slide mounted simultaneously. The observer-leave branch fires for
+// every off-screen panel — including those that never visibly entered. Without this
+// gate, an off-screen panel that auto-activated via the auth-watcher signed-in transition
+// would later fire close from observer-leave, racing the on-screen panel's activation.
+// We only fire observer-driven close when an observer-enter actually happened.
+let observerOpened = false;
 
 // `layout: center` wraps the slide body in an inline-block whose intrinsic
 // width tracks its content, so a percentage on .sp-pollpanel resolves to
@@ -151,7 +157,10 @@ async function activateFromDeck(base: string) {
 async function closeFromDeck(base: string) {
   if (auth.status.value !== "signed-in") return;
   if (!props.pollId) return;
-  if (lastSentIntent === "closed") return;
+  // Only close what this panel opened. A panel that never activated has nothing
+  // to close — and racing closes from off-screen panels would clobber whichever
+  // panel just opened the question.
+  if (lastSentIntent !== "open") return;
   const token = auth.state.value.token;
   if (!token) return;
   const url = `${base.replace(/\/$/, "")}/api/deck/polls/${encodeURIComponent(props.pollId)}/close`;
@@ -192,10 +201,11 @@ onMounted(async () => {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+            observerOpened = true;
             void activateFromDeck(base);
-          } else if (e.intersectionRatio < 0.1) {
-            // Slide left the viewport: close so attendees see "waiting" until it returns.
-            // Re-entry triggers the open branch above.
+          } else if (observerOpened && e.intersectionRatio < 0.1) {
+            // Slide left the viewport (and was previously visible): close so attendees
+            // see "waiting" until it returns. Re-entry triggers the open branch above.
             void closeFromDeck(base);
           }
         }
