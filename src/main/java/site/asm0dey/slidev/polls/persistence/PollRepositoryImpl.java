@@ -391,15 +391,22 @@ public class PollRepositoryImpl implements PollRepository {
           .set(POLL_QUESTIONS.STATUS, q.status().name())
           .execute();
       List<Option> insertedOptions = new ArrayList<>(q.options().size());
-      for (Option o : q.options()) {
-        UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
-        dsl.insertInto(POLL_OPTIONS)
-            .set(POLL_OPTIONS.ID, oid)
-            .set(POLL_OPTIONS.QUESTION_ID, qid)
-            .set(POLL_OPTIONS.LABEL, o.label())
-            .set(POLL_OPTIONS.POSITION, o.position())
-            .execute();
-        insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
+      if (!q.options().isEmpty()) {
+        var batch =
+            dsl.batch(
+                q.options().stream()
+                    .map(
+                        o -> {
+                          UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
+                          insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
+                          return dsl.insertInto(POLL_OPTIONS)
+                              .set(POLL_OPTIONS.ID, oid)
+                              .set(POLL_OPTIONS.QUESTION_ID, qid)
+                              .set(POLL_OPTIONS.LABEL, o.label())
+                              .set(POLL_OPTIONS.POSITION, o.position());
+                        })
+                    .toList());
+        batch.execute();
       }
       ordered.add(
           new Question(
