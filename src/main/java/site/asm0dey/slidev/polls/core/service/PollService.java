@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
@@ -41,8 +42,13 @@ public class PollService {
   private final ApplicationEventPublisher events;
   private PollService pollService;
 
+  // Spring 6 rejects circular references by default. @Lazy defers the proxy resolution
+  // until first call so the bean factory finishes wiring PollService itself before
+  // injecting the self-reference. The proxy is still required so transactional
+  // self-invocations (`pollService.getForOwner(...)`, `pollService.activateQuestion(...)`)
+  // pick up the target method's @Transactional advice instead of bypassing it.
   @Autowired
-  public void setPollService(PollService pollService) {
+  public void setPollService(@Lazy PollService pollService) {
     this.pollService = pollService;
   }
 
