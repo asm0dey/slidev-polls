@@ -17,6 +17,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --check \"**/*.{ts,vue,json,md,yml,yaml,html,css}\"",
     "format:write": "prettier --write \"**/*.{ts,vue,json,md,yml,yaml,html,css}\"",
+    "format:files": "prettier --write",
     "e2e": "playwright test",
     "e2e:install-browsers": "playwright install chromium"
   },
@@ -29,6 +30,7 @@
     "globals": "^17.6.0",
     "lefthook": "^2.1.6",
     "prettier": "^3.8.3",
+    "prettier-plugin-slidev": "^1.0.5",
     "typescript-eslint": "^8.59.2",
     "vue-eslint-parser": "^10.4.0"
   }

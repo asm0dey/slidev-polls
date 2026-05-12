@@ -9,7 +9,7 @@ pre-commit:
     - name: prettier
       root: frontends/
       glob: "**/*.{ts,vue,json,md,yml,yaml,html,css}"
-      run: bunx prettier --write {staged_files}
+      run: bun run format:files {staged_files}
       stage_fixed: true
 
     - name: spotless
