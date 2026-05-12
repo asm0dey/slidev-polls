@@ -293,9 +293,16 @@ async function copySnippet(q: DraftQuestion) {
   }
 }
 
-async function deletePoll() {
+const showDeleteDialog = ref(false);
+
+function openDeleteDialog() {
   if (!props.pollId) return;
-  if (!window.confirm(`Delete "${title.value}"? This cannot be undone.`)) return;
+  showDeleteDialog.value = true;
+}
+
+async function confirmDelete() {
+  showDeleteDialog.value = false;
+  if (!props.pollId) return;
   try {
     await client.deletePoll(props.pollId);
     await router.push("/polls");
@@ -372,7 +379,7 @@ onMounted(() => {
               type="button"
               data-testid="poll-delete"
               class="pe__delete"
-              @click="deletePoll"
+              @click="openDeleteDialog"
             >
               Delete poll
             </button>
@@ -542,6 +549,18 @@ onMounted(() => {
       tone="danger"
       @confirm="confirmClearVotes"
       @cancel="showClearVotesDialog = false"
+    />
+
+    <ConfirmDialog
+      :open="showDeleteDialog"
+      title="Delete this poll?"
+      :body="`This permanently removes the poll, all questions, options, and votes. Live voters will see a 404. This cannot be undone.`"
+      :require-typed="detail?.slug ?? slug"
+      confirm-label="Delete poll"
+      cancel-label="Cancel"
+      tone="danger"
+      @confirm="confirmDelete"
+      @cancel="showDeleteDialog = false"
     />
   </div>
 </template>

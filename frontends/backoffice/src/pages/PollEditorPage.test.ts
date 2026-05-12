@@ -274,17 +274,51 @@ describe("PollEditorPage — edit mode", () => {
   it("deletes the poll on confirmation and navigates back to /polls", async () => {
     const deletePoll = vi.fn().mockResolvedValue(undefined);
     const client = makeFake({ deletePoll });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    try {
-      const { wrapper, router } = await mountEdit(client);
-      await wrapper.find('[data-testid="poll-delete"]').trigger("click");
-      await flushPromises();
+    const { wrapper, router } = await mountEdit(client);
 
-      expect(deletePoll).toHaveBeenCalledWith("p1");
-      expect(router.currentRoute.value.path).toBe("/polls");
-    } finally {
-      confirmSpy.mockRestore();
-    }
+    await wrapper.find('[data-testid="poll-delete"]').trigger("click");
+    await flushPromises();
+
+    // Typed-slug confirmation required — the delete dialog is the second
+    // ConfirmDialog rendered after clear-votes (which stays mounted, closed).
+    const typed = wrapper.findAll('[data-testid="confirm-dialog-typed"]');
+    expect(typed).toHaveLength(1);
+    await typed[0].setValue("quickstart-demo");
+
+    const confirmButtons = wrapper.findAll('[data-testid="confirm-dialog-confirm"]');
+    // [0] is clear-votes (closed), [1] is delete (open with typed input)
+    await confirmButtons[confirmButtons.length - 1].trigger("click");
+    await flushPromises();
+
+    expect(deletePoll).toHaveBeenCalledWith("p1");
+    expect(router.currentRoute.value.path).toBe("/polls");
+  });
+
+  it("Delete poll opens ConfirmDialog (no native confirm) and disables until slug is typed", async () => {
+    const getPoll = vi.fn().mockResolvedValue(
+      pollDetail({
+        id: "p1",
+        title: "Workshop survey",
+        slug: "workshop",
+        questions: []
+      })
+    );
+    const client = makeFake({ getPoll });
+    const { wrapper } = await mountEdit(client);
+
+    await wrapper.get('[data-testid="poll-delete"]').trigger("click");
+    // The delete dialog is the one with the typed-confirm input.
+    const typedInputs = wrapper.findAll('[data-testid="confirm-dialog-typed"]');
+    expect(typedInputs).toHaveLength(1);
+    const dlg = typedInputs[0].element.closest('[data-testid="confirm-dialog"]') as HTMLElement;
+    expect(dlg).not.toBeNull();
+    const confirmBtn = dlg.querySelector(
+      '[data-testid="confirm-dialog-confirm"]'
+    ) as HTMLButtonElement;
+    expect(confirmBtn.hasAttribute("disabled")).toBe(true);
+
+    await typedInputs[0].setValue("workshop");
+    expect(confirmBtn.hasAttribute("disabled")).toBe(false);
   });
 
   it("does not redirect to /polls after saving an edit", async () => {

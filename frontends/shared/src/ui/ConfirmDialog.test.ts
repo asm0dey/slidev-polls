@@ -33,4 +33,23 @@ describe("ConfirmDialog", () => {
     expect((dialog.element as HTMLDialogElement).open).toBe(false);
     wrapper.unmount();
   });
+
+  it("disables confirm button until the user types the required string", async () => {
+    const wrapper = mount(ConfirmDialog, {
+      props: {
+        open: true,
+        title: "Delete?",
+        requireTyped: "my-talk",
+        confirmLabel: "Delete"
+      }
+    });
+    const confirm = wrapper.get('[data-testid="confirm-dialog-confirm"]');
+    expect(confirm.attributes("disabled")).toBeDefined();
+
+    const input = wrapper.get('[data-testid="confirm-dialog-typed"]');
+    await input.setValue("my-talk");
+    expect(
+      wrapper.get('[data-testid="confirm-dialog-confirm"]').attributes("disabled")
+    ).toBeUndefined();
+  });
 });
