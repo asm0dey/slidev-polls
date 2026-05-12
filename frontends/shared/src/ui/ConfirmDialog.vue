@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import Button from "./Button.vue";
 
 const props = withDefaults(
@@ -10,8 +10,15 @@ const props = withDefaults(
     confirmLabel?: string;
     cancelLabel?: string;
     tone?: "neutral" | "danger";
+    requireTyped?: string;
   }>(),
-  { body: "", confirmLabel: "Confirm", cancelLabel: "Cancel", tone: "neutral" }
+  {
+    body: "",
+    confirmLabel: "Confirm",
+    cancelLabel: "Cancel",
+    tone: "neutral",
+    requireTyped: ""
+  }
 );
 
 const emit = defineEmits<{
@@ -20,10 +27,12 @@ const emit = defineEmits<{
 }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
+const typed = ref("");
 
 watch(
   () => props.open,
   (isOpen) => {
+    typed.value = "";
     const d = dialogRef.value;
     if (!d) return;
     if (isOpen && !d.open) {
@@ -35,10 +44,15 @@ watch(
   { flush: "post", immediate: true }
 );
 
+const confirmDisabled = computed(
+  () => props.requireTyped.length > 0 && typed.value !== props.requireTyped
+);
+
 function onCancel() {
   emit("cancel");
 }
 function onConfirm() {
+  if (confirmDisabled.value) return;
   emit("confirm");
 }
 </script>
@@ -53,12 +67,23 @@ function onConfirm() {
   >
     <h2 class="cd__title">{{ title }}</h2>
     <p v-if="body" class="cd__body">{{ body }}</p>
+    <label v-if="requireTyped" class="cd__typed">
+      Type <code>{{ requireTyped }}</code> to confirm
+      <input
+        v-model="typed"
+        type="text"
+        class="cd__typed-input"
+        data-testid="confirm-dialog-typed"
+        autocomplete="off"
+      />
+    </label>
     <div class="cd__actions">
       <Button variant="ghost" data-testid="confirm-dialog-cancel" @click="onCancel">
         {{ cancelLabel }}
       </Button>
       <Button
         :variant="tone === 'danger' ? 'danger' : 'primary'"
+        :disabled="confirmDisabled"
         data-testid="confirm-dialog-confirm"
         @click="onConfirm"
       >
@@ -96,5 +121,32 @@ function onConfirm() {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.cd__typed {
+  display: block;
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  margin: 0 0 12px;
+}
+.cd__typed code {
+  font-family: var(--sp-font-mono);
+  font-size: 12px;
+  background: var(--sp-bg-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--sp-fg);
+}
+.cd__typed-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-family: var(--sp-font-sans);
+  font-size: 13px;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
 }
 </style>
