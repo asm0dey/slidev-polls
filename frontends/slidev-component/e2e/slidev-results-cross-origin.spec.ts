@@ -215,8 +215,12 @@ test.describe("cross-origin slidev deck activation", () => {
     await page.getByTestId("deck-auth-control").getByRole("button", { name: "sign in" }).click();
 
     try {
+      // CI runners are slower than local hardware: the deck-auth nav trigger flips
+      // to "deck" only after the login POST round-trips, the response writes to
+      // localStorage, and Vue reactivity picks up the status change. 20s absorbs
+      // cold-start jitter that pushes the round-trip past the previous 8s ceiling.
       await expect(page.getByTestId("deck-auth-nav-trigger")).toContainText("deck", {
-        timeout: 8_000
+        timeout: 20_000
       });
     } catch (err) {
       // Surface diagnostic data in the failure message so CI artifacts have it inline.
