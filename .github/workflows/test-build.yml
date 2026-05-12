@@ -116,10 +116,15 @@ jobs:
           bun-version: latest
 
       - name: Install go-task
-        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        # Upstream arduino/setup-task@v2.0.0 (last release: 2024-02) still runs on
+        # Node 20, which GitHub deprecated on 2025-09-19 and will remove from
+        # runners on 2026-09-16. No newer release exists, so install Task from
+        # the official installer instead. RUNNER_TEMP/bin is prepended to PATH
+        # via GITHUB_PATH so every subsequent step can call `task`.
+        run: |
+          curl --silent --location --fail https://taskfile.dev/install.sh \
+            | sh -s -- -b "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Install frontend dependencies
         working-directory: frontends
