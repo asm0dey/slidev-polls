@@ -32,4 +32,7 @@ public interface VoteRepository {
    * and the backoffice results view. Empty map when no votes have been recorded yet.
    */
   Map<UUID, Long> tally(UUID questionId);
+
+  /** Delete every row in {@code votes} bound to {@code pollId}. Returns the rows deleted. */
+  int deleteForPoll(UUID pollId);
 }

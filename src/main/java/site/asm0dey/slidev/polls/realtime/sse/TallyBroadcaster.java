@@ -5,6 +5,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
+import site.asm0dey.slidev.polls.core.event.PollVotesClearedEvent;
 import site.asm0dey.slidev.polls.core.event.VoteCastEvent;
 import site.asm0dey.slidev.polls.realtime.SseHub;
 
@@ -59,5 +60,12 @@ public class TallyBroadcaster {
         event.pollId(),
         "question-closed",
         new QuestionClosedPayload(event.pollId(), event.questionId(), Instant.now()));
+  }
+
+  @EventListener
+  public void onVotesCleared(PollVotesClearedEvent event) {
+    snapshots
+        .build(event.pollId())
+        .ifPresent(payload -> hub.broadcast(event.pollId(), "snapshot", payload));
   }
 }

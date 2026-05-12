@@ -276,6 +276,11 @@ class VoteServiceTest {
     public boolean isOriginAllowedByAnyPoll(String origin) {
       return false;
     }
+
+    @Override
+    public Poll resetQuestionsToDraft(UUID pollId) {
+      throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
   }
 
   /**
@@ -332,6 +337,11 @@ class VoteServiceTest {
 
     void simulateConcurrentClose(UUID questionId) {
       closedQuestions.add(questionId);
+    }
+
+    @Override
+    public int deleteForPoll(UUID pollId) {
+      throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
   }
 

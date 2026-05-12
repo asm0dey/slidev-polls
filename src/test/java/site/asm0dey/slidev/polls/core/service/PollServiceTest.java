@@ -19,7 +19,9 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
+import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
 import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
@@ -37,11 +39,13 @@ import site.asm0dey.slidev.polls.core.error.SlugTakenException;
 class PollServiceTest {
 
   private FakePollRepository repository;
+  private FakeVoteRepository fakeVoteRepository;
   private PollService service;
 
   @BeforeEach
   void setUp() {
     repository = new FakePollRepository();
+    fakeVoteRepository = new FakeVoteRepository();
     org.springframework.beans.factory.ObjectProvider<PollService> selfProvider =
         new org.springframework.beans.factory.ObjectProvider<>() {
           @Override
@@ -49,7 +53,9 @@ class PollServiceTest {
             return service;
           }
         };
-    service = new PollService(repository, new RecordingEventPublisher(), selfProvider);
+    service =
+        new PollService(
+            repository, new RecordingEventPublisher(), selfProvider, fakeVoteRepository);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title
@@ -349,6 +355,40 @@ class PollServiceTest {
         .isInstanceOf(NotOwnerException.class);
   }
 
+  @Test
+  void clearVotesForOwner_deletesVotesAndResetsQuestionsToDraft() {
+    Poll created =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "t", "clear-votes", null, List.of(questionDraft("Q?", "A", "B")), null));
+    UUID qid = created.questions().get(0).id();
+    UUID oid = created.questions().get(0).options().get(0).id();
+    service.activateQuestionForOwner(created.id(), "alice", qid);
+
+    fakeVoteRepository.insert(
+        new Vote(UUID.randomUUID(), created.id(), qid, oid, "voter-1", Instant.now()));
+
+    Poll after = service.clearVotesForOwner(created.id(), "alice");
+
+    assertThat(after.activeQuestionId()).isNull();
+    assertThat(after.status()).isEqualTo(PollStatus.DRAFT);
+    assertThat(after.questions().get(0).id()).isEqualTo(qid);
+    assertThat(after.questions().get(0).status()).isEqualTo(QuestionStatus.DRAFT);
+    assertThat(fakeVoteRepository.tally(qid)).isEmpty();
+  }
+
+  @Test
+  void clearVotesForOwner_rejectsNonOwner() {
+    Poll p =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "t", "clear-not-owner", null, List.of(questionDraft("Q?", "A", "B")), null));
+    assertThatThrownBy(() -> service.clearVotesForOwner(p.id(), "bob"))
+        .isInstanceOf(NotOwnerException.class);
+  }
+
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
     List<CreatePollCommand.OptionDraft> opts = new ArrayList<>();
     for (String o : options) {
@@ -598,12 +638,92 @@ class PollServiceTest {
       return false;
     }
 
+    @Override
+    public Poll resetQuestionsToDraft(UUID pollId) {
+      Poll existing = requirePresent(pollId);
+      List<Question> updated = new ArrayList<>(existing.questions().size());
+      for (Question q : existing.questions()) {
+        updated.add(
+            new Question(
+                q.id(),
+                q.pollId(),
+                q.prompt(),
+                q.ordinal(),
+                QuestionStatus.DRAFT,
+                q.options(),
+                null,
+                null));
+      }
+      Poll after =
+          new Poll(
+              existing.id(),
+              existing.ownerUsername(),
+              existing.title(),
+              existing.slug(),
+              PollStatus.DRAFT,
+              existing.style(),
+              null,
+              updated,
+              existing.allowedOrigins(),
+              existing.createdAt(),
+              Instant.now());
+      byId.put(pollId, after);
+      return after;
+    }
+
     private Poll requirePresent(UUID pollId) {
       Poll existing = byId.get(pollId);
       if (existing == null) {
         throw new NotFoundException(pollId.toString());
       }
       return existing;
+    }
+  }
+
+  /**
+   * Minimal in-memory {@link VoteRepository} sufficient to exercise {@link PollService}'s
+   * clearVotesForOwner path.
+   */
+  static final class FakeVoteRepository implements VoteRepository {
+    private final List<Vote> rows = new ArrayList<>();
+
+    @Override
+    public Vote insert(Vote vote) {
+      boolean duplicate =
+          rows.stream()
+              .anyMatch(
+                  r ->
+                      r.questionId().equals(vote.questionId())
+                          && r.voterToken().equals(vote.voterToken()));
+      if (duplicate) {
+        throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
+      }
+      rows.add(vote);
+      return vote;
+    }
+
+    @Override
+    public boolean alreadyVoted(UUID questionId, String voterToken) {
+      return rows.stream()
+          .anyMatch(r -> r.questionId().equals(questionId) && r.voterToken().equals(voterToken));
+    }
+
+    @Override
+    public Map<UUID, Long> tally(UUID questionId) {
+      Map<UUID, Long> out = new HashMap<>();
+      for (Vote v : rows) {
+        if (v.questionId().equals(questionId)) {
+          out.merge(v.optionId(), 1L, Long::sum);
+        }
+      }
+      return out;
+    }
+
+    @Override
+    public int deleteForPoll(UUID pollId) {
+      int before = rows.size();
+      rows.removeIf(v -> v.pollId().equals(pollId));
+      return before - rows.size();
     }
   }
 
