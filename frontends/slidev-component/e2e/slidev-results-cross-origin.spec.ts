@@ -205,7 +205,10 @@ test.describe("cross-origin slidev deck activation", () => {
     // seedPoll wrote data.ts with the seeded UUIDs; Vite picks up the fresh module
     // on this full page reload. e2e-deck.md's Q1/Q2 slides import from ./data.ts.
     await page.goto(`${SLIDEV}/3`);
-    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 30_000 });
+    // PollPanel fetches the historical /api/polls/{slug}/questions/{id}/snapshot on mount, so
+    // even an anonymous panel pinned to a DRAFT/CLOSED question renders the prompt + options
+    // immediately. Wait for the panel root rather than the (now-rare) waiting placeholder.
+    await expect(page.getByTestId("poll-results").first()).toBeVisible({ timeout: 30_000 });
 
     await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
 
@@ -323,7 +326,9 @@ test.describe("cross-origin slidev deck activation", () => {
       }
     });
     await page.goto(`${SLIDEV}/3`);
-    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 30_000 });
+    // PollPanel mounts and pulls historical snapshot data even when anonymous; assert the panel
+    // root (not the waiting placeholder, which only shows during the brief mount window).
+    await expect(page.getByTestId("poll-results").first()).toBeVisible({ timeout: 30_000 });
 
     // Without a signed-in deck-auth status, PollPanel must not render PollQrButton.
     await expect(page.getByTestId("poll-qr-toggle")).toHaveCount(0);
