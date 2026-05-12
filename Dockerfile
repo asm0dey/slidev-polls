@@ -1,4 +1,4 @@
-# Three-stage build:
+# Four-stage build:
 #   1. frontends-builder — bun install + build the voter / backoffice SPAs
 #      (the Slidev addon is consumed in-deck; its dist is irrelevant for the
 #      single-JAR runtime).
@@ -7,7 +7,13 @@
 #      generated sources must already exist in the context — `task codegen`
 #      runs the codegen profile against a running Postgres before the compose
 #      build is invoked by `task up`.
-#   3. runtime            — JRE-only layer running the fat JAR on :8080.
+#   3. aot-trainer       — distroless JRE that extracts the fat JAR into the
+#      Spring Boot layered form and performs the AOT cache training run.
+#      Must share the runtime stage's base image so the cached `lib/modules`
+#      hash matches at load time.
+#   4. runtime           — distroless JRE serving the extracted app + cache
+#      on :8080. Per-layer COPY keeps `lib/` (big, rarely changes) in its
+#      own Docker layer separate from the app jar and AOT cache.
 
 FROM oven/bun:1 AS frontends-builder
 WORKDIR /build
@@ -24,7 +30,7 @@ RUN bun run --filter '@slidev-polls/shared'     build \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/liberica-runtime-container:jdk-25.0.3_11-glibc AS backend-builder
+FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.3_11-glibc AS backend-builder
 WORKDIR /src
 
 COPY mvnw ./
@@ -44,9 +50,33 @@ RUN ./mvnw package -DskipTests -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/liberica-runtime-container:jre-25.0.3_11-glibc AS runtime
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS aot-trainer
 WORKDIR /app
-COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /app/app.jar
+COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /tmp/slidev-polls-0.0.1-SNAPSHOT.jar
+
+# Extract the fat JAR into Spring Boot 4 layered form (/app/<jar> + /app/lib/).
+# The output jar takes its name from the input jar's filename, so the input
+# must keep its release-style name to match the runtime ENTRYPOINT.
+RUN ["java", "-Djarmode=tools", "-jar", "/tmp/slidev-polls-0.0.1-SNAPSHOT.jar", "extract", "--destination", "/app"]
+
+# AOT training run. A dummy DataSource URL plus Hikari fail-fast disabled and
+# Flyway off lets the context reach onRefresh without a live Postgres — JOOQ
+# DSLContext still wires up, so user beans depending on it are AOT-cached.
+RUN ["java", \
+     "-Dspring.flyway.enabled=false", \
+     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/aot-training", \
+     "-Dspring.datasource.hikari.initialization-fail-timeout=-1", \
+     "-XX:AOTCacheOutput=/app/app.aot", \
+     "-Dspring.context.exit=onRefresh", \
+     "-jar", "/app/slidev-polls-0.0.1-SNAPSHOT.jar"]
+
+# ---------------------------------------------------------------------------
+
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS runtime
+WORKDIR /app
+COPY --from=aot-trainer /app/lib/ /app/lib/
+COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
+COPY --from=aot-trainer /app/app.aot /app/
 EXPOSE 8080
-ENV JAVA_OPTS=""
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
+ENV JDK_JAVA_OPTIONS=""
+ENTRYPOINT ["java", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]
