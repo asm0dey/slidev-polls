@@ -11,7 +11,7 @@ import java.util.List;
 public record UpdatePollCommand(
     String title,
     String slug,
-    List<CreatePollCommand.QuestionDraft> questions,
+    List<CreatePollCommand.QuestionUpdate> questions,
     List<String> allowedOrigins) {
 
   public UpdatePollCommand {
