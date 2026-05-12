@@ -16,6 +16,7 @@ import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
 import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
 import { slideWidth, useSlideContext } from "@slidev/client";
+import PollQrButton from "./PollQrButton.vue";
 
 const props = defineProps<{
   slug: string;
@@ -69,6 +70,15 @@ let stop: (() => void) | null = null;
 // canvas (slideWidth from @slidev/client/env, derived from canvasWidth in
 // the headmatter — default 980px).
 const panelWidth = computed(() => `${Math.round(slideWidth.value * 0.85)}px`);
+
+const voterUrl = computed(() => {
+  // QR encodes the voter SPA URL. The backend SPA-forwards /${slug} to the
+  // voter app, so we hit the same host as the poll server when one is
+  // configured, falling back to the deck's own origin for same-origin setups.
+  const base = (props.server ?? "") || headmatterServer || getConfiguredBackend();
+  const origin = base || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${origin.replace(/\/$/, "")}/${props.slug}`;
+});
 
 const panelQuestion = computed(() => {
   const s = snapshot.value;
@@ -195,6 +205,7 @@ onUnmounted(() => {
     :data-theme="theme.mode"
     :style="{ width: panelWidth }"
   >
+    <PollQrButton v-if="auth.status.value === 'signed-in'" :voter-url="voterUrl" />
     <div v-if="paused" class="sp-pollpanel__paused" data-testid="poll-paused">
       live updates paused
     </div>

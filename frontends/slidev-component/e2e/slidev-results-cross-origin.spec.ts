@@ -36,7 +36,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Relative to this spec file: ../../slidev-demo/data.ts
 const DATA_TS_PATH = path.resolve(__dirname, "../../slidev-demo/data.ts");
 
-type SeededData = { pollId: string; q1Id: string };
+type SeededData = { pollId: string; q1Id: string; slug: string };
 
 async function xsrfHeaders(
   request: APIRequestContext,
@@ -135,7 +135,7 @@ async function seedPoll(request: APIRequestContext, baseURL: string): Promise<Se
     ].join("\n")
   );
 
-  return { pollId, q1Id };
+  return { pollId, q1Id, slug };
 }
 
 async function deletePoll(request: APIRequestContext, baseURL: string, pollId: string) {
@@ -283,5 +283,45 @@ test.describe("cross-origin slidev deck activation", () => {
     expect(fillBg, ".sp-rp__fill backgroundColor must not be transparent").not.toMatch(
       /^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$|^transparent$/
     );
+
+    // ── @TS-C05: QR overlay visible to signed-in presenter ─────────────────────
+    // PollPanel renders <PollQrButton> as the first child of .sp-pollpanel only
+    // when auth.status === "signed-in". The button opens a Teleported overlay
+    // (fullscreen) containing a styled QR code encoding the voter URL. Scope the
+    // trigger lookup to the same poll-results panel to avoid matching siblings.
+    const qrToggle = panel.getByTestId("poll-qr-toggle");
+    await expect(qrToggle).toBeVisible();
+    await qrToggle.click();
+
+    const qrOverlay = page.getByTestId("poll-qr-overlay");
+    await expect(qrOverlay).toBeVisible();
+    // qr-code-styling renders the code as an inline <svg> child of its host node.
+    const overlaySvgs = qrOverlay.locator("svg");
+    await expect(overlaySvgs).toHaveCount(1);
+    await expect(overlaySvgs).toBeVisible();
+    // The overlay caption surfaces the voter URL; assert it contains the seeded slug.
+    await expect(qrOverlay).toContainText(`/${seededData.slug}`);
+
+    await page.keyboard.press("Escape");
+    await expect(qrOverlay).toHaveCount(0);
+  });
+
+  test("anonymous deck visitor does not see the QR overlay trigger", async ({ page }) => {
+    // seedPoll wrote data.ts; navigate to the same Q1 slide as the signed-in test
+    // but without performing the deck-auth sign-in dance. Clear any persisted
+    // deck-auth token via an init script so storage is empty on every page load
+    // this test triggers, sidestepping the in-memory auth-state hydration race.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.removeItem("slidev-polls:deck-auth");
+      } catch {
+        // localStorage access can throw in some sandboxed contexts; safe to ignore.
+      }
+    });
+    await page.goto(`${SLIDEV}/3`);
+    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 10_000 });
+
+    // Without a signed-in deck-auth status, PollPanel must not render PollQrButton.
+    await expect(page.getByTestId("poll-qr-toggle")).toHaveCount(0);
   });
 });

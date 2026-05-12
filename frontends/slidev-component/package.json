@@ -36,7 +36,8 @@
     "prepublishOnly": "bun run test && bun run build"
   },
   "dependencies": {
-    "@slidev-polls/shared": "workspace:*"
+    "@slidev-polls/shared": "workspace:*",
+    "qr-code-styling": "^1.9.2"
   },
   "peerDependencies": {
     "@slidev/client": "^52.0.0",

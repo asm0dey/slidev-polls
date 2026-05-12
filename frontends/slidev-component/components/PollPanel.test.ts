@@ -40,20 +40,52 @@ vi.mock("@slidev-polls/shared", async () => {
   };
 });
 
+const authState = vi.hoisted(() => ({
+  value: "anonymous" as "anonymous" | "signed-in"
+}));
 vi.mock("../composables/useDeckAuth", () => ({
   useDeckAuth: () => ({
-    status: { value: "signed-out" },
-    state: { value: { token: null } },
+    status: {
+      get value() {
+        return authState.value;
+      }
+    },
+    state: {
+      value: { token: authState.value === "signed-in" ? "tok" : null }
+    },
     markRevoked: vi.fn()
   })
 }));
 
+vi.mock("qr-code-styling", () => {
+  class FakeQRCodeStyling {
+    append() {}
+    update() {}
+  }
+  return { default: FakeQRCodeStyling };
+});
+
 describe("PollPanel", () => {
   it("renders ResultsPanel from snapshot", async () => {
+    authState.value = "anonymous";
     const w = mount(PollPanel, { props: { slug: "s" } });
     await flushPromises();
     expect(w.find("[data-testid='results-panel']").exists()).toBe(true);
     expect(w.text()).toContain("Pick");
     expect(w.text()).toContain("4 votes");
+  });
+
+  it("hides the QR button when not signed in", async () => {
+    authState.value = "anonymous";
+    const w = mount(PollPanel, { props: { slug: "s", server: "https://example.test" } });
+    await flushPromises();
+    expect(w.find("[data-testid='poll-qr-toggle']").exists()).toBe(false);
+  });
+
+  it("renders the QR button when signed in", async () => {
+    authState.value = "signed-in";
+    const w = mount(PollPanel, { props: { slug: "s", server: "https://example.test" } });
+    await flushPromises();
+    expect(w.find("[data-testid='poll-qr-toggle']").exists()).toBe(true);
   });
 });
