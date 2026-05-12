@@ -132,8 +132,16 @@ test.describe.serial("admin creates poll, voter sees activation live", () => {
 
     // Build an API request context that carries the presenter's session cookie so the
     // authenticated admin endpoints (/api/admin/…) work without a separate login.
+    // SecurityConfig protects /api/admin/** with CookieCsrfTokenRepository — state-changing
+    // requests must echo the XSRF-TOKEN cookie as an X-XSRF-TOKEN header (admin-api.ts:193).
     const storage = await presenterContext.storageState();
-    const apiRequest = await playwright.request.newContext({ baseURL, storageState: storage });
+    const csrfToken = storage.cookies.find((c) => c.name === "XSRF-TOKEN")?.value;
+    expect(csrfToken, "XSRF-TOKEN cookie present after login").toBeTruthy();
+    const apiRequest = await playwright.request.newContext({
+      baseURL,
+      storageState: storage,
+      extraHTTPHeaders: { "X-XSRF-TOKEN": csrfToken! }
+    });
 
     // ─── 2. presenter creates a poll via the editor UI ───────────────────────
     seed = await createPollViaUi(presenterPage);
