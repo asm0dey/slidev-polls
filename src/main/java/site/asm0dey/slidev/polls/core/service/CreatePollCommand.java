@@ -26,4 +26,14 @@ public record CreatePollCommand(
   public record QuestionDraft(String prompt, List<OptionDraft> options) {}
 
   public record OptionDraft(String label) {}
+
+  /** Update-path counterpart of {@link QuestionDraft}. {@code id} is null for new questions. */
+  public record QuestionUpdate(java.util.UUID id, String prompt, List<OptionUpdate> options) {
+    public QuestionUpdate {
+      options = options == null ? List.of() : List.copyOf(options);
+    }
+  }
+
+  /** Update-path counterpart of {@link OptionDraft}. {@code id} is null for new options. */
+  public record OptionUpdate(java.util.UUID id, String label) {}
 }
