@@ -15,6 +15,7 @@ import {
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { useSlidevTheme } from "../composables/useSlidevTheme";
 import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
+import { setPollResults } from "../composables/usePollResults";
 import { slideWidth, useSlideContext } from "@slidev/client";
 import PollQrButton from "./PollQrButton.vue";
 
@@ -172,17 +173,20 @@ onMounted(async () => {
       snapshot.value = ev;
       paused.value = false;
       closedNotice.value = null;
+      setPollResults(props.slug, ev);
     },
     onTally: (ev: TallyDeltaEvent) => {
       if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
       const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
       if (entry) entry.count = ev.count;
       else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
+      setPollResults(props.slug, snapshot.value);
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         closedNotice.value = snapshot.value.activeQuestion.prompt;
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
+        setPollResults(props.slug, snapshot.value);
       }
     },
     onConnectionStateChange: (state) => {
