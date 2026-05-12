@@ -85,6 +85,14 @@ public class PollController {
     return PollDetailDto.from(updated, PublicUrlBase.of(request));
   }
 
+  @PostMapping("/{pollId}/clone")
+  public ResponseEntity<PollDetailDto> clone(
+      @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
+    Poll cloned = pollService.cloneForOwner(pollId, owner(authentication));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(PollDetailDto.from(cloned, PublicUrlBase.of(request)));
+  }
+
   @DeleteMapping("/{pollId}")
   public ResponseEntity<Void> delete(@PathVariable UUID pollId, Authentication authentication) {
     pollService.deleteForOwner(pollId, owner(authentication));

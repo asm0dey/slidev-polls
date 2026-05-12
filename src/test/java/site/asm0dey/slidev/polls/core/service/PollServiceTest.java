@@ -313,6 +313,42 @@ class PollServiceTest {
     assertThat(after.questions().get(0).prompt()).isEqualTo("Q renamed?");
   }
 
+  @Test
+  void cloneForOwner_copiesContentWithFreshIdsAndDerivedSlug() {
+    Poll src =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "My Talk",
+                "my-talk",
+                null,
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("https://example.com")));
+
+    Poll clone = service.cloneForOwner(src.id(), "alice");
+
+    assertThat(clone.id()).isNotEqualTo(src.id());
+    assertThat(clone.title()).isEqualTo("Copy of My Talk");
+    assertThat(clone.slug()).isNotEqualTo(src.slug());
+    assertThat(clone.questions()).hasSize(1);
+    assertThat(clone.questions().get(0).id()).isNotEqualTo(src.questions().get(0).id());
+    assertThat(clone.questions().get(0).options())
+        .extracting(Option::label)
+        .containsExactly("A", "B");
+    assertThat(clone.allowedOrigins()).containsExactly("https://example.com");
+  }
+
+  @Test
+  void cloneForOwner_rejectsNonOwner() {
+    Poll src =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "talk", "talk-abc", null, List.of(questionDraft("Q?", "A", "B")), null));
+    assertThatThrownBy(() -> service.cloneForOwner(src.id(), "bob"))
+        .isInstanceOf(NotOwnerException.class);
+  }
+
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
     List<CreatePollCommand.OptionDraft> opts = new ArrayList<>();
     for (String o : options) {
