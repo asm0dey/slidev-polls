@@ -19,7 +19,6 @@ const isFullBleed = computed(() => route.name === "login" || route.name === "set
       <div class="bo-brand">slidev polls</div>
       <nav class="bo-nav">
         <RouterLink to="/polls" class="bo-nav-item">Polls</RouterLink>
-        <RouterLink to="/deck-tokens" class="bo-nav-item">Deck tokens</RouterLink>
         <RouterLink to="/users" class="bo-nav-item">Presenters</RouterLink>
       </nav>
       <div class="bo-sidebar-foot">
