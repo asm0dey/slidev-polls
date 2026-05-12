@@ -6,7 +6,9 @@ import type {
   CreatePollRequest,
   CreateQuestionRequest,
   PollDetail,
-  UpdatePollRequest
+  UpdateOptionBody,
+  UpdatePollRequest,
+  UpdateQuestionRequest
 } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import SlugField from "../components/SlugField.vue";
@@ -152,6 +154,30 @@ const canSubmit = computed(() => {
   return true;
 });
 
+const dirty = computed(() => {
+  if (!detail.value) return true; // create mode or never-loaded
+  if (title.value.trim() !== detail.value.title) return true;
+  if (slug.value !== detail.value.slug) return true;
+  const da = detail.value.allowedOrigins ?? [];
+  if (allowedOrigins.value.length !== da.length) return true;
+  for (let i = 0; i < da.length; i++) if (allowedOrigins.value[i] !== da[i]) return true;
+  if (questions.length !== detail.value.questions.length) return true;
+  const sorted = detail.value.questions.slice().sort((a, b) => a.ordinal - b.ordinal);
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    const r = sorted[i];
+    if (q.id !== r.id) return true;
+    if (q.prompt.trim() !== r.prompt) return true;
+    if (q.options.length !== r.options.length) return true;
+    const ropts = r.options.slice().sort((a, b) => a.position - b.position);
+    for (let j = 0; j < q.options.length; j++) {
+      if (q.options[j].id !== ropts[j].id) return true;
+      if (q.options[j].label.trim() !== ropts[j].label) return true;
+    }
+  }
+  return false;
+});
+
 function buildCreateRequest(): CreatePollRequest {
   const req: CreatePollRequest = {
     title: title.value.trim(),
@@ -169,7 +195,13 @@ function buildUpdateRequest(): UpdatePollRequest {
   if (slug.value.length > 0 && (!detail.value || slug.value !== detail.value.slug)) {
     req.slug = slug.value;
   }
-  req.questions = questions.map(toCreateQuestion);
+  req.questions = questions.map(
+    (q): UpdateQuestionRequest => ({
+      id: q.id,
+      prompt: q.prompt.trim(),
+      options: q.options.map((o): UpdateOptionBody => ({ id: o.id, label: o.label.trim() }))
+    })
+  );
   req.allowedOrigins = allowedOrigins.value.slice();
   return req;
 }
@@ -187,12 +219,13 @@ async function onSubmit() {
   formError.value = null;
   try {
     if (props.mode === "create") {
-      await client.createPoll(buildCreateRequest());
+      const created = await client.createPoll(buildCreateRequest());
+      loadFromDetail(created);
+      await router.replace({ name: "poll-edit", params: { pollId: created.id } });
     } else if (props.pollId) {
       const updated = await client.updatePoll(props.pollId, buildUpdateRequest());
       loadFromDetail(updated);
     }
-    await router.push("/polls");
   } catch (err) {
     formError.value = describeError(err);
   } finally {
@@ -425,7 +458,7 @@ onMounted(() => {
                 Close
               </Button>
               <Button
-                v-if="mode === 'edit' && q.id"
+                v-if="mode === 'edit' && q.id && !dirty"
                 variant="secondary"
                 size="sm"
                 data-testid="question-copy-snippet"
@@ -433,6 +466,13 @@ onMounted(() => {
               >
                 Copy snippet
               </Button>
+              <span
+                v-else-if="mode === 'edit' && q.id && dirty"
+                class="pe__hint pe__hint--inline"
+                data-testid="copy-snippet-disabled-hint"
+              >
+                Save to copy snippet
+              </span>
               <span
                 v-if="copiedQuestionId === q.id"
                 class="pe__copied"
@@ -598,6 +638,9 @@ onMounted(() => {
 .pe__hint {
   font-size: 11px;
   color: var(--sp-fg-subtle);
+  margin: 0;
+}
+.pe__hint--inline {
   margin: 0;
 }
 
