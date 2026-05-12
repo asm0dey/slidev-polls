@@ -103,7 +103,7 @@ describe("PollPanel", () => {
     w.unmount();
   });
 
-  it("clears activeQuestion in the store on question-closed", async () => {
+  it("retains last-known snapshot in the store on question-closed", async () => {
     authState.value = "anonymous";
     const sharedMod = await import("@slidev-polls/shared");
     const original = sharedMod.openPollStream;
@@ -134,9 +134,13 @@ describe("PollPanel", () => {
 
     const w = mount(PollPanel, { props: { slug: "closing-slug" } });
     await flushPromises();
+    // Local panel shows the "closed" notice, but the shared store keeps the
+    // last-known activeQuestion + tally so aggregator slides can compose
+    // combined results after individual slides have left.
+    expect(w.find("[data-testid='poll-waiting']").text()).toContain("Question closed");
     const { usePollResults } = await import("../composables/usePollResults");
-    expect(usePollResults("closing-slug").value?.activeQuestion).toBeNull();
-    expect(usePollResults("closing-slug").value?.tally).toEqual([]);
+    expect(usePollResults("closing-slug").value?.activeQuestion?.id).toBe("q9");
+    expect(usePollResults("closing-slug").value?.tally).toEqual([{ optionId: "a", count: 2 }]);
 
     (sharedMod as { openPollStream: unknown }).openPollStream = original;
     w.unmount();
@@ -182,6 +186,11 @@ describe("PollPanel", () => {
     const [, init] = closeCalls[0];
     expect((init as RequestInit).method).toBe("POST");
     expect(((init as RequestInit).headers as Record<string, string>)["X-Deck-Token"]).toBe("tok");
+    // Body scopes the close to this panel's questionId so the backend can ignore a
+    // stale close that arrives after a different question became active.
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({
+      questionId: "q-close-test"
+    });
 
     fetchSpy.mockRestore();
   });

@@ -146,6 +146,35 @@ class PublicPollViewIT {
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }
 
+  // Per-question snapshot endpoint: deck panels pinned to a CLOSED (or never-activated) question
+  // can fetch its tally + options without going through SSE, which only surfaces the active
+  // question. The endpoint must work for any question id in the poll regardless of status.
+  @Test
+  void question_snapshot_returns_prompt_and_options_for_closed_question() throws Exception {
+    PollFixture poll = createPollWithActiveQuestion("hist-talk");
+    // Close the active question so the SSE stream would no longer carry it.
+    MockHttpSession session = loginAsAlice();
+    mvc.perform(post("/api/admin/polls/" + poll.pollId() + "/close").session(session).with(csrf()))
+        .andExpect(status().isOk());
+
+    mvc.perform(get("/api/polls/hist-talk/questions/" + poll.activeQuestionId() + "/snapshot"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()))
+        .andExpect(jsonPath("$.slug").value("hist-talk"))
+        .andExpect(jsonPath("$.activeQuestion.id").value(poll.activeQuestionId().toString()))
+        .andExpect(jsonPath("$.activeQuestion.options.length()").value(2))
+        .andExpect(jsonPath("$.tally.length()").value(2));
+  }
+
+  @Test
+  void question_snapshot_returns_not_found_for_unknown_question() throws Exception {
+    PollFixture poll = createPollWithActiveQuestion("hist-unknown");
+    UUID phantom = UUID.randomUUID();
+    mvc.perform(get("/api/polls/hist-unknown/questions/" + phantom + "/snapshot"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
   // ---------- fixtures -----------------------------------------------------
 
   private PollFixture createPollWithActiveQuestion(String slug) throws Exception {

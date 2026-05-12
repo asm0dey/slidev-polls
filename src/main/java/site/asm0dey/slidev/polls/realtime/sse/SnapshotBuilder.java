@@ -35,6 +35,26 @@ public class SnapshotBuilder {
   }
 
   /**
+   * Build a snapshot keyed to a specific question (regardless of its lifecycle status), or empty
+   * when the question is not part of the poll. Used by the anonymous historical-snapshot endpoint
+   * so panels pinned to a CLOSED question can still render the question text and tally.
+   */
+  public Optional<SnapshotPayload> buildForQuestion(UUID pollId, UUID questionId) {
+    return polls
+        .findById(pollId)
+        .flatMap(poll -> buildForQuestion(poll, questionId, Instant.now()));
+  }
+
+  public Optional<SnapshotPayload> buildForQuestion(Poll poll, UUID questionId, Instant emittedAt) {
+    Question target =
+        poll.questions().stream().filter(q -> q.id().equals(questionId)).findFirst().orElse(null);
+    if (target == null) {
+      return Optional.empty();
+    }
+    return Optional.of(buildFor(poll, target, emittedAt));
+  }
+
+  /**
    * Build a snapshot directly from a hydrated {@link Poll} — shaves a round-trip when the caller
    * already has it.
    */
@@ -50,17 +70,22 @@ public class SnapshotBuilder {
       // rather than crash the fan-out (Principle IV).
       return new SnapshotPayload(poll.id(), poll.slug(), null, List.of(), emittedAt);
     }
-    List<SnapshotPayload.ActiveOption> options = new ArrayList<>(active.options().size());
-    for (Option o : active.options()) {
+    return buildFor(poll, active, emittedAt);
+  }
+
+  private SnapshotPayload buildFor(Poll poll, Question question, Instant emittedAt) {
+    List<SnapshotPayload.ActiveOption> options = new ArrayList<>(question.options().size());
+    for (Option o : question.options()) {
       options.add(new SnapshotPayload.ActiveOption(o.id(), o.label(), o.position()));
     }
-    Map<UUID, Long> tally = votes.tally(active.id());
-    List<SnapshotPayload.TallyEntry> tallyEntries = new ArrayList<>(active.options().size());
-    for (Option o : active.options()) {
+    Map<UUID, Long> tally = votes.tally(question.id());
+    List<SnapshotPayload.TallyEntry> tallyEntries = new ArrayList<>(question.options().size());
+    for (Option o : question.options()) {
       tallyEntries.add(new SnapshotPayload.TallyEntry(o.id(), tally.getOrDefault(o.id(), 0L)));
     }
-    SnapshotPayload.ActiveQuestion activeDto =
-        new SnapshotPayload.ActiveQuestion(active.id(), active.prompt(), active.ordinal(), options);
-    return new SnapshotPayload(poll.id(), poll.slug(), activeDto, tallyEntries, emittedAt);
+    SnapshotPayload.ActiveQuestion dto =
+        new SnapshotPayload.ActiveQuestion(
+            question.id(), question.prompt(), question.ordinal(), options);
+    return new SnapshotPayload(poll.id(), poll.slug(), dto, tallyEntries, emittedAt);
   }
 }

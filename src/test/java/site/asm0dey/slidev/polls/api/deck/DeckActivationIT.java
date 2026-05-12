@@ -264,6 +264,28 @@ class DeckActivationIT {
         .andExpect(jsonPath("$.activeQuestionId").doesNotExist());
   }
 
+  // Close request that scopes to a specific questionId no-ops when a different question is
+  // currently active. Prevents a slow slide-leave close from racing past the next slide's
+  // activate and clobbering the just-opened question.
+  @Test
+  void close_with_mismatched_question_id_is_no_op() throws Exception {
+    PollFixture poll = createPoll("deck-close-scoped");
+    String plaintext = mintToken(poll);
+    // Q2 is the currently-active question; the caller asks to close Q1 (stale).
+    activateViaDeck(poll.pollId(), plaintext, poll.q2());
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/close")
+                .header("X-Deck-Token", plaintext)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionId\":\"" + poll.q1() + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activeQuestionId").value(poll.q2().toString()));
+
+    var after = pollRepository.findById(poll.pollId()).orElseThrow();
+    assertThat(after.activeQuestionId()).isEqualTo(poll.q2());
+  }
+
   // @TS-062 — a token minted for poll A can't close on poll B (mirrors @TS-054 for /activate).
   @Test
   void cross_poll_token_rejected_on_close() throws Exception {

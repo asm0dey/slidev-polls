@@ -161,14 +161,21 @@ async function closeFromDeck(base: string) {
   // to close — and racing closes from off-screen panels would clobber whichever
   // panel just opened the question.
   if (lastSentIntent !== "open") return;
+  if (!props.questionId) return;
   const token = auth.state.value.token;
   if (!token) return;
   const url = `${base.replace(/\/$/, "")}/api/deck/polls/${encodeURIComponent(props.pollId)}/close`;
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "X-Deck-Token": token },
-      // Server figures out which question is active — no body needed.
+      headers: {
+        "Content-Type": "application/json",
+        "X-Deck-Token": token
+      },
+      // Body scopes the close to this panel's question — backend no-ops if a
+      // different question is active. Prevents a slow slide-leave close from
+      // landing after the next slide's activate and closing the wrong question.
+      body: JSON.stringify({ questionId: props.questionId }),
       // keepalive lets the request survive navigation / unmount.
       keepalive: true
     });
@@ -189,6 +196,25 @@ onMounted(async () => {
   //   3. URL set via configureDeckAuthBackend() (legacy data.ts side-effect)
   // All three eventually drive the same auth + SSE + activate routing.
   const base = (props.server ?? "") || headmatterServer || getConfiguredBackend();
+  // Anonymous viewers (and signed-in panels pinned to a CLOSED question) never receive a
+  // matching SSE snapshot, so the panel would render "Waiting…" indefinitely even though the
+  // question has tallied votes. Fetch the historical, question-scoped snapshot up front so the
+  // panel shows existing data immediately. Only apply if a live snapshot hasn't already arrived
+  // (SSE wins on race).
+  if (props.questionId) {
+    const histUrl = `${base.replace(/\/$/, "")}/api/polls/${encodeURIComponent(props.slug)}/questions/${encodeURIComponent(props.questionId)}/snapshot`;
+    void fetch(histUrl)
+      .then(async (res) => {
+        if (!res.ok || snapshot.value) return;
+        const ev = (await res.json()) as SnapshotEvent;
+        if (snapshot.value) return;
+        snapshot.value = ev;
+        setPollResults(resultsKey.value, ev);
+      })
+      .catch(() => {
+        /* noop — paused indicator / SSE handle live state */
+      });
+  }
   await activateFromDeck(base);
   watch(
     () => auth.status.value,
@@ -238,8 +264,11 @@ onMounted(async () => {
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         closedNotice.value = snapshot.value.activeQuestion.prompt;
+        // Wipe local panel state so it shows the "closed" notice, but leave
+        // the shared store's snapshot intact. Aggregator slides
+        // (usePollResults) need the last-known activeQuestion + tally to
+        // render combined results after individual slides leave.
         snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
-        setPollResults(resultsKey.value, snapshot.value);
       }
     },
     onConnectionStateChange: (state) => {

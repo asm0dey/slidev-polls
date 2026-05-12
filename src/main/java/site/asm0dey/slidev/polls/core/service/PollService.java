@@ -187,9 +187,23 @@ public class PollService {
    */
   @Transactional
   public Poll closeActiveQuestion(UUID pollId) {
+    return closeActiveQuestion(pollId, null);
+  }
+
+  /**
+   * Same as {@link #closeActiveQuestion(UUID)} but conditional: if {@code expectedQuestionId} is
+   * non-null and does not match the currently-active question, the close is a no-op. Lets the deck
+   * scope its slide-leave close to the question that slide opened, so a slow close request can't
+   * race past the next slide's activate and clobber it.
+   */
+  @Transactional
+  public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
     Poll before =
         repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
     UUID wasActive = before.activeQuestionId();
+    if (expectedQuestionId != null && !expectedQuestionId.equals(wasActive)) {
+      return before;
+    }
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {
       events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));

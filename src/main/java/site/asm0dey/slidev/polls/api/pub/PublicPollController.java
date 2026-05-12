@@ -1,6 +1,8 @@
 package site.asm0dey.slidev.polls.api.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
+import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +15,8 @@ import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
 import site.asm0dey.slidev.polls.core.service.VoteService;
 import site.asm0dey.slidev.polls.core.slug.SlugValidator;
+import site.asm0dey.slidev.polls.realtime.sse.SnapshotBuilder;
+import site.asm0dey.slidev.polls.realtime.sse.SnapshotPayload;
 
 /**
  * Anonymous, auth-free read surface backing the voter SPA. {@code GET /api/polls/by-slug/{slug}}
@@ -35,10 +39,13 @@ public class PublicPollController {
 
   private final PollRepository pollRepository;
   private final VoteService voteService;
+  private final SnapshotBuilder snapshots;
 
-  public PublicPollController(PollRepository pollRepository, VoteService voteService) {
+  public PublicPollController(
+      PollRepository pollRepository, VoteService voteService, SnapshotBuilder snapshots) {
     this.pollRepository = pollRepository;
     this.voteService = voteService;
+    this.snapshots = snapshots;
   }
 
   @GetMapping("/by-slug/{slug}")
@@ -68,5 +75,32 @@ public class PublicPollController {
       response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
     }
     return response.body(body);
+  }
+
+  /**
+   * Anonymous, snapshot-shaped view of a specific question regardless of its lifecycle status. The
+   * SSE stream only surfaces the currently-active question, so a deck slide pinned to a CLOSED
+   * question would otherwise render the "waiting" placeholder forever. This endpoint lets the panel
+   * render historical results without requiring the presenter to re-activate. The {@code
+   * activeQuestion} field in the response is populated from the requested question; callers
+   * treating it as "active" without inspecting status would be misled, which is acceptable because
+   * the panel only cares about prompt/options/tally for the requested id.
+   */
+  @GetMapping("/{slug}/questions/{questionId}/snapshot")
+  public SnapshotPayload questionSnapshot(
+      @PathVariable String slug, @PathVariable UUID questionId) {
+    if (!SlugValidator.isValidFormat(slug)) {
+      throw new NotFoundException("no poll with slug '" + slug + "'");
+    }
+    Poll poll =
+        pollRepository
+            .findBySlug(slug)
+            .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
+    return snapshots
+        .buildForQuestion(poll, questionId, Instant.now())
+        .orElseThrow(
+            () ->
+                new NotFoundException(
+                    "no question " + questionId + " in poll with slug '" + slug + "'"));
   }
 }

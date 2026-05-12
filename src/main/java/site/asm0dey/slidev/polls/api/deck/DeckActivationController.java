@@ -47,16 +47,24 @@ public class DeckActivationController {
 
   @PostMapping("/close")
   public DeckActivatedResponse close(
-      @PathVariable UUID pollId, @AuthenticationPrincipal DeckPrincipal principal) {
+      @PathVariable UUID pollId,
+      @RequestBody(required = false) CloseRequest body,
+      @AuthenticationPrincipal DeckPrincipal principal) {
     if (!principal.pollId().equals(pollId)) {
       throw new DeckTokenPollMismatchException(
           "deck token " + principal.tokenId() + " is not scoped to poll " + pollId);
     }
-    Poll after = pollService.closeActiveQuestion(pollId);
+    // Body carries the questionId the caller believes is active. When supplied, the
+    // service no-ops if a different question has since become active — prevents a
+    // slide-leave close from racing past the next slide's activate and clobbering it.
+    UUID expected = body == null ? null : body.questionId();
+    Poll after = pollService.closeActiveQuestion(pollId, expected);
     return new DeckActivatedResponse(pollId, after.activeQuestionId());
   }
 
   public record ActivateRequest(UUID questionId) {}
+
+  public record CloseRequest(UUID questionId) {}
 
   public record DeckActivatedResponse(UUID pollId, UUID activeQuestionId) {}
 }
