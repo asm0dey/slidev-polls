@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import PollPanel from "./PollPanel.vue";
 
@@ -151,4 +151,40 @@ describe("PollPanel", () => {
     expect(usePollResults("named-slug").value).toBeNull();
     w.unmount();
   });
+
+  it("POSTs /close when the panel unmounts while active", async () => {
+    authState.value = "signed-in";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const w = mount(PollPanel, {
+      props: {
+        slug: "s",
+        pollId: "poll-close-test",
+        questionId: "q-close-test",
+        server: "https://api.test"
+      }
+    });
+    await flushPromises();
+
+    // Reset spy after the initial activate call
+    fetchSpy.mockClear();
+    fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+
+    w.unmount();
+    await flushPromises();
+
+    const closeCalls = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).includes("/api/deck/polls/poll-close-test/close")
+    );
+    expect(closeCalls.length).toBeGreaterThan(0);
+    const [, init] = closeCalls[0];
+    expect((init as RequestInit).method).toBe("POST");
+    expect(((init as RequestInit).headers as Record<string, string>)["X-Deck-Token"]).toBe("tok");
+
+    fetchSpy.mockRestore();
+  });
+
+  it.todo("POSTs /close when the slide scrolls below the hysteresis threshold (intersect-leave)");
 });

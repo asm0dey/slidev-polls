@@ -57,13 +57,6 @@ function makeFake(overrides: Partial<AdminApiClient> = {}): AdminApiClient {
     createPoll: vi.fn(async (req: CreatePollRequest) => pollDetail({ title: req.title })),
     updatePoll: vi.fn(async (_id: string, _req) => pollDetail()),
     deletePoll: vi.fn().mockResolvedValue(undefined),
-    activateQuestion: vi.fn(async () =>
-      pollDetail({
-        activeQuestionId: "q1",
-        questions: [{ ...pollDetail().questions[0], status: "ACTIVE" }]
-      })
-    ),
-    closeActiveQuestion: vi.fn(async () => pollDetail({ activeQuestionId: null })),
     qrUrl: (id: string) => `/api/admin/polls/${id}/qr.png`,
     ...overrides
   } as unknown as AdminApiClient;
@@ -222,38 +215,6 @@ describe("PollEditorPage — edit mode", () => {
     expect(title.element.value).toBe("Quickstart demo");
     const slug = wrapper.find<HTMLInputElement>('input[data-testid="slug-input"]');
     expect(slug.element.value).toBe("quickstart-demo");
-  });
-
-  it("activates a draft question when the Activate button is clicked", async () => {
-    const activateQuestion = vi.fn(async () =>
-      pollDetail({
-        activeQuestionId: "q1",
-        questions: [{ ...pollDetail().questions[0], status: "ACTIVE" }]
-      })
-    );
-    const client = makeFake({ activateQuestion });
-    const { wrapper } = await mountEdit(client);
-
-    await wrapper.find('[data-testid="question-activate"]').trigger("click");
-    await flushPromises();
-
-    expect(activateQuestion).toHaveBeenCalledWith("p1", { questionId: "q1" });
-  });
-
-  it("closes the active question via the Close button", async () => {
-    const closeActiveQuestion = vi.fn(async () => pollDetail({ activeQuestionId: null }));
-    const getPoll = vi.fn().mockResolvedValue(
-      pollDetail({
-        activeQuestionId: "q1",
-        questions: [{ ...pollDetail().questions[0], status: "ACTIVE" }]
-      })
-    );
-    const client = makeFake({ getPoll, closeActiveQuestion });
-    const { wrapper } = await mountEdit(client);
-
-    await wrapper.find('[data-testid="question-close"]').trigger("click");
-    await flushPromises();
-    expect(closeActiveQuestion).toHaveBeenCalledWith("p1");
   });
 
   describe("copy snippet", () => {
