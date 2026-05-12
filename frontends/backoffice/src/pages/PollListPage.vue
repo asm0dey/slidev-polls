@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import type { Poll } from "@slidev-polls/shared";
-import { Button, Input, Pill } from "@slidev-polls/shared/ui";
+import { Button, Input, Pill, pluralize } from "@slidev-polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import QrPreview from "../components/QrPreview.vue";
 
@@ -97,7 +97,7 @@ function statusLabel(s: string): string {
     <div class="pl__head">
       <div>
         <h1 class="pl__title">Polls</h1>
-        <p class="pl__sub">{{ totalCount }} polls · {{ activeCount }} active sessions</p>
+        <p class="pl__sub">{{ pluralize(totalCount, "poll") }} · {{ activeCount }} live now</p>
       </div>
       <div class="pl__actions">
         <Input v-model="filterText" placeholder="Search…" style="width: 200px" />

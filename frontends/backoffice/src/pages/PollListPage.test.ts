@@ -164,6 +164,28 @@ describe("PollListPage", () => {
     }
   });
 
+  it("uses singular when there is exactly one poll", async () => {
+    const client = makeFake({
+      listPolls: vi.fn().mockResolvedValue([poll({ id: "p1", status: "OPEN" })])
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    const text = wrapper.find('[data-testid="poll-list-page"]').text();
+    expect(text).toContain("1 poll");
+    expect(text).not.toContain("1 polls");
+  });
+
+  it("renames active sessions to 'live now'", async () => {
+    const client = makeFake({
+      listPolls: vi.fn().mockResolvedValue([poll({ id: "p1", status: "OPEN" })])
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="poll-list-page"]').text()).toContain("1 live now");
+  });
+
   it("clones a poll and navigates to the new poll editor", async () => {
     const polls = [poll({ id: "p1", title: "Original Poll" })];
     const clonedPoll = poll({ id: "p-cloned", title: "Original Poll (copy)" });
