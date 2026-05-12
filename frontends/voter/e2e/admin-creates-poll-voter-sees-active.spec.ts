@@ -17,7 +17,6 @@ import {
 
 const ADMIN_USERNAME = "alice";
 const ADMIN_PASSWORD = "correct-horse";
-const ADMIN_DISPLAY = "Alice Presenter";
 
 type SeededPoll = {
   slug: string;
@@ -37,7 +36,6 @@ async function registerAdmin(page: Page) {
   await page.goto("/admin/setup");
   await expect(page.getByTestId("setup-page")).toBeVisible();
   await page.getByTestId("setup-username").fill(ADMIN_USERNAME);
-  await page.getByTestId("setup-displayname").fill(ADMIN_DISPLAY);
   await page.getByTestId("setup-password").fill(ADMIN_PASSWORD);
   await page.getByTestId("setup-submit").click();
   // SetupPage navigates to /polls on success.

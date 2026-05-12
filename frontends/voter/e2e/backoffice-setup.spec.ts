@@ -21,8 +21,7 @@ test.describe("backoffice first-run setup", () => {
       headers: { "content-type": "application/json" },
       data: {
         username: "alice",
-        password: "correct-horse",
-        displayName: "Alice Presenter"
+        password: "correct-horse"
       }
     });
     // The voter full-flow spec races us to /api/admin/setup against the same
@@ -41,8 +40,7 @@ test.describe("backoffice first-run setup", () => {
       headers: { "content-type": "application/json" },
       data: {
         username: "bob",
-        password: "another-strong-pw",
-        displayName: "Bob Presenter"
+        password: "another-strong-pw"
       }
     });
     expect(locked.status(), "subsequent setup attempt").toBe(409);

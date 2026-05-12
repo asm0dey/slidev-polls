@@ -72,8 +72,7 @@ async function ensureAdminBootstrapped(request: APIRequestContext) {
     headers: { "content-type": "application/json" },
     data: {
       username: "alice",
-      password: "correct-horse",
-      displayName: "Alice Presenter"
+      password: "correct-horse"
     }
   });
   if (!res.ok()) {
