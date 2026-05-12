@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -213,6 +214,49 @@ class PollAuthoringIT {
     mvc.perform(get("/api/admin/polls/" + pollId).session(session))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void patch_preservesQuestionAndOptionIds() throws Exception {
+    MockHttpSession session = loginAsAlice();
+
+    String createBody =
+        "{\"title\":\"keep ids\",\"slug\":\"keep-ids\","
+            + "\"questions\":[{\"prompt\":\"Q?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]}";
+    MvcResult created =
+        mvc.perform(
+                post("/api/admin/polls")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+    JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
+    String pollId = createdJson.get("id").asText();
+    String qId = createdJson.get("questions").get(0).get("id").asText();
+    String oAId = createdJson.get("questions").get(0).get("options").get(0).get("id").asText();
+    String oBId = createdJson.get("questions").get(0).get("options").get(1).get("id").asText();
+
+    String patchBody =
+        String.format(
+            "{\"title\":\"keep ids\",\"questions\":[{\"id\":\"%s\",\"prompt\":\"Q"
+                + " edited?\",\"options\":[{\"id\":\"%s\",\"label\":\"A"
+                + " edited\"},{\"id\":\"%s\",\"label\":\"B\"}]}]}",
+            qId, oAId, oBId);
+
+    mvc.perform(
+            patch("/api/admin/polls/" + pollId)
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(patchBody))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.questions[0].id").value(qId))
+        .andExpect(jsonPath("$.questions[0].prompt").value("Q edited?"))
+        .andExpect(jsonPath("$.questions[0].options[0].id").value(oAId))
+        .andExpect(jsonPath("$.questions[0].options[0].label").value("A edited"));
   }
 
   private MockHttpSession loginAsAlice() throws Exception {
