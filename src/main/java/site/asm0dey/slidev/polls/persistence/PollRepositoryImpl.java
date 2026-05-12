@@ -130,28 +130,101 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   @Override
-  public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionDraft> questions) {
+  public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming) {
     dsl.update(POLLS)
         .setNull(POLLS.ACTIVE_QUESTION_ID)
         .set(POLLS.STATUS, PollStatus.DRAFT.name())
         .set(POLLS.UPDATED_AT, OffsetDateTime.now())
         .where(POLLS.ID.eq(pollId))
         .execute();
-    dsl.deleteFrom(POLL_QUESTIONS).where(POLL_QUESTIONS.POLL_ID.eq(pollId)).execute();
-    List<Question> drafts = new ArrayList<>(questions.size());
-    for (int i = 0; i < questions.size(); i++) {
-      CreatePollCommand.QuestionDraft draft = questions.get(i);
-      UUID questionId = UUID.randomUUID();
-      List<Option> options = new ArrayList<>(draft.options().size());
-      for (int j = 0; j < draft.options().size(); j++) {
-        options.add(new Option(UUID.randomUUID(), questionId, draft.options().get(j).label(), j));
-      }
-      drafts.add(
-          new Question(
-              questionId, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+
+    java.util.Set<UUID> existingQuestionIds =
+        new java.util.HashSet<>(
+            dsl.select(POLL_QUESTIONS.ID)
+                .from(POLL_QUESTIONS)
+                .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
+                .fetch(POLL_QUESTIONS.ID));
+
+    java.util.Set<UUID> keepQuestionIds = new java.util.HashSet<>();
+    for (CreatePollCommand.QuestionUpdate q : incoming) {
+      if (q.id() != null) keepQuestionIds.add(q.id());
     }
-    insertQuestions(pollId, drafts);
+    java.util.Set<UUID> toDelete = new java.util.HashSet<>(existingQuestionIds);
+    toDelete.removeAll(keepQuestionIds);
+    if (!toDelete.isEmpty()) {
+      dsl.deleteFrom(POLL_QUESTIONS).where(POLL_QUESTIONS.ID.in(toDelete)).execute();
+    }
+
+    for (int i = 0; i < incoming.size(); i++) {
+      CreatePollCommand.QuestionUpdate q = incoming.get(i);
+      UUID qid = (q.id() != null && existingQuestionIds.contains(q.id())) ? q.id() : null;
+      if (qid != null) {
+        dsl.update(POLL_QUESTIONS)
+            .set(POLL_QUESTIONS.PROMPT, q.prompt())
+            .set(POLL_QUESTIONS.ORDINAL, i)
+            .where(POLL_QUESTIONS.ID.eq(qid))
+            .execute();
+        syncOptions(qid, q.options());
+      } else {
+        UUID newQid = UUID.randomUUID();
+        dsl.insertInto(POLL_QUESTIONS)
+            .set(POLL_QUESTIONS.ID, newQid)
+            .set(POLL_QUESTIONS.POLL_ID, pollId)
+            .set(POLL_QUESTIONS.PROMPT, q.prompt())
+            .set(POLL_QUESTIONS.ORDINAL, i)
+            .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
+            .execute();
+        insertNewOptions(newQid, q.options());
+      }
+    }
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+  }
+
+  private void syncOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> incoming) {
+    java.util.Set<UUID> existing =
+        new java.util.HashSet<>(
+            dsl.select(POLL_OPTIONS.ID)
+                .from(POLL_OPTIONS)
+                .where(POLL_OPTIONS.QUESTION_ID.eq(questionId))
+                .fetch(POLL_OPTIONS.ID));
+    java.util.Set<UUID> keep = new java.util.HashSet<>();
+    for (CreatePollCommand.OptionUpdate o : incoming) {
+      if (o.id() != null) keep.add(o.id());
+    }
+    java.util.Set<UUID> toDelete = new java.util.HashSet<>(existing);
+    toDelete.removeAll(keep);
+    if (!toDelete.isEmpty()) {
+      dsl.deleteFrom(POLL_OPTIONS).where(POLL_OPTIONS.ID.in(toDelete)).execute();
+    }
+    for (int i = 0; i < incoming.size(); i++) {
+      CreatePollCommand.OptionUpdate o = incoming.get(i);
+      if (o.id() != null && existing.contains(o.id())) {
+        dsl.update(POLL_OPTIONS)
+            .set(POLL_OPTIONS.LABEL, o.label())
+            .set(POLL_OPTIONS.POSITION, i)
+            .where(POLL_OPTIONS.ID.eq(o.id()))
+            .execute();
+      } else {
+        dsl.insertInto(POLL_OPTIONS)
+            .set(POLL_OPTIONS.ID, UUID.randomUUID())
+            .set(POLL_OPTIONS.QUESTION_ID, questionId)
+            .set(POLL_OPTIONS.LABEL, o.label())
+            .set(POLL_OPTIONS.POSITION, i)
+            .execute();
+      }
+    }
+  }
+
+  private void insertNewOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> options) {
+    for (int i = 0; i < options.size(); i++) {
+      CreatePollCommand.OptionUpdate o = options.get(i);
+      dsl.insertInto(POLL_OPTIONS)
+          .set(POLL_OPTIONS.ID, UUID.randomUUID())
+          .set(POLL_OPTIONS.QUESTION_ID, questionId)
+          .set(POLL_OPTIONS.LABEL, o.label())
+          .set(POLL_OPTIONS.POSITION, i)
+          .execute();
+    }
   }
 
   @Override
