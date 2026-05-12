@@ -65,9 +65,10 @@ Example shape:
 -->
 
 <PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="4cc12084-d866-44e1-ad86-d012d9511ba8"
+  slug="test-talk"
+  pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
+  questionId="bc81b41a-0306-401b-9f81-4d98c1226580"
+  name="q1"
 />
 
 <!--
@@ -82,9 +83,10 @@ layout: center
 ## Q2 — paste your second snippet here
 
 <PollResults
-  slug="liqui-way-1"
-  pollId="78a7aa06-68ea-498e-b1a8-f9faba8bcb2c"
-  questionId="0bcef414-1611-428f-920a-78e2b181b43e"
+  slug="test-talk"
+  pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
+  questionId="7d0a8041-8836-4414-b66c-4baf70249b70"
+  name="q2"
 />
 
 ---
@@ -116,3 +118,49 @@ layout: end
 # Done.
 
 Mint more tokens any time from the backoffice **Deck tokens** page.
+
+---
+layout: center
+---
+
+# Live results — combined from Q1 and Q2
+
+<script setup>
+import { computed } from "vue";
+import { usePollResults } from "@slidev-polls/component";
+
+// Each PollResults above declared `name="q1"` / `name="q2"`. The store keys
+// by that name, so the aggregator never has to hold a UUID.
+const q1 = usePollResults("q1");
+const q2 = usePollResults("q2");
+
+function rowsFor(snap) {
+  const tally = snap?.tally ?? [];
+  const opts = snap?.activeQuestion?.options ?? [];
+  return tally.map((t) => ({
+    label: opts.find((o) => o.id === t.optionId)?.label ?? t.optionId,
+    count: t.count
+  }));
+}
+
+const q1Rows = computed(() => rowsFor(q1.value));
+const q2Rows = computed(() => rowsFor(q2.value));
+</script>
+
+<div data-testid="aggregate-rows">
+  <div v-if="q1">
+    <p><strong>Q1:</strong> {{ q1.activeQuestion?.prompt ?? "(closed)" }}</p>
+    <ul>
+      <li v-for="r in q1Rows" :key="'q1-' + r.label">{{ r.label }} — {{ r.count }}</li>
+    </ul>
+  </div>
+  <p v-else>Q1: no snapshot yet — visit the Q1 slide first.</p>
+
+  <div v-if="q2">
+    <p><strong>Q2:</strong> {{ q2.activeQuestion?.prompt ?? "(closed)" }}</p>
+    <ul>
+      <li v-for="r in q2Rows" :key="'q2-' + r.label">{{ r.label }} — {{ r.count }}</li>
+    </ul>
+  </div>
+  <p v-else>Q2: no snapshot yet — visit the Q2 slide first.</p>
+</div>

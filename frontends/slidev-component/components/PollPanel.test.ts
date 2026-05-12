@@ -88,4 +88,67 @@ describe("PollPanel", () => {
     await flushPromises();
     expect(w.find("[data-testid='poll-qr-toggle']").exists()).toBe(true);
   });
+
+  it("registers the snapshot in the shared store", async () => {
+    authState.value = "anonymous";
+    const w = mount(PollPanel, { props: { slug: "shared-slug" } });
+    await flushPromises();
+    const { usePollResults } = await import("../composables/usePollResults");
+    const r = usePollResults("shared-slug");
+    expect(r.value?.activeQuestion?.id).toBe("q1");
+    expect(r.value?.tally).toEqual([
+      { optionId: "a", count: 1 },
+      { optionId: "b", count: 3 }
+    ]);
+    w.unmount();
+  });
+
+  it("clears activeQuestion in the store on question-closed", async () => {
+    authState.value = "anonymous";
+    const sharedMod = await import("@slidev-polls/shared");
+    const original = sharedMod.openPollStream;
+    (sharedMod as { openPollStream: unknown }).openPollStream = (
+      _b: string,
+      _s: string,
+      handlers: {
+        onSnapshot: (e: unknown) => void;
+        onQuestionClosed: (e: unknown) => void;
+        onConnectionStateChange: (s: string) => void;
+      }
+    ) => {
+      handlers.onSnapshot({
+        pollId: "p1",
+        slug: "closing-slug",
+        emittedAt: "now",
+        activeQuestion: {
+          id: "q9",
+          prompt: "Pick",
+          ordinal: 1,
+          options: [{ id: "a", label: "A", position: 0 }]
+        },
+        tally: [{ optionId: "a", count: 2 }]
+      });
+      handlers.onQuestionClosed({ pollId: "p1", questionId: "q9", emittedAt: "now" });
+      return () => {};
+    };
+
+    const w = mount(PollPanel, { props: { slug: "closing-slug" } });
+    await flushPromises();
+    const { usePollResults } = await import("../composables/usePollResults");
+    expect(usePollResults("closing-slug").value?.activeQuestion).toBeNull();
+    expect(usePollResults("closing-slug").value?.tally).toEqual([]);
+
+    (sharedMod as { openPollStream: unknown }).openPollStream = original;
+    w.unmount();
+  });
+
+  it("registers under the `name` prop when provided", async () => {
+    authState.value = "anonymous";
+    const w = mount(PollPanel, { props: { slug: "named-slug", name: "q-warmup" } });
+    await flushPromises();
+    const { usePollResults } = await import("../composables/usePollResults");
+    expect(usePollResults("q-warmup").value?.activeQuestion?.id).toBe("q1");
+    expect(usePollResults("named-slug").value).toBeNull();
+    w.unmount();
+  });
 });
