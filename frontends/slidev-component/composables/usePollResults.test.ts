@@ -27,8 +27,8 @@ function makeSnapshot(slug: string, count = 1): SnapshotEvent {
 async function loadFresh() {
   // Re-import so module-singleton state and hydration logic re-run after we
   // tweak localStorage. Vitest caches ESM by default; resetModules clears it.
-  const { resetModules } = await import("vitest");
-  resetModules();
+  const { vi } = await import("vitest");
+  vi.resetModules();
   return await import("./usePollResults");
 }
 
