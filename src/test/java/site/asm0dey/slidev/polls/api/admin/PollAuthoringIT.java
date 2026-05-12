@@ -259,6 +259,35 @@ class PollAuthoringIT {
         .andExpect(jsonPath("$.questions[0].options[0].label").value("A edited"));
   }
 
+  @Test
+  void clone_returnsNewPollWithFreshIds() throws Exception {
+    MockHttpSession session = loginAsAlice();
+
+    String body =
+        "{\"title\":\"talk\",\"slug\":\"talk-original\",\"questions\":[{\"prompt\":\"Q?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]}";
+    String src =
+        mvc.perform(
+                post("/api/admin/polls")
+                    .session(session)
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    JsonNode srcJson = objectMapper.readTree(src);
+    String srcId = srcJson.get("id").asText();
+    String srcQId = srcJson.get("questions").get(0).get("id").asText();
+
+    mvc.perform(post("/api/admin/polls/" + srcId + "/clone").session(session).with(csrf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.not(srcId)))
+        .andExpect(jsonPath("$.title").value("Copy of talk"))
+        .andExpect(jsonPath("$.questions[0].id").value(org.hamcrest.Matchers.not(srcQId)));
+  }
+
   private MockHttpSession loginAsAlice() throws Exception {
     MvcResult login =
         mvc.perform(

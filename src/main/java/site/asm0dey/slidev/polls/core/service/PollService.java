@@ -125,6 +125,31 @@ public class PollService {
     repository.delete(pollId);
   }
 
+  /**
+   * Duplicate a poll into a new aggregate owned by the same presenter. Title becomes "Copy of
+   * <title>"; slug is derived from the new title via {@code resolveSlug} (so the result never
+   * clashes with an existing slug). All questions/options are recreated with fresh UUIDs, leaving
+   * the source poll untouched. Active question state is NOT carried over — the clone starts as
+   * DRAFT.
+   */
+  @Transactional
+  public Poll cloneForOwner(UUID pollId, String ownerUsername) {
+    Poll src = self.getObject().getForOwner(pollId, ownerUsername);
+    List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>(src.questions().size());
+    for (Question q : src.questions()) {
+      List<CreatePollCommand.OptionDraft> opts = new ArrayList<>(q.options().size());
+      for (Option o : q.options()) {
+        opts.add(new CreatePollCommand.OptionDraft(o.label()));
+      }
+      drafts.add(new CreatePollCommand.QuestionDraft(q.prompt(), opts));
+    }
+    return self.getObject()
+        .create(
+            ownerUsername,
+            new CreatePollCommand(
+                "Copy of " + src.title(), null, src.style(), drafts, src.allowedOrigins()));
+  }
+
   @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
     self.getObject().getForOwner(pollId, ownerUsername);
