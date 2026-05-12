@@ -8,7 +8,7 @@
 #      runs the codegen profile against a running Postgres before the compose
 #      build is invoked by `task up`.
 #   3. aot-trainer       — distroless JRE that extracts the fat JAR into the
-#      Spring Boot layered form and performs the AOT cache training run.
+#      Spring Boot layered form and performs the JDK AOT cache training run.
 #      Must share the runtime stage's base image so the cached `lib/modules`
 #      hash matches at load time.
 #   4. runtime           — distroless JRE serving the extracted app + cache
@@ -54,16 +54,16 @@ FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc
 WORKDIR /app
 COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /tmp/slidev-polls-0.0.1-SNAPSHOT.jar
 
-# Extract the fat JAR into Spring Boot 4 layered form (/app/<jar> + /app/lib/).
-# The output jar takes its name from the input jar's filename, so the input
-# must keep its release-style name to match the runtime ENTRYPOINT.
+# Extract into Spring Boot 4 layered form (/app/<jar> + /app/lib/). The output
+# jar takes its name from the input jar's filename, so the input must keep its
+# release-style name to match the runtime ENTRYPOINT.
 RUN ["java", "-Djarmode=tools", "-jar", "/tmp/slidev-polls-0.0.1-SNAPSHOT.jar", "extract", "--destination", "/app"]
 
-# AOT training run. A dummy DataSource URL plus Hikari fail-fast disabled and
-# Flyway off lets the context reach onRefresh without a live Postgres — JOOQ
-# DSLContext still wires up, so user beans depending on it are AOT-cached.
+# JDK AOT cache training run. Disable Flyway and let HikariCP fail-fast off
+# so the context can refresh against a dummy DataSource — Flyway's autoconfig
+# condition re-evaluates at runtime (the cache is class-loading data, not a
+# pre-baked bean factory) and reaches the real Postgres there.
 RUN ["java", \
-     "-Dspring.aot.enabled=true", \
      "-Dspring.flyway.enabled=false", \
      "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/aot-training", \
      "-Dspring.datasource.hikari.initialization-fail-timeout=-1", \
@@ -80,4 +80,4 @@ COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
 COPY --from=aot-trainer /app/app.aot /app/
 EXPOSE 8080
 ENV JDK_JAVA_OPTIONS=""
-ENTRYPOINT ["java", "-Dspring.aot.enabled=true", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]

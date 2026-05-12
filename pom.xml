@@ -153,29 +153,6 @@
                 <configuration>
                     <mainClass>site.asm0dey.slidev.polls.api.PollApiApplication</mainClass>
                 </configuration>
-                <executions>
-                    <execution>
-                        <id>process-aot</id>
-                        <goals>
-                            <goal>process-aot</goal>
-                        </goals>
-                        <configuration>
-                            <!--
-                              process-aot fully refreshes the ApplicationContext at build
-                              time so conditional beans get evaluated. Disable Flyway and
-                              point HikariCP at a dummy URL with fail-timeout=-1 so JOOQ
-                              autoconfig can wire up a DSLContext without a live Postgres.
-                              An in-memory H2 URL would be cleaner but pulls in an h2
-                              runtime dependency just for this build-time step.
-                            -->
-                            <systemPropertyVariables>
-                                <spring.flyway.enabled>false</spring.flyway.enabled>
-                                <spring.datasource.url>jdbc:postgresql://localhost:5432/aot-build</spring.datasource.url>
-                                <spring.datasource.hikari.initialization-fail-timeout>-1</spring.datasource.hikari.initialization-fail-timeout>
-                            </systemPropertyVariables>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <!--
