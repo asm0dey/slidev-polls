@@ -389,6 +389,35 @@ class PollServiceTest {
         .isInstanceOf(NotOwnerException.class);
   }
 
+  @Test
+  void closeActiveQuestion_closesActiveAndEmitsEvent() {
+    Poll created =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "t", "deck-close", null, List.of(questionDraft("Q?", "A", "B")), null));
+    UUID qid = created.questions().get(0).id();
+    service.activateQuestionForOwner(created.id(), "alice", qid);
+
+    Poll after = service.closeActiveQuestion(created.id());
+
+    assertThat(after.activeQuestionId()).isNull();
+    assertThat(findQuestion(after, qid).status()).isEqualTo(QuestionStatus.CLOSED);
+  }
+
+  @Test
+  void closeActiveQuestion_isIdempotentWhenNothingActive() {
+    Poll created =
+        service.create(
+            "alice",
+            new CreatePollCommand(
+                "t", "deck-close-idem", null, List.of(questionDraft("Q?", "A", "B")), null));
+
+    Poll after = service.closeActiveQuestion(created.id());
+
+    assertThat(after.activeQuestionId()).isNull();
+  }
+
   private static CreatePollCommand.QuestionDraft questionDraft(String prompt, String... options) {
     List<CreatePollCommand.OptionDraft> opts = new ArrayList<>();
     for (String o : options) {

@@ -231,6 +231,53 @@ class DeckActivationIT {
         .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
   }
 
+  // @TS-060 — POSTing /close after activation returns 200 with null activeQuestionId and sets the
+  // question to CLOSED in the database.
+  @Test
+  void close_after_activate_sets_question_closed() throws Exception {
+    PollFixture poll = createPoll("deck-close-happy");
+    String plaintext = mintToken(poll);
+    activateViaDeck(poll.pollId(), plaintext, poll.q1());
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/close").header("X-Deck-Token", plaintext))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()))
+        .andExpect(jsonPath("$.activeQuestionId").doesNotExist());
+
+    var after = pollRepository.findById(poll.pollId()).orElseThrow();
+    assertThat(after.activeQuestionId()).isNull();
+    var q1 =
+        after.questions().stream().filter(q -> q.id().equals(poll.q1())).findFirst().orElseThrow();
+    assertThat(q1.status()).isEqualTo(QuestionStatus.CLOSED);
+  }
+
+  // @TS-061 — /close when no question is active is idempotent (200, null activeQuestionId).
+  @Test
+  void close_when_nothing_active_is_idempotent() throws Exception {
+    PollFixture poll = createPoll("deck-close-idem");
+    String plaintext = mintToken(poll);
+
+    mvc.perform(
+            post("/api/deck/polls/" + poll.pollId() + "/close").header("X-Deck-Token", plaintext))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.activeQuestionId").doesNotExist());
+  }
+
+  // @TS-062 — a token minted for poll A can't close on poll B (mirrors @TS-054 for /activate).
+  @Test
+  void cross_poll_token_rejected_on_close() throws Exception {
+    PollFixture pollA = createPoll("deck-close-cross-a");
+    PollFixture pollB = createPoll("deck-close-cross-b");
+    String plaintextForA = mintToken(pollA);
+
+    mvc.perform(
+            post("/api/deck/polls/" + pollB.pollId() + "/close")
+                .header("X-Deck-Token", plaintextForA))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("DECK_TOKEN_POLL_MISMATCH"));
+  }
+
   // ---------- fixtures -----------------------------------------------------
 
   private void activateViaDeck(UUID pollId, String plaintext, UUID questionId) throws Exception {
