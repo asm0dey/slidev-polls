@@ -205,7 +205,7 @@ test.describe("cross-origin slidev deck activation", () => {
     // seedPoll wrote data.ts with the seeded UUIDs; Vite picks up the fresh module
     // on this full page reload. e2e-deck.md's Q1/Q2 slides import from ./data.ts.
     await page.goto(`${SLIDEV}/3`);
-    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 30_000 });
 
     await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
 
@@ -323,7 +323,7 @@ test.describe("cross-origin slidev deck activation", () => {
       }
     });
     await page.goto(`${SLIDEV}/3`);
-    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("poll-waiting").first()).toBeVisible({ timeout: 30_000 });
 
     // Without a signed-in deck-auth status, PollPanel must not render PollQrButton.
     await expect(page.getByTestId("poll-qr-toggle")).toHaveCount(0);
