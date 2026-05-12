@@ -47,20 +47,17 @@ export interface SetupStatus {
 export interface SetupRequestBody {
   username: string;
   password: string;
-  displayName: string;
 }
 
 /** Create-user payload (POST /api/admin/users). */
 export interface CreateUserRequestBody {
   username: string;
   password: string;
-  displayName: string;
 }
 
 /** Admin user view returned by setup + user-management endpoints. */
 export interface AdminUserView {
   username: string;
-  displayName: string;
   createdAt: string;
 }
 

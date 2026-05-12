@@ -6,12 +6,9 @@ function makeClient(over = {}) {
   return {
     listUsers: vi
       .fn()
-      .mockResolvedValue([
-        { username: "alice", displayName: "Alice", createdAt: "2026-05-09T00:00:00Z" }
-      ]),
+      .mockResolvedValue([{ username: "alice", createdAt: "2026-05-09T00:00:00Z" }]),
     createUser: vi.fn().mockResolvedValue({
       username: "bob",
-      displayName: "Bob",
       createdAt: "2026-05-09T00:00:00Z"
     }),
     ...over
@@ -24,7 +21,6 @@ describe("UsersPage", () => {
     const wrapper = mount(UsersPage, { props: { apiClient } });
     await flushPromises();
     expect(wrapper.text()).toContain("alice");
-    expect(wrapper.text()).toContain("Alice");
   });
 
   it("creates user and refreshes list", async () => {
@@ -34,14 +30,12 @@ describe("UsersPage", () => {
 
     await wrapper.find('[data-testid="users-username"]').setValue("bob");
     await wrapper.find('[data-testid="users-password"]').setValue("another-strong-pw");
-    await wrapper.find('[data-testid="users-displayname"]').setValue("Bob");
     await wrapper.find('[data-testid="users-form"]').trigger("submit.prevent");
     await flushPromises();
 
     expect(apiClient.createUser).toHaveBeenCalledWith({
       username: "bob",
-      password: "another-strong-pw",
-      displayName: "Bob"
+      password: "another-strong-pw"
     });
     expect(apiClient.listUsers).toHaveBeenCalledTimes(2);
   });
@@ -64,7 +58,6 @@ describe("UsersPage", () => {
 
     await wrapper.find('[data-testid="users-username"]').setValue("alice");
     await wrapper.find('[data-testid="users-password"]').setValue("another-strong-pw");
-    await wrapper.find('[data-testid="users-displayname"]').setValue("Alice 2");
     await wrapper.find('[data-testid="users-form"]').trigger("submit.prevent");
     await flushPromises();
 

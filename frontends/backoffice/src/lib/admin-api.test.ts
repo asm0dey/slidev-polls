@@ -139,7 +139,6 @@ describe("AdminApiClient setup + user management", () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       jsonResponse(201, {
         username: "alice",
-        displayName: "Alice",
         createdAt: "2026-05-09T00:00:00Z"
       })
     );
@@ -149,8 +148,7 @@ describe("AdminApiClient setup + user management", () => {
     });
     const result = await client.runSetup({
       username: "alice",
-      password: "correct-horse-battery",
-      displayName: "Alice"
+      password: "correct-horse-battery"
     });
     expect(result.username).toBe("alice");
     const init = fetchImpl.mock.calls[0][1] as RequestInit;
@@ -174,7 +172,6 @@ describe("AdminApiClient setup + user management", () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       jsonResponse(201, {
         username: "bob",
-        displayName: "Bob",
         createdAt: "2026-05-09T00:00:00Z"
       })
     );
@@ -184,8 +181,7 @@ describe("AdminApiClient setup + user management", () => {
     });
     const result = await client.createUser({
       username: "bob",
-      password: "another-strong-pw",
-      displayName: "Bob"
+      password: "another-strong-pw"
     });
     expect(result.username).toBe("bob");
     const init = fetchImpl.mock.calls[0][1] as RequestInit;
@@ -208,7 +204,7 @@ describe("AdminApiClient setup + user management", () => {
       cookieReader: () => "XSRF-TOKEN=t"
     });
     await expect(
-      client.createUser({ username: "alice", password: "another-strong-pw", displayName: "Alice" })
+      client.createUser({ username: "alice", password: "another-strong-pw" })
     ).rejects.toMatchObject({
       name: "AdminApiError",
       status: 409,

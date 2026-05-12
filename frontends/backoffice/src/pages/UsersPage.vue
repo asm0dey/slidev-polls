@@ -14,7 +14,6 @@ const client = props.apiClient ?? defaultAdminClient;
 const users = ref<AdminUserView[]>([]);
 const username = ref("");
 const password = ref("");
-const displayName = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
@@ -32,12 +31,10 @@ async function onSubmit() {
   try {
     await client.createUser({
       username: username.value,
-      password: password.value,
-      displayName: displayName.value
+      password: password.value
     });
     username.value = "";
     password.value = "";
-    displayName.value = "";
     await refresh();
   } catch (err) {
     errorMessage.value = describeError(err);
@@ -68,14 +65,12 @@ function describeError(err: unknown): string {
       <thead>
         <tr>
           <th>Username</th>
-          <th>Display name</th>
           <th>Created</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="u in users" :key="u.username">
           <td>{{ u.username }}</td>
-          <td>{{ u.displayName }}</td>
           <td>{{ new Date(u.createdAt).toLocaleString() }}</td>
         </tr>
       </tbody>
@@ -84,7 +79,6 @@ function describeError(err: unknown): string {
     <h2 class="users-page__subtitle">Add a presenter</h2>
     <form data-testid="users-form" class="users-page__form" @submit.prevent="onSubmit">
       <Input v-model="username" placeholder="username" data-testid="users-username" />
-      <Input v-model="displayName" placeholder="display name" data-testid="users-displayname" />
       <Input
         v-model="password"
         type="password"

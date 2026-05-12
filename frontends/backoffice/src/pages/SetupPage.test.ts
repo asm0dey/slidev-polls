@@ -7,7 +7,6 @@ function makeClient(overrides = {}) {
   return {
     runSetup: vi.fn().mockResolvedValue({
       username: "alice",
-      displayName: "Alice",
       createdAt: "2026-05-09T00:00:00Z"
     }),
     login: vi.fn().mockResolvedValue(undefined),
@@ -38,14 +37,12 @@ describe("SetupPage", () => {
 
     await wrapper.find('[data-testid="setup-username"]').setValue("alice");
     await wrapper.find('[data-testid="setup-password"]').setValue("correct-horse-battery");
-    await wrapper.find('[data-testid="setup-displayname"]').setValue("Alice");
     await wrapper.find('[data-testid="setup-form"]').trigger("submit.prevent");
     await flushPromises();
 
     expect(apiClient.runSetup).toHaveBeenCalledWith({
       username: "alice",
-      password: "correct-horse-battery",
-      displayName: "Alice"
+      password: "correct-horse-battery"
     });
     expect(apiClient.login).toHaveBeenCalledWith({
       username: "alice",
@@ -76,7 +73,6 @@ describe("SetupPage", () => {
 
     await wrapper.find('[data-testid="setup-username"]').setValue("alice");
     await wrapper.find('[data-testid="setup-password"]').setValue("short");
-    await wrapper.find('[data-testid="setup-displayname"]').setValue("Alice");
     await wrapper.find('[data-testid="setup-form"]').trigger("submit.prevent");
     await flushPromises();
 

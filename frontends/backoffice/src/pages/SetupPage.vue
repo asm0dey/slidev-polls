@@ -10,7 +10,6 @@ const router = useRouter();
 
 const username = ref("");
 const password = ref("");
-const displayName = ref("");
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
@@ -20,8 +19,7 @@ async function onSubmit() {
   try {
     await client.runSetup({
       username: username.value,
-      password: password.value,
-      displayName: displayName.value
+      password: password.value
     });
     await client.login({ username: username.value, password: password.value });
     await router.push("/polls");
@@ -57,13 +55,6 @@ function describeError(err: unknown): string {
       <p class="login__sub">Create the first presenter account.</p>
       <form data-testid="setup-form" @submit.prevent="onSubmit">
         <Input v-model="username" type="text" placeholder="username" data-testid="setup-username" />
-        <Input
-          v-model="displayName"
-          type="text"
-          placeholder="display name"
-          data-testid="setup-displayname"
-          style="margin-top: 10px"
-        />
         <Input
           v-model="password"
           type="password"
