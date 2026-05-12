@@ -42,8 +42,14 @@ class PollServiceTest {
   @BeforeEach
   void setUp() {
     repository = new FakePollRepository();
-    service = new PollService(repository, new RecordingEventPublisher());
-    service.setPollService(service);
+    org.springframework.beans.factory.ObjectProvider<PollService> selfProvider =
+        new org.springframework.beans.factory.ObjectProvider<>() {
+          @Override
+          public PollService getObject() {
+            return service;
+          }
+        };
+    service = new PollService(repository, new RecordingEventPublisher(), selfProvider);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title

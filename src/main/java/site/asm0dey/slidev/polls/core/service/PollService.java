@@ -5,9 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
@@ -40,21 +39,20 @@ public class PollService {
 
   private final PollRepository repository;
   private final ApplicationEventPublisher events;
-  private PollService pollService;
+  // Spring 6 rejects circular references by default and Spring AOT cannot generate code
+  // for an `@Lazy` self-injected setter (the AOT-emitted CGLIB proxy clashes with
+  // SerializableNoOp at setCallbacks). ObjectProvider resolves on demand from the bean
+  // factory, which returns the proxy that `@Transactional` advice is bound to, so
+  // self-invocations still cross a transactional boundary.
+  private final ObjectProvider<PollService> self;
 
-  // Spring 6 rejects circular references by default. @Lazy defers the proxy resolution
-  // until first call so the bean factory finishes wiring PollService itself before
-  // injecting the self-reference. The proxy is still required so transactional
-  // self-invocations (`pollService.getForOwner(...)`, `pollService.activateQuestion(...)`)
-  // pick up the target method's @Transactional advice instead of bypassing it.
-  @Autowired
-  public void setPollService(@Lazy PollService pollService) {
-    this.pollService = pollService;
-  }
-
-  public PollService(PollRepository repository, ApplicationEventPublisher events) {
+  public PollService(
+      PollRepository repository,
+      ApplicationEventPublisher events,
+      ObjectProvider<PollService> self) {
     this.repository = repository;
     this.events = events;
+    this.self = self;
   }
 
   @Transactional
@@ -97,7 +95,7 @@ public class PollService {
 
   @Transactional
   public Poll updateForOwner(UUID pollId, String ownerUsername, UpdatePollCommand command) {
-    Poll existing = pollService.getForOwner(pollId, ownerUsername);
+    Poll existing = self.getObject().getForOwner(pollId, ownerUsername);
     String title = command.title() != null ? command.title() : existing.title();
     String slug = existing.slug();
     if (command.slug() != null && !command.slug().equals(existing.slug())) {
@@ -117,25 +115,25 @@ public class PollService {
 
   @Transactional
   public Poll updateStyleForOwner(UUID pollId, String ownerUsername, Map<String, Object> style) {
-    pollService.getForOwner(pollId, ownerUsername);
+    self.getObject().getForOwner(pollId, ownerUsername);
     return repository.updateStyle(pollId, style == null ? Map.of() : style);
   }
 
   @Transactional
   public void deleteForOwner(UUID pollId, String ownerUsername) {
-    pollService.getForOwner(pollId, ownerUsername);
+    self.getObject().getForOwner(pollId, ownerUsername);
     repository.delete(pollId);
   }
 
   @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
-    pollService.getForOwner(pollId, ownerUsername);
-    return pollService.activateQuestion(pollId, questionId);
+    self.getObject().getForOwner(pollId, ownerUsername);
+    return self.getObject().activateQuestion(pollId, questionId);
   }
 
   @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    Poll before = pollService.getForOwner(pollId, ownerUsername);
+    Poll before = self.getObject().getForOwner(pollId, ownerUsername);
     UUID wasActive = before.activeQuestionId();
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {

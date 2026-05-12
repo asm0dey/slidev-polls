@@ -63,6 +63,7 @@ RUN ["java", "-Djarmode=tools", "-jar", "/tmp/slidev-polls-0.0.1-SNAPSHOT.jar", 
 # Flyway off lets the context reach onRefresh without a live Postgres — JOOQ
 # DSLContext still wires up, so user beans depending on it are AOT-cached.
 RUN ["java", \
+     "-Dspring.aot.enabled=true", \
      "-Dspring.flyway.enabled=false", \
      "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/aot-training", \
      "-Dspring.datasource.hikari.initialization-fail-timeout=-1", \
@@ -79,4 +80,4 @@ COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
 COPY --from=aot-trainer /app/app.aot /app/
 EXPOSE 8080
 ENV JDK_JAVA_OPTIONS=""
-ENTRYPOINT ["java", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-Dspring.aot.enabled=true", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]
