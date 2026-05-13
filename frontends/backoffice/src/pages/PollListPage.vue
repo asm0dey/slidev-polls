@@ -184,7 +184,7 @@ function statusLabel(s: string): string {
       title="Delete this poll?"
       :body="
         pendingDelete
-          ? `Permanently removes &quot;${pendingDelete.title}&quot; and every vote. Live voters will see a 404.`
+          ? `Permanently removes “${pendingDelete.title}” and every vote. Live voters will see a 404.`
           : ''
       "
       :require-typed="pendingDelete?.slug ?? ''"
