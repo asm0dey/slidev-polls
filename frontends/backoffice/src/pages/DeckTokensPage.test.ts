@@ -58,8 +58,18 @@ async function mountDeckTokens(rows: DeckToken[]) {
 }
 
 describe("DeckTokensPage", () => {
+  // jsdom does not implement HTMLDialogElement showModal()/close() — shim them.
   beforeEach(() => {
-    vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+    if (!HTMLDialogElement.prototype.showModal) {
+      HTMLDialogElement.prototype.showModal = function () {
+        this.setAttribute("open", "");
+      };
+    }
+    if (!HTMLDialogElement.prototype.close) {
+      HTMLDialogElement.prototype.close = function () {
+        this.removeAttribute("open");
+      };
+    }
   });
 
   it("has no manual mint UI", async () => {
@@ -114,7 +124,18 @@ describe("DeckTokensPage", () => {
     await flushPromises();
     await wrapper.get("[data-testid='revoke-t-x']").trigger("click");
     await flushPromises();
+    await wrapper.get('[data-testid="confirm-dialog-confirm"]').trigger("click");
+    await flushPromises();
     expect(revokeDeckToken).toHaveBeenCalledWith("p-1", "t-x");
+  });
+
+  it("revoke opens ConfirmDialog instead of window.confirm", async () => {
+    const { wrapper } = await mountDeckTokens([
+      tokenRow({ id: "tk1", label: "laptop", revokedAt: null })
+    ]);
+    await wrapper.get('[data-testid="revoke-tk1"]').trigger("click");
+    expect(wrapper.find('[data-testid="confirm-dialog"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="confirm-dialog-confirm"]').exists()).toBe(true);
   });
 
   it("maps AUTH_REQUIRED onto an actionable message", async () => {
