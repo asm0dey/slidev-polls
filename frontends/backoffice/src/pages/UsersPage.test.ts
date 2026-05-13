@@ -40,6 +40,17 @@ describe("UsersPage", () => {
     expect(apiClient.listUsers).toHaveBeenCalledTimes(2);
   });
 
+  it("formats createdAt with the relative helper", async () => {
+    const apiClient = makeClient({
+      listUsers: vi
+        .fn()
+        .mockResolvedValue([{ username: "alice", createdAt: new Date().toISOString() }])
+    });
+    const wrapper = mount(UsersPage, { props: { apiClient } });
+    await flushPromises();
+    expect(wrapper.text()).toMatch(/today \d{2}:\d{2}/);
+  });
+
   it("surfaces USERNAME_TAKEN error", async () => {
     const { AdminApiError } = await import("../lib/admin-api");
     const apiClient = makeClient({

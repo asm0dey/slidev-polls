@@ -18,3 +18,4 @@ export { validateOrigin, type OriginValidation } from "./origin-validator";
 export { default as ConfirmDialog } from "./ConfirmDialog.vue";
 export { default as Menu } from "./Menu.vue";
 export { pluralize } from "./pluralize";
+export { formatRelative } from "./formatRelative";
