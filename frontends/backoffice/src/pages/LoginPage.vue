@@ -53,13 +53,24 @@ function describeError(err: unknown): string {
       <h1 class="login__title">Sign in</h1>
       <p class="login__sub">Run polls in your decks.</p>
       <form data-testid="login-form" @submit.prevent="onSubmit">
-        <Input v-model="username" type="text" placeholder="username" data-testid="login-username" />
+        <label class="login__label" for="login-username">Username</label>
+        <Input
+          v-model="username"
+          id="login-username"
+          name="username"
+          autocomplete="username"
+          placeholder="alice"
+          data-testid="login-username"
+        />
+        <label class="login__label" for="login-password" style="margin-top: 10px">Password</label>
         <Input
           v-model="password"
+          id="login-password"
+          name="password"
           type="password"
-          placeholder="Password"
+          autocomplete="current-password"
+          placeholder="Your password"
           data-testid="login-password"
-          style="margin-top: 10px"
         />
         <Button
           type="submit"
@@ -122,6 +133,12 @@ function describeError(err: unknown): string {
   font-size: 13px;
   color: var(--sp-fg-subtle);
   margin: 0 0 24px;
+}
+.login__label {
+  display: block;
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+  margin-bottom: 4px;
 }
 .login__error {
   background: var(--sp-danger-bg);
