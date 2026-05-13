@@ -55,6 +55,16 @@
         </div>
       </div>
     </template>
+
+    <ConfirmDialog
+      :open="pendingRevokeId !== null"
+      title="Revoke this deck token?"
+      body="Any deck using it will stop activating. Existing polls and votes are unaffected."
+      confirm-label="Revoke"
+      tone="danger"
+      @confirm="confirmRevoke"
+      @cancel="cancelRevoke"
+    />
   </section>
 </template>
 
@@ -62,11 +72,11 @@
 import { defineComponent, ref, onMounted, type PropType } from "vue";
 import type { DeckToken } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
-import { Button, formatRelative } from "@slidev-polls/shared/ui";
+import { Button, ConfirmDialog, formatRelative } from "@slidev-polls/shared/ui";
 
 export default defineComponent({
   name: "DeckTokensPage",
-  components: { Button },
+  components: { Button, ConfirmDialog },
   props: {
     pollId: { type: String, required: true },
     apiClient: { type: Object as PropType<AdminApiClient>, default: null }
@@ -76,6 +86,7 @@ export default defineComponent({
     const tokens = ref<DeckToken[]>([]);
     const loading = ref(true);
     const revokingId = ref<string | null>(null);
+    const pendingRevokeId = ref<string | null>(null);
     const errorMessage = ref<string | null>(null);
 
     async function refresh(): Promise<void> {
@@ -90,10 +101,14 @@ export default defineComponent({
       }
     }
 
-    async function onRevoke(tokenId: string): Promise<void> {
-      if (!window.confirm("Revoke this deck token? Any deck using it will stop activating.")) {
-        return;
-      }
+    function onRevoke(tokenId: string): void {
+      pendingRevokeId.value = tokenId;
+    }
+
+    async function confirmRevoke(): Promise<void> {
+      const tokenId = pendingRevokeId.value;
+      if (!tokenId) return;
+      pendingRevokeId.value = null;
       revokingId.value = tokenId;
       errorMessage.value = null;
       try {
@@ -106,6 +121,10 @@ export default defineComponent({
       }
     }
 
+    function cancelRevoke(): void {
+      pendingRevokeId.value = null;
+    }
+
     onMounted(() => {
       void refresh();
     });
@@ -114,8 +133,11 @@ export default defineComponent({
       tokens,
       loading,
       revokingId,
+      pendingRevokeId,
       errorMessage,
       onRevoke,
+      confirmRevoke,
+      cancelRevoke,
       formatRelative,
       maskedToken
     };
