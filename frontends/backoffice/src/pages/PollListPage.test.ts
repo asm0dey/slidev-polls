@@ -259,6 +259,15 @@ describe("PollListPage", () => {
     expect(wrapper.find('[data-testid="poll-qr-img"]').exists()).toBe(true);
   });
 
+  it("empty state has a primary CTA button", async () => {
+    const client = makeFake({ listPolls: vi.fn().mockResolvedValue([]) });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+    const empty = wrapper.get('[data-testid="poll-list-empty"]');
+    expect(empty.find('[data-testid="empty-create-cta"]').exists()).toBe(true);
+    expect(empty.text()).toContain("first poll");
+  });
+
   it("clones a poll and navigates to the new poll editor", async () => {
     const polls = [poll({ id: "p1", title: "Original Poll" })];
     const clonedPoll = poll({ id: "p-cloned", title: "Original Poll (copy)" });
