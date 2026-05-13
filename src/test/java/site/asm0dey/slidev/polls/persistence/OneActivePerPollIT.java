@@ -14,7 +14,6 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -40,19 +39,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
 
     protected abstract DSLContext dsl();
 
-    /**
-     * PostgreSQL serialises concurrent writes to a unique index even when the indexed value comes
-     * from a generated column. H2 2.4.240's MVStore does not — two transactions can both commit
-     * UPDATEs that produce the same {@code active_poll_id} value, because the generated-column
-     * computation runs without an exclusive lock on the index entry. The race test below is
-     * therefore disabled on H2; the single-binary deploy path it targets is always
-     * single-presenter, so the invariant the test guards is upheld by usage pattern rather than by
-     * the database.
-     */
-    protected boolean serialisesConcurrentActivations() {
-      return true;
-    }
-
     @BeforeEach
     void setUp() {
       DSLContext dsl = dsl();
@@ -70,9 +56,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
     // sees the unique-constraint violation translated into ConcurrentActivationException.
     @Test
     void concurrent_activations_on_same_poll_serialise() throws Exception {
-      Assumptions.assumeTrue(
-          serialisesConcurrentActivations(),
-          "engine does not serialise concurrent writes to a generated-column unique index");
       Poll seeded = seedPollWithTwoQuestions();
       UUID q1 = seeded.questions().get(0).id();
       UUID q2 = seeded.questions().get(1).id();
@@ -203,11 +186,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
     @Override
     protected DSLContext dsl() {
       return AbstractH2Test.dsl(ds);
-    }
-
-    @Override
-    protected boolean serialisesConcurrentActivations() {
-      return false;
     }
   }
 }

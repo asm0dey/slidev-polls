@@ -228,6 +228,19 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Poll activateQuestion(UUID pollId, UUID questionId) {
+    // Pessimistic row lock on the parent polls row: serialises concurrent activations on the
+    // same poll across PostgreSQL and H2. H2 2.4.240's MVStore otherwise lets two transactions
+    // both flip different poll_questions rows to ACTIVE without conflicting on the partial
+    // unique index that's fed by a generated column. The SELECT ... FOR UPDATE forces the
+    // second transaction to wait until the first commits, after which the second's UPDATE
+    // collides with the index and throws ConcurrentActivationException as expected.
+    dsl.select(POLLS.ID)
+        .from(POLLS)
+        .where(POLLS.ID.eq(pollId))
+        .forUpdate()
+        .fetchOptional()
+        .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
+
     var existing =
         dsl.selectFrom(POLL_QUESTIONS)
             .where(POLL_QUESTIONS.ID.eq(questionId).and(POLL_QUESTIONS.POLL_ID.eq(pollId)))
