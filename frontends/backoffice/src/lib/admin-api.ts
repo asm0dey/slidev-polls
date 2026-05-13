@@ -1,9 +1,7 @@
 import type {
   CreatePollRequest,
   DeckToken,
-  DeckTokenMinted,
   LoginRequest,
-  MintDeckTokenRequest,
   Poll,
   PollDetail,
   PollStyle,
@@ -146,14 +144,6 @@ export class AdminApiClient {
     return this.send<DeckToken[]>(
       "GET",
       `/api/admin/polls/${encodeURIComponent(pollId)}/deck-tokens`
-    );
-  }
-
-  mintDeckToken(pollId: string, body: MintDeckTokenRequest = {}): Promise<DeckTokenMinted> {
-    return this.send<DeckTokenMinted>(
-      "POST",
-      `/api/admin/polls/${encodeURIComponent(pollId)}/deck-tokens`,
-      body
     );
   }
 

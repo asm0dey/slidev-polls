@@ -159,15 +159,6 @@ export interface DeckToken {
   revokedAt: string | null;
 }
 
-/** Freshly minted deck token — plaintext bearer returned once (POST .../deck-tokens). */
-export interface DeckTokenMinted extends DeckToken {
-  plaintext: string;
-}
-
-export interface MintDeckTokenRequest {
-  label?: string | null;
-}
-
 /** Slimmed snapshot of an active question — what the SSE `snapshot` event carries.
  *  Lacks `status` because the SSE stream is only emitted for the currently-active question. */
 export interface SnapshotActiveQuestion {

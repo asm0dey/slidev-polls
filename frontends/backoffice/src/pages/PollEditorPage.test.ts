@@ -240,8 +240,7 @@ describe("PollEditorPage — edit mode", () => {
     });
 
     it("copiesSnippetWithSlugPollIdAndQuestionIdNoDeckToken", async () => {
-      const mintDeckToken = vi.fn();
-      const client = makeFake({ mintDeckToken });
+      const client = makeFake({});
       const { wrapper } = await mountEdit(client);
 
       await wrapper.find('[data-testid="question-copy-snippet"]').trigger("click");
@@ -249,7 +248,6 @@ describe("PollEditorPage — edit mode", () => {
 
       // Deck token must NOT be in the markup — PollPanel reads it from the
       // in-deck auth control and warns in dev if a deckToken prop is present.
-      expect(mintDeckToken).not.toHaveBeenCalled();
       expect(writeText).toHaveBeenCalledTimes(1);
       const snippet = writeText.mock.calls[0][0] as string;
       expect(snippet).toContain('slug="quickstart-demo"');

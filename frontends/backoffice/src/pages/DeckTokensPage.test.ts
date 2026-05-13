@@ -1,22 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
-import type { DeckToken, DeckTokenMinted } from "@slidev-polls/shared";
+import type { DeckToken } from "@slidev-polls/shared";
 import DeckTokensPage from "./DeckTokensPage.vue";
 import type { AdminApiClient } from "../lib/admin-api";
 import { AdminApiError } from "../lib/admin-api";
 
-// @TS-056 — mint surfaces plaintext exactly once; list rows never carry it. The UI contract tests
-// mirror that: after mint the banner with `[data-testid="minted-plaintext"]` is visible, but
-// table rows render only label/date/status, never the plaintext.
+// @TS-056 — minting now happens server-side on POST /api/deck/auth/login, never from this page.
+// The UI is a read-only list of issued tokens plus a per-row revoke. The plaintext bearer never
+// leaves the backend on this surface, so no `[data-testid="minted-banner"]` element can ever
+// appear here.
 // @TS-057 — revoke path is present and lands a DELETE call; feedback is rendered to the presenter.
 
-type FakeClient = Pick<AdminApiClient, "listDeckTokens" | "mintDeckToken" | "revokeDeckToken">;
+type FakeClient = Pick<AdminApiClient, "listDeckTokens" | "revokeDeckToken">;
 
 function makeFake(overrides: Partial<FakeClient> = {}): AdminApiClient {
   const base: FakeClient = {
     listDeckTokens: vi.fn().mockResolvedValue([]),
-    mintDeckToken: vi.fn(),
     revokeDeckToken: vi.fn().mockResolvedValue(undefined),
     ...overrides
   };
@@ -44,7 +44,8 @@ function makeRouter() {
   });
 }
 
-async function mountPage(client: AdminApiClient) {
+async function mountDeckTokens(rows: DeckToken[]) {
+  const client = makeFake({ listDeckTokens: vi.fn().mockResolvedValue(rows) });
   const router = makeRouter();
   router.push("/polls/p-1/deck-tokens");
   await router.isReady();
@@ -53,67 +54,47 @@ async function mountPage(client: AdminApiClient) {
     global: { plugins: [router] }
   });
   await flushPromises();
-  return wrapper;
+  return { wrapper, client };
 }
 
 describe("DeckTokensPage", () => {
   beforeEach(() => {
-    // jsdom's URL / clipboard access is fine as-is; window.confirm returns true by default only
-    // after we stub it, so stub at the suite level.
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
   });
 
-  it("renders an empty state when no tokens exist", async () => {
-    const client = makeFake();
-    const wrapper = await mountPage(client);
-    expect(wrapper.get("[data-testid='empty']").text()).toMatch(/no deck tokens/i);
-    expect(client.listDeckTokens).toHaveBeenCalledWith("p-1");
+  it("has no manual mint UI", async () => {
+    const { wrapper } = await mountDeckTokens([]);
+    expect(wrapper.find('[data-testid="mint-form"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="mint-submit"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="mint-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="deck-token-create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="minted-banner"]').exists()).toBe(false);
   });
 
-  it("lists existing tokens with status", async () => {
-    const client = makeFake({
-      listDeckTokens: vi
-        .fn()
-        .mockResolvedValue([
-          tokenRow({ id: "a", label: "laptop" }),
-          tokenRow({ id: "b", label: null, revokedAt: "2026-04-19T12:00:00Z" })
-        ])
-    });
-    const wrapper = await mountPage(client);
+  it("empty state explains where deck tokens come from", async () => {
+    const { wrapper } = await mountDeckTokens([]);
+    const empty = wrapper.get('[data-testid="empty"]');
+    expect(empty.text()).toContain("Sign in from your deck");
+  });
+
+  it("lists existing tokens with a revoke action", async () => {
+    const { wrapper } = await mountDeckTokens([
+      tokenRow({ id: "tk1", label: "laptop", revokedAt: null })
+    ]);
+    expect(wrapper.find('[data-testid="row-tk1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="revoke-tk1"]').exists()).toBe(true);
+  });
+
+  it("renders Live/Revoked status per row", async () => {
+    const { wrapper } = await mountDeckTokens([
+      tokenRow({ id: "a", label: "laptop" }),
+      tokenRow({ id: "b", label: null, revokedAt: "2026-04-19T12:00:00Z" })
+    ]);
     const rows = wrapper.findAll("[data-testid^='row-']");
     expect(rows).toHaveLength(2);
     expect(rows[0].text()).toContain("laptop");
     expect(rows[0].text()).toContain("Live");
     expect(rows[1].text()).toContain("Revoked");
-    // @TS-056: rendered row text never leaks plaintext — the shared DeckToken type forbids it,
-    // so this assertion reads as intent even though TS already guarantees the field is absent.
-    expect(wrapper.html()).not.toContain("plaintext-for-b");
-  });
-
-  it("surfaces the minted plaintext exactly once and refreshes the list", async () => {
-    const listMock = vi.fn();
-    listMock.mockResolvedValueOnce([]); // initial
-    listMock.mockResolvedValueOnce([tokenRow({ id: "new-token" })]); // post-mint
-    const minted: DeckTokenMinted = {
-      id: "new-token",
-      pollId: "p-1",
-      label: "laptop",
-      createdAt: "2026-04-19T10:00:00Z",
-      revokedAt: null,
-      plaintext: "supersecret"
-    };
-    const client = makeFake({
-      listDeckTokens: listMock,
-      mintDeckToken: vi.fn().mockResolvedValue(minted)
-    });
-    const wrapper = await mountPage(client);
-    await wrapper.get("[data-testid='mint-label']").setValue("laptop");
-    await wrapper.get("[data-testid='mint-submit']").trigger("submit");
-    await flushPromises();
-    expect(client.mintDeckToken).toHaveBeenCalledWith("p-1", { label: "laptop" });
-    expect(wrapper.get("[data-testid='minted-plaintext']").text()).toBe("supersecret");
-    // Table refreshed → row for the new token rendered.
-    expect(wrapper.findAll("[data-testid^='row-']")).toHaveLength(1);
   });
 
   it("lands a DELETE when revoke is confirmed", async () => {
@@ -121,11 +102,19 @@ describe("DeckTokensPage", () => {
       .fn()
       .mockResolvedValueOnce([tokenRow({ id: "t-x", revokedAt: null })])
       .mockResolvedValueOnce([tokenRow({ id: "t-x", revokedAt: "2026-04-19T11:00:00Z" })]);
-    const client = makeFake({ listDeckTokens: listMock });
-    const wrapper = await mountPage(client);
+    const revokeDeckToken = vi.fn().mockResolvedValue(undefined);
+    const client = makeFake({ listDeckTokens: listMock, revokeDeckToken });
+    const router = makeRouter();
+    router.push("/polls/p-1/deck-tokens");
+    await router.isReady();
+    const wrapper = mount(DeckTokensPage, {
+      props: { pollId: "p-1", apiClient: client },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
     await wrapper.get("[data-testid='revoke-t-x']").trigger("click");
     await flushPromises();
-    expect(client.revokeDeckToken).toHaveBeenCalledWith("p-1", "t-x");
+    expect(revokeDeckToken).toHaveBeenCalledWith("p-1", "t-x");
   });
 
   it("maps AUTH_REQUIRED onto an actionable message", async () => {
@@ -140,7 +129,14 @@ describe("DeckTokensPage", () => {
           )
         )
     });
-    const wrapper = await mountPage(client);
+    const router = makeRouter();
+    router.push("/polls/p-1/deck-tokens");
+    await router.isReady();
+    const wrapper = mount(DeckTokensPage, {
+      props: { pollId: "p-1", apiClient: client },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
     expect(wrapper.get("[data-testid='deck-tokens-error']").text()).toMatch(/sign back in/i);
   });
 });
