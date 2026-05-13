@@ -5,7 +5,7 @@ import type { Poll } from "@slidev-polls/shared";
 import { Button, Input, Pill, pluralize } from "@slidev-polls/shared/ui";
 import { ConfirmDialog } from "@slidev-polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
-import QrPreview from "../components/QrPreview.vue";
+import QrPopover from "../components/QrPopover.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -154,7 +154,7 @@ function statusLabel(s: string): string {
           {{ poll.publicUrl }}
         </a>
         <div class="pl__row-side">
-          <QrPreview data-testid="poll-qr-img" :poll-id="poll.id" :slug="poll.slug" :size="120" />
+          <QrPopover :poll-id="poll.id" :slug="poll.slug" :size="160" />
           <div class="pl__row-actions">
             <RouterLink
               :to="{ name: 'poll-edit', params: { pollId: poll.id } }"
@@ -229,7 +229,7 @@ function statusLabel(s: string): string {
 }
 .pl__row {
   display: grid;
-  grid-template-columns: 1fr 110px 1fr 160px;
+  grid-template-columns: 1fr 110px 1fr 220px;
   padding: 12px 14px;
   font-size: 13px;
   align-items: center;

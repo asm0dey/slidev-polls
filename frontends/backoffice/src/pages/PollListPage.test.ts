@@ -115,6 +115,8 @@ describe("PollListPage", () => {
     const joinLink = first.find('[data-testid="poll-join-link"]');
     expect(joinLink.exists()).toBe(true);
     expect(joinLink.attributes("href")).toBe("http://localhost:8080/quickstart-demo");
+    expect(first.find('[data-testid="poll-qr-img"]').exists()).toBe(false);
+    await first.get('[data-testid="qr-popover-trigger"]').trigger("mouseenter");
     const qrImg = first.find('[data-testid="poll-qr-img"]');
     expect(qrImg.exists()).toBe(true);
     expect(qrImg.attributes("src")).toBe("/api/admin/polls/p1/qr.png");
@@ -239,6 +241,22 @@ describe("PollListPage", () => {
     const wrapper = await mountPage(client);
     await flushPromises();
     expect(wrapper.findAll('[data-testid="poll-row"] .pl__status-cell > *')).toHaveLength(1);
+  });
+
+  it("hides the QR behind a popover by default", async () => {
+    const client = makeFake({
+      listPolls: vi
+        .fn()
+        .mockResolvedValue([
+          poll({ id: "p1", title: "X", slug: "x", status: "OPEN", publicUrl: "/x" })
+        ])
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="poll-qr-img"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="qr-popover-trigger"]').trigger("mouseenter");
+    expect(wrapper.find('[data-testid="poll-qr-img"]').exists()).toBe(true);
   });
 
   it("clones a poll and navigates to the new poll editor", async () => {
