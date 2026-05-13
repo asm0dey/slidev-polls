@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import SlugField from "./SlugField.vue";
 
 // Mirrors the server-side SlugValidator (regex ^[a-z0-9]+(-[a-z0-9]+)*$,
@@ -96,5 +96,33 @@ describe("SlugField", () => {
     const events = wrapper.emitted<[boolean]>("update:valid");
     expect(events).toBeTruthy();
     expect(events?.[events.length - 1]?.[0]).toBe(false);
+  });
+
+  it("seeds slug from autoSeed until the user types in it", async () => {
+    const wrapper = mount(SlugField, {
+      props: { modelValue: "", mode: "create", autoSeed: "My Cool Talk" }
+    });
+
+    await flushPromises();
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("my-cool-talk");
+
+    // User edits the slug manually -> seeding must stop.
+    await wrapper.get('[data-testid="slug-input"]').setValue("custom");
+    await wrapper.setProps({ autoSeed: "Different Title" });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("custom");
+  });
+
+  it("input rule uses themed tokens, not hard-coded colors", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, resolve } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(here, "SlugField.vue"), "utf8");
+    const block = src.split(".slug-field__input")[1] ?? "";
+    expect(block).not.toMatch(/#[0-9a-f]{3,8}/i);
+    expect(block).toMatch(/var\(--sp-bg\)/);
+    expect(block).toMatch(/color-scheme:\s*inherit/);
   });
 });
