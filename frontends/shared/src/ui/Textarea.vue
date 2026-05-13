@@ -38,6 +38,7 @@ defineEmits<{ "update:modelValue": [v: string] }>();
   border-radius: var(--sp-radius);
   background: var(--sp-bg);
   color: var(--sp-fg);
+  color-scheme: inherit;
   line-height: 1.5;
   resize: none;
   min-height: 120px;
