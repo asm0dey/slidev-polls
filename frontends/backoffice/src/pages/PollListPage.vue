@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import type { Poll } from "@slidev-polls/shared";
 import { Button, Input, Pill, pluralize } from "@slidev-polls/shared/ui";
+import { ConfirmDialog } from "@slidev-polls/shared/ui";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import QrPreview from "../components/QrPreview.vue";
 
@@ -49,8 +50,16 @@ function describeError(err: unknown): string {
   return "Unable to load polls.";
 }
 
-async function onDelete(p: Poll) {
-  if (!window.confirm(`Delete "${p.title}"? This cannot be undone.`)) return;
+const pendingDelete = ref<Poll | null>(null);
+
+function askDelete(p: Poll) {
+  pendingDelete.value = p;
+}
+
+async function confirmDelete() {
+  const p = pendingDelete.value;
+  pendingDelete.value = null;
+  if (!p) return;
   try {
     await client.deletePoll(p.id);
     if (polls.value) {
@@ -158,7 +167,7 @@ function statusLabel(s: string): string {
             <Button variant="secondary" size="sm" data-testid="poll-clone" @click="cloneRow(poll)">
               Clone
             </Button>
-            <Button variant="danger" size="sm" data-testid="poll-delete" @click="onDelete(poll)">
+            <Button variant="danger" size="sm" data-testid="poll-delete" @click="askDelete(poll)">
               Delete
             </Button>
           </div>
@@ -169,6 +178,21 @@ function statusLabel(s: string): string {
         No polls match — try a different search, or create a new one.
       </p>
     </div>
+
+    <ConfirmDialog
+      :open="!!pendingDelete"
+      title="Delete this poll?"
+      :body="
+        pendingDelete
+          ? `Permanently removes &quot;${pendingDelete.title}&quot; and every vote. Live voters will see a 404.`
+          : ''
+      "
+      :require-typed="pendingDelete?.slug ?? ''"
+      confirm-label="Delete poll"
+      tone="danger"
+      @confirm="confirmDelete"
+      @cancel="pendingDelete = null"
+    />
   </section>
 </template>
 

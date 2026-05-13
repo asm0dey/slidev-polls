@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import type { Poll } from "@slidev-polls/shared";
@@ -8,6 +8,20 @@ import { AdminApiError } from "../lib/admin-api";
 
 // Match @TS-002 ("poll appears in her poll list" + "poll exposes a join link")
 // and @TS-001 (auth-failure surfaces an actionable error, not a stack trace).
+
+// jsdom does not implement HTMLDialogElement showModal()/close() — shim them.
+beforeEach(() => {
+  if (!HTMLDialogElement.prototype.showModal) {
+    HTMLDialogElement.prototype.showModal = function () {
+      this.setAttribute("open", "");
+    };
+  }
+  if (!HTMLDialogElement.prototype.close) {
+    HTMLDialogElement.prototype.close = function () {
+      this.removeAttribute("open");
+    };
+  }
+});
 
 type FakeClient = Pick<AdminApiClient, "listPolls" | "deletePoll" | "clonePoll" | "qrUrl">;
 
@@ -146,22 +160,24 @@ describe("PollListPage", () => {
       listPolls: vi.fn().mockResolvedValue(polls),
       deletePoll
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    try {
-      const wrapper = await mountPage(client);
-      await flushPromises();
+    const wrapper = await mountPage(client);
+    await flushPromises();
 
-      const firstDelete = wrapper.find('[data-testid="poll-row"] [data-testid="poll-delete"]');
-      await firstDelete.trigger("click");
-      await flushPromises();
+    const firstDelete = wrapper.find('[data-testid="poll-row"] [data-testid="poll-delete"]');
+    await firstDelete.trigger("click");
+    await flushPromises();
 
-      expect(deletePoll).toHaveBeenCalledWith("p1");
-      const rows = wrapper.findAll('[data-testid="poll-row"]');
-      expect(rows).toHaveLength(1);
-      expect(rows[0].text()).toContain("Second");
-    } finally {
-      confirmSpy.mockRestore();
-    }
+    // Typed-slug confirmation required — type the first poll's slug.
+    const typed = wrapper.get('[data-testid="confirm-dialog-typed"]');
+    await typed.setValue("quickstart-demo");
+
+    await wrapper.get('[data-testid="confirm-dialog-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(deletePoll).toHaveBeenCalledWith("p1");
+    const rows = wrapper.findAll('[data-testid="poll-row"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain("Second");
   });
 
   it("uses singular when there is exactly one poll", async () => {
@@ -184,6 +200,30 @@ describe("PollListPage", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="poll-list-page"]').text()).toContain("1 live now");
+  });
+
+  it("Delete row opens ConfirmDialog with typed-slug guard", async () => {
+    const client = makeFake({
+      listPolls: vi
+        .fn()
+        .mockResolvedValue([
+          poll({
+            id: "p1",
+            title: "Workshop",
+            slug: "workshop",
+            status: "OPEN",
+            publicUrl: "/workshop"
+          })
+        ])
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="poll-delete"]').trigger("click");
+    expect(wrapper.find('[data-testid="confirm-dialog"]').exists()).toBe(true);
+    expect(
+      wrapper.get('[data-testid="confirm-dialog-confirm"]').attributes("disabled")
+    ).toBeDefined();
   });
 
   it("clones a poll and navigates to the new poll editor", async () => {
