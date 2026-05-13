@@ -18,6 +18,7 @@ import {
   Button,
   ConfirmDialog,
   Input,
+  Menu,
   Pill,
   IconChevronDown
 } from "@slidev-polls/shared/ui";
@@ -334,6 +335,11 @@ function openClearVotesDialog() {
   showClearVotesDialog.value = true;
 }
 
+function onOverflowSelect(key: string) {
+  if (key === "clear-votes") openClearVotesDialog();
+  if (key === "delete") openDeleteDialog();
+}
+
 async function confirmClearVotes() {
   showClearVotesDialog.value = false;
   if (!props.pollId) return;
@@ -381,30 +387,21 @@ onMounted(() => {
             >
               Deck tokens
             </router-link>
-            <button
-              v-if="mode === 'edit'"
-              type="button"
-              data-testid="poll-clear-votes"
-              class="pe__clear-votes"
-              @click="openClearVotesDialog"
-            >
-              Clear votes
-            </button>
-            <button
-              v-if="mode === 'edit'"
-              type="button"
-              data-testid="poll-delete"
-              class="pe__delete"
-              @click="openDeleteDialog"
-            >
-              Delete poll
-            </button>
             <span v-if="submitHint" class="pe__submit-hint" data-testid="poll-submit-hint">
               {{ submitHint }}
             </span>
             <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
               {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
             </Button>
+            <Menu
+              v-if="mode === 'edit'"
+              label="⋯"
+              :items="[
+                { key: 'clear-votes', label: 'Clear votes' },
+                { key: 'delete', label: 'Delete poll', tone: 'danger' }
+              ]"
+              @select="onOverflowSelect"
+            />
           </div>
         </header>
 
@@ -624,15 +621,6 @@ onMounted(() => {
   align-items: center;
 }
 
-.pe__delete {
-  background: #fdecea;
-  color: #b71c1c;
-  border: 1px solid #f5c6cb;
-  padding: 0.4rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
 .pe__error {
   background: var(--sp-danger-bg, #fdecea);
   color: var(--sp-danger-fg, #b71c1c);
@@ -806,18 +794,6 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: 500;
-}
-
-.pe__clear-votes {
-  background: var(--sp-bg);
-  color: var(--sp-fg);
-  border: 1px solid var(--sp-border);
-  padding: 0.4rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.pe__clear-votes:hover {
-  background: var(--sp-bg-muted);
 }
 
 .pe__submit-hint {
