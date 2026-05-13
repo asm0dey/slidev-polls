@@ -115,6 +115,17 @@ Spring Boot's Flyway autoconfig sees the `jdbc:h2:` prefix, expands the `{vendor
 
 **Never** set `spring.h2.console.enabled=true` — that would expose a SQL shell at `/h2-console` and bypass every other auth surface in the app.
 
+### Upgrade Notes — V8/V9 schema change
+
+This release applies two migrations to existing PostgreSQL installs:
+
+- **V8** drops `polls.style`. The column was unused; data in it is permanently lost.
+- **V9** rewrites the schema for cross-engine portability: `polls.allowed_origins` (text[]) becomes a `poll_allowed_origins` child table (data is migrated automatically); the partial unique on `poll_questions(status='ACTIVE')` and the functional unique on `lower(polls.slug)` become generated columns. No data loss outside of V8.
+
+**Before upgrading,** take a snapshot: `pg_dump -Fc -f slidev-polls-pre-V9.dump`. Flyway runs both migrations on boot.
+
+V1–V7 are also relocated from `db/migration/` to `db/migration/postgresql/`. Flyway's history table records the bare filename (e.g. `V1__core_tables.sql`), so standard Spring Boot autoconfig validates fine across the move. If your deployment customised Flyway to record full classpath paths, run `flyway repair` once before the next boot.
+
 ### Inner-loop dev (Vite HMR + host spring-boot:run)
 
 ```bash
