@@ -62,7 +62,7 @@
 import { defineComponent, ref, onMounted, type PropType } from "vue";
 import type { DeckToken } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
-import { Button } from "@slidev-polls/shared/ui";
+import { Button, formatRelative } from "@slidev-polls/shared/ui";
 
 export default defineComponent({
   name: "DeckTokensPage",
@@ -125,48 +125,6 @@ export default defineComponent({
 function maskedToken(t: { id: string }): string {
   const tail = t.id.slice(-4);
   return `tk_••••••${tail}`;
-}
-
-// Inline relative-time helper — will be replaced by the shared @slidev-polls/shared/ui export
-// once Task 13 ships. Spec: same day → "today HH:MM", previous day → "yesterday HH:MM",
-// same calendar year → "MMM D", earlier years → "YYYY".
-function formatRelative(iso?: string | null): string {
-  if (!iso) return "never";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const now = new Date();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) return `today ${hh}:${mm}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    d.getFullYear() === yesterday.getFullYear() &&
-    d.getMonth() === yesterday.getMonth() &&
-    d.getDate() === yesterday.getDate();
-  if (isYesterday) return `yesterday ${hh}:${mm}`;
-  if (d.getFullYear() === now.getFullYear()) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
-    ];
-    return `${months[d.getMonth()]} ${d.getDate()}`;
-  }
-  return String(d.getFullYear());
 }
 
 function messageFor(ex: unknown): string {

@@ -6,7 +6,7 @@ import {
   defaultAdminClient,
   type AdminUserView
 } from "../lib/admin-api";
-import { Button, Input } from "@slidev-polls/shared/ui";
+import { Button, Input, formatRelative } from "@slidev-polls/shared/ui";
 
 const props = withDefaults(defineProps<{ apiClient?: AdminApiClient }>(), { apiClient: undefined });
 const client = props.apiClient ?? defaultAdminClient;
@@ -71,7 +71,7 @@ function describeError(err: unknown): string {
       <tbody>
         <tr v-for="u in users" :key="u.username">
           <td>{{ u.username }}</td>
-          <td>{{ new Date(u.createdAt).toLocaleString() }}</td>
+          <td>{{ formatRelative(u.createdAt) }}</td>
         </tr>
       </tbody>
     </table>
