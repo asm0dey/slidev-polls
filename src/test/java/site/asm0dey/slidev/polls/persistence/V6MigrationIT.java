@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.jooq.impl.DSL;
@@ -43,16 +42,12 @@ class V6MigrationIT {
               + " '$2a$10$9CvgAtcz7/XAUwDSz/7Uuu7K85lbQAGe8EqYH8Wvh4auT.ZO1Siai') ON CONFLICT"
               + " (username) DO NOTHING");
       UUID pollId = UUID.randomUUID();
-      OffsetDateTime now = OffsetDateTime.now();
-      dsl.insertInto(POLLS)
-          .set(POLLS.ID, pollId)
-          .set(POLLS.OWNER_USERNAME, "alice")
-          .set(POLLS.TITLE, "doomed")
-          .set(POLLS.SLUG, "doomed")
-          .set(POLLS.STATUS, "DRAFT")
-          .set(POLLS.CREATED_AT, now)
-          .set(POLLS.UPDATED_AT, now)
-          .execute();
+      // Pre-V10 schema still has polls.status; jOOQ codegen reflects the post-V10 schema
+      // where the column has been dropped, so we insert via raw SQL.
+      dsl.execute(
+          "INSERT INTO polls (id, owner_username, title, slug, status, created_at, updated_at) "
+              + "VALUES (?, 'alice', 'doomed', 'doomed', 'DRAFT', now(), now())",
+          pollId);
 
       Flyway upToV6 =
           Flyway.configure()

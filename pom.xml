@@ -100,9 +100,14 @@
             <artifactId>postgresql</artifactId>
         </dependency>
         <dependency>
+            <!--
+              H2 is on the compile classpath (rather than runtime) because
+              site.asm0dey.slidev.polls.persistence.h2.TouchPollUpdatedAtTrigger
+              implements org.h2.api.Trigger and is referenced by name from the
+              H2 migration that creates the poll_questions_touch_polls trigger.
+            -->
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- QR generation -->

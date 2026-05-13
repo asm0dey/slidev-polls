@@ -204,6 +204,18 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
       assertThat(after.questions().get(1).ordinal()).isEqualTo(1);
     }
 
+    // V10 / H2 V2 introduced a per-row trigger on poll_questions that touches polls.updated_at;
+    // when the parent poll is deleted, ON DELETE CASCADE fires the trigger for each child row
+    // and the trigger's UPDATE on polls hits zero rows. This smoke test guards against either
+    // engine throwing on that path.
+    @Test
+    void deletePollCascadesQuestionsWithoutTriggerError() {
+      Poll inserted =
+          insertPollWithQuestions("cascade-delete", new QuestionSeed("Q?", List.of("A", "B")));
+      repo.delete(inserted.id());
+      assertThat(repo.findById(inserted.id())).isEmpty();
+    }
+
     private record QuestionSeed(String prompt, List<String> optionLabels) {}
 
     private Poll insertPollWithQuestions(String slugSuffix, QuestionSeed... seeds) {

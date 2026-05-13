@@ -32,10 +32,10 @@ class H2MigrationIT extends AbstractH2Test {
       s.execute("INSERT INTO admin_user(username, password_hash) VALUES ('h','x')");
       UUID pollId = UUID.randomUUID();
       s.execute(
-          "INSERT INTO polls(id, owner_username, title, slug, status) "
+          "INSERT INTO polls(id, owner_username, title, slug) "
               + "VALUES ('"
               + pollId
-              + "','h','title','test-slug','DRAFT')");
+              + "','h','title','test-slug')");
       s.execute(
           "INSERT INTO poll_questions(id, poll_id, prompt, ordinal, status, activated_at) "
               + "VALUES ('"
@@ -65,16 +65,16 @@ class H2MigrationIT extends AbstractH2Test {
         var s = c.createStatement()) {
       s.execute("INSERT INTO admin_user(username, password_hash) VALUES ('h','x')");
       s.execute(
-          "INSERT INTO polls(id, owner_username, title, slug, status) "
+          "INSERT INTO polls(id, owner_username, title, slug) "
               + "VALUES ('"
               + UUID.randomUUID()
-              + "','h','title','SameSlug','DRAFT')");
+              + "','h','title','SameSlug')");
       try {
         s.execute(
-            "INSERT INTO polls(id, owner_username, title, slug, status) "
+            "INSERT INTO polls(id, owner_username, title, slug) "
                 + "VALUES ('"
                 + UUID.randomUUID()
-                + "','h','title','sameslug','DRAFT')");
+                + "','h','title','sameslug')");
         org.junit.jupiter.api.Assertions.fail("expected unique violation");
       } catch (Exception _) {
         /* expected */
