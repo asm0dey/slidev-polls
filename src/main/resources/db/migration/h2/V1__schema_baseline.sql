@@ -2,6 +2,15 @@
 -- in DDL that parses on H2 2.x. Validation that used PG regex CHECKs lives in
 -- application code (OriginNormaliser, SlugValidator) so it stays uniform
 -- across both engines.
+--
+-- Note: enum CHECK constraints use REGEXP_LIKE rather than the more natural
+-- `status IN ('A','B','C')`. H2 2.4.240 has a bug where CHECK constraints
+-- containing an IN-list with constant strings build a TreeSet whose
+-- comparator is bound to the SessionLocal that ran the DDL. Once that
+-- session closes (e.g. when Flyway finishes and returns the connection),
+-- subsequent INSERTs from new sessions hit "The database has been closed
+-- [90098-240]" while validating the constraint. REGEXP_LIKE avoids the
+-- ConditionInConstantSet code path entirely.
 
 CREATE TABLE admin_user (
     username        varchar(64) PRIMARY KEY CHECK (username = lower(username)),
@@ -15,7 +24,7 @@ CREATE TABLE polls (
     title               varchar(200) NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
     slug                varchar(40)  NOT NULL CHECK (char_length(slug)  BETWEEN 3 AND 40),
     slug_lower          varchar(40)  GENERATED ALWAYS AS (lower(slug)),
-    status              varchar(10)  NOT NULL CHECK (status IN ('DRAFT','OPEN','CLOSED')),
+    status              varchar(10)  NOT NULL CHECK (REGEXP_LIKE(status, '^(DRAFT|OPEN|CLOSED)$')),
     active_question_id  uuid,
     created_at          timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -28,7 +37,7 @@ CREATE TABLE poll_questions (
     prompt          varchar(500) NOT NULL CHECK (char_length(prompt) BETWEEN 1 AND 500),
     type            varchar(32)  NOT NULL DEFAULT 'SINGLE_CHOICE',
     ordinal         int          NOT NULL,
-    status          varchar(10)  NOT NULL CHECK (status IN ('DRAFT','ACTIVE','CLOSED')),
+    status          varchar(10)  NOT NULL CHECK (REGEXP_LIKE(status, '^(DRAFT|ACTIVE|CLOSED)$')),
     activated_at    timestamp with time zone,
     closed_at       timestamp with time zone,
     active_poll_id  uuid GENERATED ALWAYS AS
