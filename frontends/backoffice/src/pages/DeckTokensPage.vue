@@ -4,46 +4,14 @@
       <div>
         <h1 class="dt__title">Deck tokens</h1>
         <p class="dt__sub">
-          Tokens authenticate your deck to push poll state. Treat like passwords.
+          Tokens authorise a Slidev deck to push poll state. They are minted automatically when you
+          sign into the deck.
           <router-link :to="{ name: 'poll-edit', params: { pollId } }" class="dt__back">
             ← back to poll
           </router-link>
         </p>
       </div>
-      <Button @click="onOpenMintForm" data-testid="deck-token-create">+ New token</Button>
     </header>
-
-    <form class="dt__mint-form" @submit.prevent="onMint" data-testid="mint-form">
-      <label class="dt__mint-label">
-        Label (optional)
-        <input
-          v-model="newLabel"
-          type="text"
-          placeholder="e.g. laptop, conference-wifi"
-          class="dt__mint-input"
-          data-testid="mint-label"
-        />
-      </label>
-      <button type="submit" :disabled="minting" class="dt__mint-submit" data-testid="mint-submit">
-        {{ minting ? "Minting…" : "Mint token" }}
-      </button>
-    </form>
-
-    <div v-if="justMinted" class="dt__minted" data-testid="minted-banner">
-      <p>New token (copy now — it will not be shown again):</p>
-      <pre class="dt__code dt__code--big" data-testid="minted-plaintext">{{
-        justMinted.plaintext
-      }}</pre>
-      <button
-        type="button"
-        class="dt__minted-copy"
-        @click="copyPlaintext"
-        data-testid="minted-copy"
-      >
-        {{ copied ? "Copied" : "Copy" }}
-      </button>
-      <button type="button" class="dt__minted-dismiss" @click="justMinted = null">Dismiss</button>
-    </div>
 
     <p v-if="errorMessage" class="dt__error" role="alert" data-testid="deck-tokens-error">
       {{ errorMessage }}
@@ -52,7 +20,7 @@
     <div v-if="loading" data-testid="loading">Loading tokens…</div>
     <template v-else>
       <p v-if="tokens.length === 0" class="dt__empty" data-testid="empty">
-        No deck tokens yet — mint one above to use this poll inside a Slidev deck.
+        No deck tokens yet. Sign in from your deck to create one.
       </p>
 
       <div v-else class="dt__table" data-testid="tokens-table">
@@ -70,7 +38,7 @@
           <span class="dt__when">{{ formatRelative(token.createdAt) }}</span>
           <span>
             <span v-if="token.revokedAt" class="dt__status dt__status--revoked">
-              Revoked {{ formatDate(token.revokedAt) }}
+              Revoked {{ formatRelative(token.revokedAt) }}
             </span>
             <span v-else class="dt__status dt__status--live">Live</span>
           </span>
@@ -81,8 +49,9 @@
             :disabled="revokingId === token.id"
             :data-testid="`revoke-${token.id}`"
             @click="onRevoke(token.id)"
-            >{{ revokingId === token.id ? "Revoking…" : "×" }}</Button
           >
+            {{ revokingId === token.id ? "Revoking…" : "Revoke" }}
+          </Button>
         </div>
       </div>
     </template>
@@ -91,7 +60,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, type PropType } from "vue";
-import type { DeckToken, DeckTokenMinted } from "@slidev-polls/shared";
+import type { DeckToken } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import { Button } from "@slidev-polls/shared/ui";
 
@@ -106,11 +75,7 @@ export default defineComponent({
     const client = (props.apiClient ?? defaultAdminClient) as AdminApiClient;
     const tokens = ref<DeckToken[]>([]);
     const loading = ref(true);
-    const newLabel = ref("");
-    const minting = ref(false);
     const revokingId = ref<string | null>(null);
-    const justMinted = ref<DeckTokenMinted | null>(null);
-    const copied = ref(false);
     const errorMessage = ref<string | null>(null);
 
     async function refresh(): Promise<void> {
@@ -122,30 +87,6 @@ export default defineComponent({
         errorMessage.value = messageFor(ex);
       } finally {
         loading.value = false;
-      }
-    }
-
-    function onOpenMintForm(): void {
-      // Scroll/focus the mint form — the form is always visible
-      const el = document.querySelector("[data-testid='mint-label']") as HTMLElement | null;
-      el?.focus();
-    }
-
-    async function onMint(): Promise<void> {
-      minting.value = true;
-      errorMessage.value = null;
-      copied.value = false;
-      try {
-        const minted = await client.mintDeckToken(props.pollId, {
-          label: newLabel.value.trim() || undefined
-        });
-        justMinted.value = minted;
-        newLabel.value = "";
-        await refresh();
-      } catch (ex) {
-        errorMessage.value = messageFor(ex);
-      } finally {
-        minting.value = false;
       }
     }
 
@@ -165,16 +106,6 @@ export default defineComponent({
       }
     }
 
-    async function copyPlaintext(): Promise<void> {
-      if (!justMinted.value) return;
-      try {
-        await navigator.clipboard.writeText(justMinted.value.plaintext);
-        copied.value = true;
-      } catch {
-        // clipboard unavailable — plaintext stays visible for manual copy
-      }
-    }
-
     onMounted(() => {
       void refresh();
     });
@@ -182,45 +113,60 @@ export default defineComponent({
     return {
       tokens,
       loading,
-      newLabel,
-      minting,
       revokingId,
-      justMinted,
-      copied,
       errorMessage,
-      onOpenMintForm,
-      onMint,
       onRevoke,
-      copyPlaintext,
-      formatDate,
       formatRelative,
       maskedToken
     };
   }
 });
 
-function maskedToken(t: { plaintext?: string | null; id: string }): string {
-  if (t.plaintext) return t.plaintext;
+function maskedToken(t: { id: string }): string {
   const tail = t.id.slice(-4);
   return `tk_••••••${tail}`;
 }
 
+// Inline relative-time helper — will be replaced by the shared @slidev-polls/shared/ui export
+// once Task 13 ships. Spec: same day → "today HH:MM", previous day → "yesterday HH:MM",
+// same calendar year → "MMM D", earlier years → "YYYY".
 function formatRelative(iso?: string | null): string {
   if (!iso) return "never";
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} hr ago`;
-  if (diff < 30 * 86_400_000) return `${Math.floor(diff / 86_400_000)} d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const now = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) return `today ${hh}:${mm}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  if (isYesterday) return `yesterday ${hh}:${mm}`;
+  if (d.getFullYear() === now.getFullYear()) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ];
+    return `${months[d.getMonth()]} ${d.getDate()}`;
   }
+  return String(d.getFullYear());
 }
 
 function messageFor(ex: unknown): string {
@@ -280,51 +226,6 @@ function messageFor(ex: unknown): string {
   font-size: 13px;
   margin-bottom: 14px;
 }
-.dt__mint-form {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  background: var(--sp-bg-muted);
-  border: 1px solid var(--sp-border);
-  border-radius: var(--sp-radius-lg);
-}
-.dt__mint-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--sp-fg-subtle);
-  flex: 1;
-}
-.dt__mint-input {
-  padding: 6px 10px;
-  font-size: 13px;
-  border: 1px solid var(--sp-border);
-  border-radius: var(--sp-radius-sm);
-  background: var(--sp-bg);
-  color: var(--sp-fg);
-  min-width: 200px;
-}
-.dt__mint-input:focus {
-  outline: none;
-  border-color: var(--sp-accent, #0b63c9);
-}
-.dt__mint-submit {
-  padding: 6px 14px;
-  font-size: 13px;
-  background: var(--sp-accent, #0b63c9);
-  color: #fff;
-  border: none;
-  border-radius: var(--sp-radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.dt__mint-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 .dt__table {
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius-lg);
@@ -332,7 +233,7 @@ function messageFor(ex: unknown): string {
 }
 .dt__row {
   display: grid;
-  grid-template-columns: 1fr 180px 110px 130px 40px;
+  grid-template-columns: 1fr 180px 110px 130px 90px;
   padding: 12px 14px;
   font-size: 13px;
   align-items: center;
@@ -359,13 +260,6 @@ function messageFor(ex: unknown): string {
   padding: 2px 8px;
   border-radius: var(--sp-radius-sm);
 }
-.dt__code--big {
-  font-size: 13px;
-  padding: 6px 10px;
-  display: block;
-  margin: 8px 0;
-  word-break: break-all;
-}
 .dt__when {
   color: var(--sp-fg-subtle);
   font-size: 12px;
@@ -383,26 +277,5 @@ function messageFor(ex: unknown): string {
   text-align: center;
   color: var(--sp-fg-subtle);
   font-size: 13px;
-}
-.dt__minted {
-  margin-bottom: 18px;
-  padding: 14px;
-  background: var(--sp-success-bg);
-  border: 1px solid var(--sp-success);
-  border-radius: var(--sp-radius-lg);
-  font-size: 13px;
-  color: var(--sp-success-fg);
-}
-.dt__minted-copy,
-.dt__minted-dismiss {
-  margin-top: 8px;
-  margin-right: 6px;
-  padding: 4px 12px;
-  font-size: 12px;
-  border: 1px solid currentColor;
-  border-radius: var(--sp-radius-sm);
-  background: transparent;
-  cursor: pointer;
-  color: inherit;
 }
 </style>
