@@ -2,12 +2,19 @@
 import { computed } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import { ThemeToggle } from "@slidev-polls/shared/ui";
+import { defaultAdminClient } from "./lib/admin-api";
+import UserMenu from "./components/UserMenu.vue";
 
 const route = useRoute();
 // Routes that render full-bleed (no sidebar/chrome). Both login and the
 // first-run setup screen own the full viewport; sidebar links would either
 // 401 (no session yet) or fight the centered form layout.
 const isFullBleed = computed(() => route.name === "login" || route.name === "setup");
+
+// No /whoami endpoint exists on /api/admin yet (only login/logout). Until the
+// backend exposes the current principal, label the menu with a generic role.
+// The plan acknowledges this fallback.
+const currentUser = "presenter";
 </script>
 
 <template>
@@ -22,6 +29,7 @@ const isFullBleed = computed(() => route.name === "login" || route.name === "set
         <RouterLink to="/users" class="bo-nav-item">Presenters</RouterLink>
       </nav>
       <div class="bo-sidebar-foot">
+        <UserMenu :username="currentUser" :api-client="defaultAdminClient" />
         <ThemeToggle />
       </div>
     </aside>
@@ -88,6 +96,9 @@ body {
 .bo-sidebar-foot {
   margin-top: auto;
   padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .bo-main {
   flex: 1;
