@@ -122,10 +122,13 @@ function statusLabel(s: string): string {
       {{ errorMessage }}
     </p>
 
-    <p v-else-if="polls && polls.length === 0" data-testid="poll-list-empty" class="pl__empty">
-      You don't have any polls yet.
-      <RouterLink to="/polls/new">Create the first one.</RouterLink>
-    </p>
+    <div v-else-if="polls && polls.length === 0" data-testid="poll-list-empty" class="pl__empty">
+      <h2>No polls yet</h2>
+      <p>Polls live next to your slides. Create one to share a join link with your audience.</p>
+      <RouterLink to="/polls/new" data-testid="empty-create-cta">
+        <Button>Create your first poll</Button>
+      </RouterLink>
+    </div>
 
     <div v-else-if="polls" class="pl__table">
       <div class="pl__row pl__row--head">
@@ -293,12 +296,28 @@ function statusLabel(s: string): string {
   padding: 0.5rem 0.75rem;
   border-radius: var(--sp-radius-lg, 4px);
 }
-.pl__empty,
 .pl__filter-empty {
   padding: 32px;
   text-align: center;
   color: var(--sp-fg-subtle);
   font-size: 13px;
+}
+.pl__empty {
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px dashed var(--sp-border);
+  border-radius: var(--sp-radius-lg);
+  color: var(--sp-fg-muted);
+}
+.pl__empty h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--sp-fg);
+}
+.pl__empty p {
+  font-size: 13px;
+  margin: 0 0 16px;
 }
 
 .btn-link {
