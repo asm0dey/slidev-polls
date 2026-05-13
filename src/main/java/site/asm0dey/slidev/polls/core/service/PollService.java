@@ -3,7 +3,6 @@ package site.asm0dey.slidev.polls.core.service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
@@ -75,7 +74,6 @@ public class PollService {
             command.title(),
             slug,
             PollStatus.DRAFT,
-            command.style() == null ? Map.of() : command.style(),
             null,
             questions,
             origins,
@@ -118,12 +116,6 @@ public class PollService {
   }
 
   @Transactional
-  public Poll updateStyleForOwner(UUID pollId, String ownerUsername, Map<String, Object> style) {
-    self.getObject().getForOwner(pollId, ownerUsername);
-    return repository.updateStyle(pollId, style == null ? Map.of() : style);
-  }
-
-  @Transactional
   public void deleteForOwner(UUID pollId, String ownerUsername) {
     self.getObject().getForOwner(pollId, ownerUsername);
     repository.delete(pollId);
@@ -159,8 +151,7 @@ public class PollService {
     return self.getObject()
         .create(
             ownerUsername,
-            new CreatePollCommand(
-                "Copy of " + src.title(), null, src.style(), drafts, src.allowedOrigins()));
+            new CreatePollCommand("Copy of " + src.title(), null, drafts, src.allowedOrigins()));
   }
 
   @Transactional

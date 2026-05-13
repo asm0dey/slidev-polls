@@ -86,7 +86,6 @@ class PerPollCorsConfigurationSourceTest {
         "T",
         slug,
         site.asm0dey.slidev.polls.core.domain.PollStatus.OPEN,
-        java.util.Map.of(),
         null,
         java.util.List.of(),
         origins,

@@ -7,7 +7,6 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +17,6 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Integration tests for {@link PollRepositoryImpl} against a real Postgres instance
@@ -32,7 +30,7 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
   @BeforeEach
   void setUp() {
     DSLContext dsl = dsl();
-    repo = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
+    repo = new PollRepositoryImpl(dsl);
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "repo-test-owner")
         .set(ADMIN_USER.PASSWORD_HASH, "n/a")
@@ -223,7 +221,6 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
             "Test poll",
             slugSuffix + "-" + pollId.toString().substring(0, 8),
             PollStatus.DRAFT,
-            Map.of(),
             null,
             questions,
             List.of(),
@@ -246,7 +243,6 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
         "Test poll",
         slugSuffix + "-" + pollId.toString().substring(0, 8),
         PollStatus.DRAFT,
-        Map.of(),
         null,
         List.of(new Question(q1, pollId, "Q?", 0, QuestionStatus.DRAFT, options, null, null)),
         allowedOrigins,

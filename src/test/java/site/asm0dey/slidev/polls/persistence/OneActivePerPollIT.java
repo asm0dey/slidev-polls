@@ -6,7 +6,6 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -21,7 +20,6 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Storage-level coverage for {@code @TS-004}: the partial unique index {@code
@@ -37,7 +35,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
   @BeforeEach
   void setUp() {
     DSLContext dsl = dsl();
-    repository = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
+    repository = new PollRepositoryImpl(dsl);
     // Each test needs an admin_user row to satisfy the polls.owner_username FK added in V3.
     dsl.insertInto(ADMIN_USER)
         .set(ADMIN_USER.USERNAME, "concurrency-owner")
@@ -153,7 +151,6 @@ class OneActivePerPollIT extends AbstractPostgresTest {
             "Concurrency test poll",
             "concurrency-" + pollId.toString().substring(0, 8),
             PollStatus.DRAFT,
-            Map.of(),
             null,
             List.of(
                 new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null),

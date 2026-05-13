@@ -1,7 +1,6 @@
 package site.asm0dey.slidev.polls.core.service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -38,8 +37,6 @@ public interface PollRepository {
    * is intended only for explicit removals, never for unchanged questions.
    */
   Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming);
-
-  Poll updateStyle(UUID pollId, Map<String, Object> style);
 
   void delete(UUID pollId);
 

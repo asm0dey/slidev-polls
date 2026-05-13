@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -27,7 +26,6 @@ import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Storage-level coverage for {@code @TS-024}: the unique index {@code votes_question_voter_uq ON
@@ -44,7 +42,7 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
   @BeforeEach
   void setUp() {
     dsl = dsl();
-    pollRepository = new PollRepositoryImpl(dsl, JsonMapper.builder().build());
+    pollRepository = new PollRepositoryImpl(dsl);
     voteRepository = new VoteRepositoryImpl(dsl);
     // polls.owner_username FK is added in V3; seed the owner row once per test.
     dsl.insertInto(ADMIN_USER)
@@ -120,7 +118,6 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
             "Race poll",
             "race-" + pollId.toString().substring(0, 8),
             PollStatus.DRAFT,
-            Map.of(),
             null,
             List.of(
                 new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null)),

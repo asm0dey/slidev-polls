@@ -25,7 +25,6 @@ public record CreatePollRequest(
     // surfaces as a 409 with a slug-specific ProblemCode (@TS-011..@TS-014). A @Size here would
     // leak short/long slugs out as 400 VALIDATION_FAILED, which is the wrong wire contract.
     String slug,
-    PollStyleDto style,
     @Valid @Size(min = 1) List<CreateQuestionRequest> questions,
     @Size(max = 32) List<String> allowedOrigins) {
 
@@ -36,7 +35,6 @@ public record CreatePollRequest(
         drafts.add(q.toDraft());
       }
     }
-    return new CreatePollCommand(
-        title, slug, style == null ? null : style.toMap(), drafts, allowedOrigins);
+    return new CreatePollCommand(title, slug, drafts, allowedOrigins);
   }
 }

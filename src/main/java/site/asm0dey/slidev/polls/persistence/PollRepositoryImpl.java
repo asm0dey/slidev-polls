@@ -10,14 +10,11 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
-import org.jooq.JSONB;
 import org.jooq.Record;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,8 +27,6 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * jOOQ-backed implementation of {@link PollRepository}. All methods are thin projections over the
@@ -47,11 +42,9 @@ import tools.jackson.databind.ObjectMapper;
 public class PollRepositoryImpl implements PollRepository {
 
   private final DSLContext dsl;
-  private final ObjectMapper objectMapper;
 
-  public PollRepositoryImpl(DSLContext dsl, ObjectMapper objectMapper) {
+  public PollRepositoryImpl(DSLContext dsl) {
     this.dsl = dsl;
-    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -63,7 +56,6 @@ public class PollRepositoryImpl implements PollRepository {
         .set(POLLS.TITLE, poll.title())
         .set(POLLS.SLUG, poll.slug())
         .set(POLLS.STATUS, poll.status().name())
-        .set(POLLS.STYLE, toJsonb(poll.style()))
         .set(POLLS.ACTIVE_QUESTION_ID, poll.activeQuestionId())
         .set(POLLS.ALLOWED_ORIGINS, poll.allowedOrigins().toArray(new String[0]))
         .set(POLLS.CREATED_AT, now)
@@ -225,20 +217,6 @@ public class PollRepositoryImpl implements PollRepository {
           .set(POLL_OPTIONS.POSITION, i)
           .execute();
     }
-  }
-
-  @Override
-  public Poll updateStyle(UUID pollId, Map<String, Object> style) {
-    int updated =
-        dsl.update(POLLS)
-            .set(POLLS.STYLE, toJsonb(style))
-            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-            .where(POLLS.ID.eq(pollId))
-            .execute();
-    if (updated == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
-    }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
   @Override
@@ -478,35 +456,11 @@ public class PollRepositoryImpl implements PollRepository {
         row.get(POLLS.TITLE),
         row.get(POLLS.SLUG),
         PollStatus.valueOf(row.get(POLLS.STATUS)),
-        fromJsonb(row.get(POLLS.STYLE)),
         row.get(POLLS.ACTIVE_QUESTION_ID),
         row.get(QUESTIONS_FIELD),
         originsArr == null ? List.of() : List.of(originsArr),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
-  }
-
-  private JSONB toJsonb(Map<String, Object> style) {
-    if (style == null || style.isEmpty()) {
-      return JSONB.jsonb("{}");
-    }
-    try {
-      return JSONB.jsonb(objectMapper.writeValueAsString(style));
-    } catch (JacksonException e) {
-      throw new IllegalStateException("cannot serialise poll style to jsonb", e);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> fromJsonb(JSONB value) {
-    if (value == null) {
-      return Map.of();
-    }
-    try {
-      return objectMapper.readValue(value.data(), LinkedHashMap.class);
-    } catch (Exception e) {
-      throw new IllegalStateException("cannot read poll style from jsonb", e);
-    }
   }
 
   /**
