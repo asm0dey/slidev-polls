@@ -14,7 +14,8 @@ CREATE INDEX poll_allowed_origins_by_poll_ix ON poll_allowed_origins (poll_id, p
 INSERT INTO poll_allowed_origins (poll_id, origin, position)
 SELECT p.id, o.origin, o.ord - 1
 FROM polls p,
-     LATERAL unnest(p.allowed_origins) WITH ORDINALITY AS o(origin, ord);
+     LATERAL unnest(p.allowed_origins) WITH ORDINALITY AS o(origin, ord)
+ON CONFLICT (poll_id, origin) DO NOTHING;
 
 ALTER TABLE polls DROP CONSTRAINT polls_allowed_origins_format_ck;
 DROP FUNCTION polls_origins_valid(text[]);
