@@ -57,6 +57,22 @@ describe("LoginPage", () => {
     expect(router.currentRoute.value.path).toBe("/polls");
   });
 
+  it("inputs have semantic labels and autocomplete hints", async () => {
+    const client = makeFake();
+    const { wrapper } = await mountLogin(client);
+
+    const username = wrapper.get('[data-testid="login-username"]');
+    expect(username.attributes("autocomplete")).toBe("username");
+    expect(username.attributes("name")).toBe("username");
+
+    const password = wrapper.get('[data-testid="login-password"]');
+    expect(password.attributes("autocomplete")).toBe("current-password");
+    expect(password.attributes("name")).toBe("password");
+
+    expect(wrapper.find('label[for="login-username"]').text()).toContain("Username");
+    expect(wrapper.find('label[for="login-password"]').text()).toContain("Password");
+  });
+
   it("surfaces an actionable error when authentication fails", async () => {
     const login = vi
       .fn()

@@ -4,6 +4,9 @@ defineProps<{
   placeholder?: string;
   type?: string;
   invalid?: boolean;
+  autocomplete?: string;
+  name?: string;
+  id?: string;
 }>();
 defineEmits<{ "update:modelValue": [v: string] }>();
 </script>
@@ -15,6 +18,9 @@ defineEmits<{ "update:modelValue": [v: string] }>();
     :type="type ?? 'text'"
     :value="modelValue"
     :placeholder="placeholder"
+    :autocomplete="autocomplete"
+    :name="name"
+    :id="id"
     @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
   />
 </template>
