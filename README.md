@@ -98,6 +98,23 @@ on first run.
 GHCR images are public when the repo is public; if you've made the package
 private, run `docker login ghcr.io` with a PAT that has `read:packages` first.
 
+### Running on H2 (no Postgres required)
+
+Single-binary deploy that does not need Docker. Set three env vars before starting the JAR:
+
+```bash
+SPRING_DATASOURCE_URL='jdbc:h2:file:./data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
+SPRING_DATASOURCE_USERNAME=sa
+SPRING_DATASOURCE_PASSWORD=
+java -jar slidev-polls.jar
+```
+
+To put the DB somewhere other than `./data/polls.mv.db`, replace the path in `SPRING_DATASOURCE_URL` directly (e.g. `jdbc:h2:file:/var/lib/slidev-polls/polls;...`).
+
+Spring Boot's Flyway autoconfig sees the `jdbc:h2:` prefix, expands the `{vendor}` placeholder in `spring.flyway.locations` to `h2`, and runs `db/migration/h2/V1__schema_baseline.sql` plus everything in `db/migration/common/`. jOOQ's H2 dialect is auto-detected from the same URL.
+
+**Never** set `spring.h2.console.enabled=true` — that would expose a SQL shell at `/h2-console` and bypass every other auth surface in the app.
+
 ### Inner-loop dev (Vite HMR + host spring-boot:run)
 
 ```bash
