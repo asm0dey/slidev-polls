@@ -27,6 +27,7 @@ class V6MigrationIT {
     Flyway upToV5 =
         Flyway.configure()
             .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
             .target("5")
             .load();
     upToV5.migrate();
@@ -56,6 +57,7 @@ class V6MigrationIT {
       Flyway upToV6 =
           Flyway.configure()
               .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+              .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
               .target("6")
               .load();
       upToV6.migrate();

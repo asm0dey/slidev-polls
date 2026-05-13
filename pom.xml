@@ -296,7 +296,8 @@
                                         </schemas>
                                         <createSchemas>true</createSchemas>
                                         <locations>
-                                            <location>filesystem:src/main/resources/db/migration</location>
+                                            <location>filesystem:src/main/resources/db/migration/postgresql</location>
+                                            <location>filesystem:src/main/resources/db/migration/common</location>
                                         </locations>
                                     </flyway>
                                     <jooq>

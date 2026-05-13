@@ -35,7 +35,7 @@ public abstract class AbstractPostgresTest {
   static void migrate() {
     Flyway.configure()
         .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-        .locations("classpath:db/migration")
+        .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
         .cleanDisabled(false)
         .load()
         .migrate();
