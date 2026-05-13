@@ -99,6 +99,16 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
         </dependency>
+        <dependency>
+            <!--
+              H2 is on the compile classpath (rather than runtime) because
+              site.asm0dey.slidev.polls.persistence.h2.TouchPollUpdatedAtTrigger
+              implements org.h2.api.Trigger and is referenced by name from the
+              H2 migration that creates the poll_questions_touch_polls trigger.
+            -->
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+        </dependency>
 
         <!-- QR generation -->
         <dependency>
@@ -291,19 +301,25 @@
                                     </database>
                                     <flyway>
                                         <defaultSchema>${db.codegen.schema}</defaultSchema>
-                                        <schemas>
-                                            <schema>${db.codegen.schema}</schema>
-                                        </schemas>
+                                        <schemas>${db.codegen.schema}</schemas>
                                         <createSchemas>true</createSchemas>
-                                        <locations>
-                                            <location>filesystem:src/main/resources/db/migration</location>
-                                        </locations>
+                                        <!--
+                                          The plugin's FlywayRunner extends HashMap<String,String>
+                                          so Flyway config must be passed as flat scalar properties.
+                                          Nested <location> children are silently dropped by Plexus,
+                                          which lets the plugin's default `classpath:/db/migration`
+                                          win and recursively scan every vendor subdirectory
+                                          (postgresql/, h2/) — producing duplicate V1 migrations.
+                                          Use the comma-separated string form so `flyway.locations`
+                                          is set explicitly and the default is suppressed.
+                                        -->
+                                        <locations>filesystem:src/main/resources/db/migration/postgresql,filesystem:src/main/resources/db/migration/common</locations>
                                     </flyway>
                                     <jooq>
                                         <generator>
                                             <database>
                                                 <name>org.jooq.meta.postgres.PostgresDatabase</name>
-                                                <includes>admin_user|polls|poll_questions|poll_options|votes|deck_tokens</includes>
+                                                <includes>admin_user|polls|poll_questions|poll_options|poll_allowed_origins|votes|deck_tokens</includes>
                                                 <schemata>
                                                     <schema>
                                                         <inputSchema>${db.codegen.schema}</inputSchema>

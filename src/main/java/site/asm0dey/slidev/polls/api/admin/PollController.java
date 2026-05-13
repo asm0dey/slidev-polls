@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,7 +19,6 @@ import site.asm0dey.slidev.polls.api.admin.dto.ActivateQuestionRequest;
 import site.asm0dey.slidev.polls.api.admin.dto.CreatePollRequest;
 import site.asm0dey.slidev.polls.api.admin.dto.PollDetailDto;
 import site.asm0dey.slidev.polls.api.admin.dto.PollDto;
-import site.asm0dey.slidev.polls.api.admin.dto.PollStyleDto;
 import site.asm0dey.slidev.polls.api.admin.dto.UpdatePollRequest;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.service.PollService;
@@ -121,18 +119,6 @@ public class PollController {
   public PollDetailDto close(
       @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
     Poll after = pollService.closeActiveQuestionForOwner(pollId, owner(authentication));
-    return PollDetailDto.from(after, PublicUrlBase.of(request));
-  }
-
-  @PutMapping("/{pollId}/style")
-  public PollDetailDto style(
-      @PathVariable UUID pollId,
-      @RequestBody PollStyleDto body,
-      Authentication authentication,
-      HttpServletRequest request) {
-    Poll after =
-        pollService.updateStyleForOwner(
-            pollId, owner(authentication), body == null ? java.util.Map.of() : body.toMap());
     return PollDetailDto.from(after, PublicUrlBase.of(request));
   }
 

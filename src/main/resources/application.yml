@@ -18,11 +18,9 @@ spring:
     password: polls
   flyway:
     enabled: true
-    # Migrations ship with poll-persistence and arrive on the classpath
-    # through the Maven reactor dependency.
-    locations: classpath:db/migration
-  jooq:
-    sql-dialect: POSTGRES
+    # {vendor} is substituted by Spring Boot's Flyway autoconfig based on the
+    # JDBC URL — "postgresql" for jdbc:postgresql://…, "h2" for jdbc:h2:…
+    locations: classpath:db/migration/{vendor},classpath:db/migration/common
   jackson:
     deserialization:
       # TS-027 / TS-046: the vote endpoint must ignore unknown properties so a

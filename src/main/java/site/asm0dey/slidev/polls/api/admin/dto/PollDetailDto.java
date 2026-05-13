@@ -7,7 +7,7 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
 
 /**
  * Full poll view returned by {@code GET/POST/PATCH /api/admin/polls/{pollId}}. Mirrors the {@code
- * PollDetail} schema (Poll + questions + style) in {@code openapi.yaml}.
+ * PollDetail} schema (Poll + questions) in {@code openapi.yaml}.
  */
 public record PollDetailDto(
     UUID id,
@@ -16,7 +16,6 @@ public record PollDetailDto(
     PollStatus status,
     String publicUrl,
     UUID activeQuestionId,
-    PollStyleDto style,
     List<QuestionDto> questions,
     List<String> allowedOrigins) {
 
@@ -30,7 +29,6 @@ public record PollDetailDto(
         summary.status(),
         summary.publicUrl(),
         summary.activeQuestionId(),
-        PollStyleDto.fromMap(domain.style()),
         questions,
         domain.allowedOrigins());
   }

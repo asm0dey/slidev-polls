@@ -73,6 +73,16 @@ tasks:
     cmds:
       - bash scripts/dev.sh
 
+  dev:h2:
+    desc: Inner-loop on H2 file-mode (no Docker required)
+    deps: [codegen, frontends]
+    cmds:
+      - |
+        SPRING_DATASOURCE_URL='jdbc:h2:file:${SP_DATA_DIR:-./data}/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE' \
+        SPRING_DATASOURCE_USERNAME=sa \
+        SPRING_DATASOURCE_PASSWORD='' \
+        ./mvnw spring-boot:run -Dspotless.check.skip=true
+
   # ---------- Build surfaces ----------------------------------------------
 
   frontends:

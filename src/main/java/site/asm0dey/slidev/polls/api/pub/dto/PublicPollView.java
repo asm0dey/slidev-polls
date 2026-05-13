@@ -1,7 +1,6 @@
 package site.asm0dey.slidev.polls.api.pub.dto;
 
 import java.util.UUID;
-import site.asm0dey.slidev.polls.api.admin.dto.PollStyleDto;
 import site.asm0dey.slidev.polls.api.admin.dto.QuestionDto;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.Question;
@@ -15,15 +14,13 @@ import site.asm0dey.slidev.polls.core.domain.Question;
  *
  * <p>{@code alreadyVoted} is a best-effort hint — {@code null} when the server has no {@code
  * sp_voter} cookie to look up, {@code true}/{@code false} once a cookie is present. The {@code
- * Question} / {@code PollStyle} DTO shapes are reused from the admin surface since the OpenAPI
- * schemas are identical.
+ * Question} DTO shape is reused from the admin surface since the OpenAPI schemas are identical.
  */
 public record PublicPollView(
     UUID pollId,
     String slug,
     String title,
     State state,
-    PollStyleDto style,
     QuestionDto activeQuestion,
     Boolean alreadyVoted) {
 
@@ -44,13 +41,6 @@ public record PublicPollView(
     }
     State state = active == null ? State.WAITING : State.ACTIVE;
     QuestionDto activeDto = active == null ? null : QuestionDto.from(active);
-    return new PublicPollView(
-        poll.id(),
-        poll.slug(),
-        poll.title(),
-        state,
-        PollStyleDto.fromMap(poll.style()),
-        activeDto,
-        alreadyVoted);
+    return new PublicPollView(poll.id(), poll.slug(), poll.title(), state, activeDto, alreadyVoted);
   }
 }

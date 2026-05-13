@@ -204,7 +204,6 @@ class TallyBroadcastTest {
             "Fixture",
             slug,
             PollStatus.DRAFT,
-            Map.of(),
             null,
             List.of(question1, question2),
             List.of(), // allowedOrigins
@@ -294,11 +293,6 @@ class TallyBroadcastTest {
     }
 
     @Override
-    public Poll updateStyle(UUID pollId, Map<String, Object> style) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public void delete(UUID pollId) {
       byId.remove(pollId);
     }
@@ -341,7 +335,6 @@ class TallyBroadcastTest {
               existing.title(),
               existing.slug(),
               PollStatus.OPEN,
-              existing.style(),
               questionId,
               updated,
               existing.allowedOrigins(),

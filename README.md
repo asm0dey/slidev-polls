@@ -41,8 +41,20 @@ from **Presenters** in the sidebar.
 After every successful `main` build, CI pushes a backend image to GHCR:
 `ghcr.io/asm0dey/slidev-polls-backend` (tags: `latest`, `sha-<commit>`).
 
-Drop the snippet below into a `compose.yml`, fill in the env vars (or supply
-them via a `.env` file next to it / `--env-file`), and `docker compose up -d`:
+The image supports two storage backends, selected at runtime by
+`SPRING_DATASOURCE_URL`:
+
+- **PostgreSQL** — production default. Requires a sibling `postgres` service.
+- **H2 file-mode** — single-container deploy. Persists to a volume; no second
+  service required. Good for self-hosting one talk or a small team.
+
+GHCR images are public when the repo is public; if the package is private,
+`docker login ghcr.io` with a PAT that has `read:packages` first.
+
+#### PostgreSQL stack (recommended for prod)
+
+Drop the snippet into `compose.yml`, fill in the env vars (or supply them via
+`.env` / `--env-file`), and `docker compose up -d`:
 
 ```yaml
 services:
@@ -53,7 +65,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
@@ -95,8 +107,69 @@ authenticates with the same pair via `SPRING_DATASOURCE_USERNAME`/
 presenter account) are created interactively at `http://localhost:8080/admin/`
 on first run.
 
-GHCR images are public when the repo is public; if you've made the package
-private, run `docker login ghcr.io` with a PAT that has `read:packages` first.
+#### H2 single-container (no Postgres needed)
+
+One container, one volume. The DB file lives at `/data/polls.mv.db` inside the
+container; the named volume keeps it across restarts and image upgrades:
+
+```yaml
+services:
+  backend:
+    image: ghcr.io/asm0dey/slidev-polls-backend:latest
+    environment:
+      SPRING_DATASOURCE_URL: 'jdbc:h2:file:/data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ''
+      # `prod` flips the SP_SESSION cookie to Secure — only enable when you
+      # terminate TLS in front of the container.
+      SPRING_PROFILES_ACTIVE: prod
+    volumes:
+      - polls-data:/data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  polls-data:
+```
+
+Spring Boot's Flyway autoconfig sees the `jdbc:h2:` URL prefix, expands the
+`{vendor}` placeholder in `spring.flyway.locations` to `h2`, and runs
+`db/migration/h2/V1__schema_baseline.sql` plus everything in
+`db/migration/common/`. jOOQ's H2 dialect is auto-detected from the same URL.
+
+**Back up the volume** (`docker run --rm -v polls-data:/data -v $PWD:/out
+alpine tar czf /out/polls-backup.tgz -C /data .`) before upgrading to a major
+release — H2 file-format changes between minor versions are rare but possible.
+
+**Never** set `spring.h2.console.enabled=true` — that would expose a SQL shell
+at `/h2-console` and bypass every other auth surface in the app.
+
+### Running on H2 from a fat-JAR (no Docker)
+
+Same env-var trio, but pointed at a host path:
+
+```bash
+SPRING_DATASOURCE_URL='jdbc:h2:file:./data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
+SPRING_DATASOURCE_USERNAME=sa
+SPRING_DATASOURCE_PASSWORD=
+java -jar slidev-polls.jar
+```
+
+The DB lands at `./data/polls.mv.db`. Override the path inside
+`SPRING_DATASOURCE_URL` for a different location (e.g.
+`jdbc:h2:file:/var/lib/slidev-polls/polls;...`).
+
+### Upgrade Notes — V8/V9 schema change
+
+This release applies two migrations to existing PostgreSQL installs:
+
+- **V8** drops `polls.style`. The column was unused; data in it is permanently lost.
+- **V9** rewrites the schema for cross-engine portability: `polls.allowed_origins` (text[]) becomes a `poll_allowed_origins` child table (data is migrated automatically); the partial unique on `poll_questions(status='ACTIVE')` and the functional unique on `lower(polls.slug)` become generated columns. No data loss outside of V8.
+
+**Before upgrading,** take a snapshot: `pg_dump -Fc -f slidev-polls-pre-V9.dump`. Flyway runs both migrations on boot.
+
+V1–V7 are also relocated from `db/migration/` to `db/migration/postgresql/`. Flyway's history table records the bare filename (e.g. `V1__core_tables.sql`), so standard Spring Boot autoconfig validates fine across the move. If your deployment customised Flyway to record full classpath paths, run `flyway repair` once before the next boot.
 
 ### Inner-loop dev (Vite HMR + host spring-boot:run)
 

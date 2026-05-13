@@ -23,7 +23,6 @@ function makeActiveView(): PublicPollView {
     slug: "my-talk",
     title: "My talk",
     state: "ACTIVE",
-    style: {},
     activeQuestion: {
       id: "q1",
       prompt: "Which JVM?",
@@ -42,8 +41,7 @@ function makeWaitingView(): PublicPollView {
     pollId: "poll-uuid",
     slug: "my-talk",
     title: "My talk",
-    state: "WAITING",
-    style: {}
+    state: "WAITING"
   };
 }
 

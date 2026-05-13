@@ -170,7 +170,6 @@ class VoteServiceTest {
             "My talk",
             "my-talk",
             PollStatus.OPEN,
-            Map.of(),
             q1,
             List.of(
                 new Question(
@@ -196,7 +195,6 @@ class VoteServiceTest {
             "Waiting",
             "waiting-poll",
             PollStatus.DRAFT,
-            Map.of(),
             null,
             List.of(new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, q1Options, null, null)),
             List.of(), // allowedOrigins
@@ -244,11 +242,6 @@ class VoteServiceTest {
 
     @Override
     public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> questions) {
-      throw new UnsupportedOperationException("not needed for VoteServiceTest");
-    }
-
-    @Override
-    public Poll updateStyle(UUID pollId, Map<String, Object> style) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
 

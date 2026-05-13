@@ -1,26 +1,22 @@
 package site.asm0dey.slidev.polls.persistence;
 
-import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.val;
+import static org.jooq.impl.DSL.when;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
-import org.jooq.JSONB;
 import org.jooq.Record;
-import org.jooq.exception.IntegrityConstraintViolationException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -30,14 +26,14 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * jOOQ-backed implementation of {@link PollRepository}. All methods are thin projections over the
- * generated {@code POLLS / POLL_QUESTIONS / POLL_OPTIONS} tables; the only piece of non-trivial SQL
- * is {@link #activateQuestion} which leans on the partial unique index defined in {@code
- * V1__core_tables.sql} to serialise concurrent activations (FR-004, {@code @TS-004}).
+ * generated {@code POLLS / POLL_QUESTIONS / POLL_OPTIONS} tables. The canonical "which question is
+ * active" state lives on {@code poll_questions.status}; {@link #activateQuestion} is a single
+ * CASE-driven UPDATE that flips the target question to ACTIVE and closes every other row of the
+ * poll in one statement, relying on the partial unique index defined in {@code V1__core_tables.sql}
+ * to serialise concurrent activations (FR-004, {@code @TS-004}).
  *
  * <p>Transaction boundaries are supplied by the caller (typically Spring's {@code @Transactional}
  * on {@link site.asm0dey.slidev.polls.core.service.PollService}); this class does not open its own
@@ -47,11 +43,9 @@ import tools.jackson.databind.ObjectMapper;
 public class PollRepositoryImpl implements PollRepository {
 
   private final DSLContext dsl;
-  private final ObjectMapper objectMapper;
 
-  public PollRepositoryImpl(DSLContext dsl, ObjectMapper objectMapper) {
+  public PollRepositoryImpl(DSLContext dsl) {
     this.dsl = dsl;
-    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -62,13 +56,10 @@ public class PollRepositoryImpl implements PollRepository {
         .set(POLLS.OWNER_USERNAME, poll.ownerUsername())
         .set(POLLS.TITLE, poll.title())
         .set(POLLS.SLUG, poll.slug())
-        .set(POLLS.STATUS, poll.status().name())
-        .set(POLLS.STYLE, toJsonb(poll.style()))
-        .set(POLLS.ACTIVE_QUESTION_ID, poll.activeQuestionId())
-        .set(POLLS.ALLOWED_ORIGINS, poll.allowedOrigins().toArray(new String[0]))
         .set(POLLS.CREATED_AT, now)
         .set(POLLS.UPDATED_AT, now)
         .execute();
+    writeOrigins(poll.id(), poll.allowedOrigins());
     insertQuestions(poll.id(), poll.questions());
     return findById(poll.id()).orElseThrow(() -> new NotFoundException(poll.id().toString()));
   }
@@ -77,6 +68,7 @@ public class PollRepositoryImpl implements PollRepository {
   public Optional<Poll> findById(UUID pollId) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
         .where(POLLS.ID.eq(pollId))
         .fetchOptional()
@@ -87,8 +79,9 @@ public class PollRepositoryImpl implements PollRepository {
   public Optional<Poll> findBySlug(String slug) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
-        .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()))
+        .where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()))
         .fetchOptional()
         .map(this::toPoll);
   }
@@ -97,6 +90,7 @@ public class PollRepositoryImpl implements PollRepository {
   public List<Poll> findByOwner(String ownerUsername) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
         .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
         .orderBy(POLLS.CREATED_AT.desc())
@@ -106,10 +100,7 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public boolean slugTaken(String slug, UUID excludingPollId) {
-    var base =
-        dsl.selectOne()
-            .from(POLLS)
-            .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()));
+    var base = dsl.selectOne().from(POLLS).where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()));
     var scoped = excludingPollId == null ? base : base.and(POLLS.ID.ne(excludingPollId));
     return scoped.fetchOptional().isPresent();
   }
@@ -131,13 +122,6 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming) {
-    dsl.update(POLLS)
-        .setNull(POLLS.ACTIVE_QUESTION_ID)
-        .set(POLLS.STATUS, PollStatus.DRAFT.name())
-        .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-        .where(POLLS.ID.eq(pollId))
-        .execute();
-
     java.util.Set<UUID> existingQuestionIds =
         new java.util.HashSet<>(
             dsl.select(POLL_QUESTIONS.ID)
@@ -228,20 +212,6 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   @Override
-  public Poll updateStyle(UUID pollId, Map<String, Object> style) {
-    int updated =
-        dsl.update(POLLS)
-            .set(POLLS.STYLE, toJsonb(style))
-            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-            .where(POLLS.ID.eq(pollId))
-            .execute();
-    if (updated == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
-    }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
-
-  @Override
   public void delete(UUID pollId) {
     int deleted = dsl.deleteFrom(POLLS).where(POLLS.ID.eq(pollId)).execute();
     if (deleted == 0) {
@@ -251,55 +221,49 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Poll activateQuestion(UUID pollId, UUID questionId) {
-    var existing =
-        dsl.selectFrom(POLL_QUESTIONS)
-            .where(POLL_QUESTIONS.ID.eq(questionId).and(POLL_QUESTIONS.POLL_ID.eq(pollId)))
-            .fetchOptional()
-            .orElseThrow(
-                () -> new NotFoundException("question " + questionId + " not in poll " + pollId));
-
-    switch (QuestionStatus.valueOf(existing.getStatus())) {
-      case ACTIVE -> {
-        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-      }
-      // CLOSED questions are reopenable — slide navigation may bounce a
-      // viewer back to an earlier question and the deck must be able to
-      // re-activate it. Falls through to the ACTIVATE flow below, which
-      // clears closed_at as part of the update.
-      case CLOSED, DRAFT -> {}
+    // Canonical state lives only on poll_questions.status. We flip every row of the poll in a
+    // single CASE-driven UPDATE:
+    //   - the target row becomes ACTIVE (activated_at = now, closed_at = NULL),
+    //   - any currently-ACTIVE row that is not the target becomes CLOSED
+    //     (activated_at = NULL, closed_at = now),
+    //   - every other row keeps its existing status / timestamps.
+    // The partial unique index poll_questions_one_active_uq serialises concurrent activations
+    // on the same poll (FR-004) — both engines lock the index slot for the duration of the
+    // statement. polls.updated_at is maintained by a trigger that fires on poll_questions
+    // changes (V10 / H2 V2).
+    int matches =
+        dsl.fetchCount(
+            POLL_QUESTIONS,
+            POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
+    if (matches == 0) {
+      throw new NotFoundException("question " + questionId + " not in poll " + pollId);
     }
 
     OffsetDateTime now = OffsetDateTime.now();
-    // poll_questions_active_timestamp_ck: `(status = 'ACTIVE') = (activated_at IS NOT NULL)`.
-    // Clearing activated_at on ACTIVE -> CLOSED is mandatory; the constraint rolls the update
-    // back otherwise. closed_at is the authoritative "when did this question stop accepting
-    // votes?" timestamp.
+    // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT NULL).
+    // The CASE expressions keep that invariant by setting activated_at=now only when status
+    // transitions to ACTIVE and clearing it when an ACTIVE row is closed in the same statement.
     dsl.update(POLL_QUESTIONS)
-        .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
-        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-        .set(POLL_QUESTIONS.CLOSED_AT, now)
-        .where(
-            POLL_QUESTIONS
-                .POLL_ID
-                .eq(pollId)
-                .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))
-                .and(POLL_QUESTIONS.ID.ne(questionId)))
-        .execute();
-    try {
-      dsl.update(POLL_QUESTIONS)
-          .set(POLL_QUESTIONS.STATUS, QuestionStatus.ACTIVE.name())
-          .set(POLL_QUESTIONS.ACTIVATED_AT, now)
-          .set(POLL_QUESTIONS.CLOSED_AT, (OffsetDateTime) null)
-          .where(POLL_QUESTIONS.ID.eq(questionId))
-          .execute();
-    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException e) {
-      throw new ConcurrentActivationException(pollId, questionId, e);
-    }
-    dsl.update(POLLS)
-        .set(POLLS.ACTIVE_QUESTION_ID, questionId)
-        .set(POLLS.STATUS, PollStatus.OPEN.name())
-        .set(POLLS.UPDATED_AT, now)
-        .where(POLLS.ID.eq(pollId))
+        .set(
+            POLL_QUESTIONS.STATUS,
+            when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
+                .when(
+                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                    val(QuestionStatus.CLOSED.name()))
+                .otherwise(POLL_QUESTIONS.STATUS))
+        .set(
+            POLL_QUESTIONS.ACTIVATED_AT,
+            when(POLL_QUESTIONS.ID.eq(questionId), val(now))
+                .when(
+                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                    val((OffsetDateTime) null))
+                .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
+        .set(
+            POLL_QUESTIONS.CLOSED_AT,
+            when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
+                .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
+                .otherwise(POLL_QUESTIONS.CLOSED_AT))
+        .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
         .execute();
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
@@ -307,8 +271,7 @@ public class PollRepositoryImpl implements PollRepository {
   @Override
   public Poll closeActiveQuestion(UUID pollId) {
     OffsetDateTime now = OffsetDateTime.now();
-    // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not ACTIVE;
-    // see the matching close branch inside activateQuestion.
+    // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not ACTIVE.
     dsl.update(POLL_QUESTIONS)
         .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
         .setNull(POLL_QUESTIONS.ACTIVATED_AT)
@@ -319,28 +282,16 @@ public class PollRepositoryImpl implements PollRepository {
                 .eq(pollId)
                 .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
         .execute();
-    dsl.update(POLLS)
-        .setNull(POLLS.ACTIVE_QUESTION_ID)
-        .set(POLLS.UPDATED_AT, now)
-        .where(POLLS.ID.eq(pollId))
-        .execute();
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
   @Override
   public Poll resetQuestionsToDraft(UUID pollId) {
-    OffsetDateTime now = OffsetDateTime.now();
     dsl.update(POLL_QUESTIONS)
         .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
         .setNull(POLL_QUESTIONS.ACTIVATED_AT)
         .setNull(POLL_QUESTIONS.CLOSED_AT)
         .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-        .execute();
-    dsl.update(POLLS)
-        .setNull(POLLS.ACTIVE_QUESTION_ID)
-        .set(POLLS.STATUS, PollStatus.DRAFT.name())
-        .set(POLLS.UPDATED_AT, now)
-        .where(POLLS.ID.eq(pollId))
         .execute();
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
@@ -348,32 +299,34 @@ public class PollRepositoryImpl implements PollRepository {
   @Override
   public boolean isOriginAllowedByAnyPoll(String origin) {
     return dsl.fetchExists(
-        dsl.selectOne().from(POLLS).where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));
+        dsl.selectOne().from(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.ORIGIN.eq(origin)));
   }
 
   @Override
   public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
-    return dsl.update(POLLS)
-        .set(POLLS.ALLOWED_ORIGINS, origins.toArray(new String[0]))
-        .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-        .where(POLLS.ID.eq(pollId))
-        .returningResult(pollFieldsWithQuestions())
-        .fetchOptional()
-        .map(this::toPoll)
-        .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
+    dsl.deleteFrom(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(pollId)).execute();
+    writeOrigins(pollId, origins);
+    int touched =
+        dsl.update(POLLS)
+            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
+            .where(POLLS.ID.eq(pollId))
+            .execute();
+    if (touched == 0) throw new NotFoundException("poll " + pollId + " does not exist");
+    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
-  /**
-   * Combine the {@link site.asm0dey.slidev.polls.persistence.jooq.tables.Polls} columns with the
-   * {@link #QUESTIONS_FIELD} multiset so an {@code UPDATE … RETURNING} can hand back a fully
-   * hydrated poll aggregate in a single Postgres round-trip — no follow-up {@code SELECT}.
-   */
-  private static org.jooq.SelectField<?>[] pollFieldsWithQuestions() {
-    Field<?>[] cols = POLLS.fields();
-    org.jooq.SelectField<?>[] all = new org.jooq.SelectField<?>[cols.length + 1];
-    System.arraycopy(cols, 0, all, 0, cols.length);
-    all[cols.length] = QUESTIONS_FIELD;
-    return all;
+  private void writeOrigins(UUID pollId, List<String> origins) {
+    if (origins == null || origins.isEmpty()) return;
+    var rows =
+        java.util.stream.IntStream.range(0, origins.size())
+            .mapToObj(
+                i ->
+                    dsl.insertInto(POLL_ALLOWED_ORIGINS)
+                        .set(POLL_ALLOWED_ORIGINS.POLL_ID, pollId)
+                        .set(POLL_ALLOWED_ORIGINS.ORIGIN, origins.get(i))
+                        .set(POLL_ALLOWED_ORIGINS.POSITION, i))
+            .toList();
+    dsl.batch(rows).execute();
   }
 
   private List<Question> insertQuestions(UUID pollId, List<Question> questions) {
@@ -470,55 +423,36 @@ public class PollRepositoryImpl implements PollRepository {
                                   ? null
                                   : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
 
+  private static final Field<List<String>> ORIGINS_FIELD =
+      multiset(
+              select(POLL_ALLOWED_ORIGINS.ORIGIN)
+                  .from(POLL_ALLOWED_ORIGINS)
+                  .where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(POLLS.ID))
+                  .orderBy(POLL_ALLOWED_ORIGINS.POSITION.asc()))
+          .convertFrom(r -> r.map(o -> o.value1()));
+
   private Poll toPoll(Record row) {
-    String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);
+    List<Question> questions = row.get(QUESTIONS_FIELD);
+    UUID activeQuestionId =
+        questions.stream()
+            .filter(q -> q.status() == QuestionStatus.ACTIVE)
+            .findFirst()
+            .map(Question::id)
+            .orElse(null);
+    PollStatus status =
+        questions.stream().anyMatch(q -> q.status() == QuestionStatus.ACTIVE)
+            ? PollStatus.OPEN
+            : PollStatus.DRAFT;
     return new Poll(
         row.get(POLLS.ID),
         row.get(POLLS.OWNER_USERNAME),
         row.get(POLLS.TITLE),
         row.get(POLLS.SLUG),
-        PollStatus.valueOf(row.get(POLLS.STATUS)),
-        fromJsonb(row.get(POLLS.STYLE)),
-        row.get(POLLS.ACTIVE_QUESTION_ID),
-        row.get(QUESTIONS_FIELD),
-        originsArr == null ? List.of() : List.of(originsArr),
+        status,
+        activeQuestionId,
+        questions,
+        row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
-  }
-
-  private JSONB toJsonb(Map<String, Object> style) {
-    if (style == null || style.isEmpty()) {
-      return JSONB.jsonb("{}");
-    }
-    try {
-      return JSONB.jsonb(objectMapper.writeValueAsString(style));
-    } catch (JacksonException e) {
-      throw new IllegalStateException("cannot serialise poll style to jsonb", e);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> fromJsonb(JSONB value) {
-    if (value == null) {
-      return Map.of();
-    }
-    try {
-      return objectMapper.readValue(value.data(), LinkedHashMap.class);
-    } catch (Exception e) {
-      throw new IllegalStateException("cannot read poll style from jsonb", e);
-    }
-  }
-
-  /**
-   * Thrown by {@link #activateQuestion} when the partial unique index {@code
-   * poll_questions_one_active_uq} refuses a second concurrent activation on the same poll (FR-004,
-   * {@code @TS-004}). Callers translate this into a presenter-visible error via {@link
-   * org.springframework.retry.support.RetryTemplate} or by surfacing the failure to the other
-   * transaction that raced.
-   */
-  public static final class ConcurrentActivationException extends RuntimeException {
-    public ConcurrentActivationException(UUID pollId, UUID questionId, Throwable cause) {
-      super("concurrent activation race for poll " + pollId + " question " + questionId, cause);
-    }
   }
 }
