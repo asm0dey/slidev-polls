@@ -34,7 +34,6 @@ function pollDetail(over: Partial<PollDetail> = {}): PollDetail {
     status: "DRAFT",
     publicUrl: "http://localhost:8080/quickstart-demo",
     activeQuestionId: null,
-    style: {},
     questions: [
       {
         id: "q1",

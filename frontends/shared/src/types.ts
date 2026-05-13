@@ -5,14 +5,6 @@
 export type PollStatus = "DRAFT" | "OPEN" | "CLOSED";
 export type QuestionStatus = "DRAFT" | "ACTIVE" | "CLOSED";
 
-export interface PollStyle {
-  primaryColor?: string;
-  accentColor?: string;
-  backgroundColor?: string;
-  fontFamily?: string;
-  layout?: "BARS" | "COLUMNS" | "DONUT";
-}
-
 export interface Option {
   id: string;
   label: string;
@@ -40,9 +32,8 @@ export interface Poll {
   activeQuestionId: string | null;
 }
 
-/** Full poll with questions, options, and style (GET /api/admin/polls/{id}). */
+/** Full poll with questions, options (GET /api/admin/polls/{id}). */
 export interface PollDetail extends Poll {
-  style: PollStyle;
   questions: Question[];
   allowedOrigins?: string[];
 }
@@ -53,7 +44,6 @@ export interface PublicPollView {
   slug: string;
   title: string;
   state: "WAITING" | "ACTIVE";
-  style: PollStyle;
   activeQuestion?: Question;
   alreadyVoted?: boolean;
 }
@@ -79,7 +69,6 @@ export interface CreateQuestionRequest {
 export interface CreatePollRequest {
   title: string;
   slug?: string;
-  style?: PollStyle;
   questions: CreateQuestionRequest[];
   allowedOrigins?: string[];
 }

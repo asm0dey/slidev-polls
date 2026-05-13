@@ -6,7 +6,6 @@ import type {
   MintDeckTokenRequest,
   Poll,
   PollDetail,
-  PollStyle,
   Problem,
   ProblemCode,
   UpdatePollRequest
@@ -127,14 +126,6 @@ export class AdminApiClient {
       `/api/admin/polls/${encodeURIComponent(pollId)}`,
       undefined,
       false
-    );
-  }
-
-  updateStyle(pollId: string, body: PollStyle): Promise<PollDetail> {
-    return this.send<PollDetail>(
-      "PUT",
-      `/api/admin/polls/${encodeURIComponent(pollId)}/style`,
-      body
     );
   }
 
