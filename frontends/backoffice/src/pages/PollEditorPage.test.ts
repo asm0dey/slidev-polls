@@ -135,6 +135,17 @@ describe("PollEditorPage — create mode", () => {
     expect(router.currentRoute.value.params.pollId).toBe("p1");
   });
 
+  it("explains why Create is disabled in create mode", async () => {
+    const { wrapper } = await mountCreate(makeFake());
+    expect(wrapper.get('[data-testid="poll-editor-submit"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-testid="poll-submit-hint"]').text()).toContain("Add a title");
+
+    await wrapper.get('input[data-testid="poll-title"]').setValue("My talk");
+    expect(wrapper.find('[data-testid="poll-submit-hint"]').text()).toContain(
+      "Add a question prompt"
+    );
+  });
+
   it("surfaces server-issued SLUG_TAKEN as a readable error, not a stack trace", async () => {
     const createPoll = vi
       .fn()
