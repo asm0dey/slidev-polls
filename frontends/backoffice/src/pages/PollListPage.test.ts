@@ -120,7 +120,7 @@ describe("PollListPage", () => {
     expect(qrImg.attributes("src")).toBe("/api/admin/polls/p1/qr.png");
 
     const second = rows[1];
-    expect(second.text()).toContain("OPEN");
+    expect(second.text()).toContain("live");
   });
 
   it("renders an empty-state message when the presenter has no polls", async () => {
@@ -226,6 +226,19 @@ describe("PollListPage", () => {
     expect(wrapper.find('[data-testid="confirm-dialog"]').text()).toMatch(
       /Permanently removes [“"]Workshop[”"]/
     );
+  });
+
+  it("renders only one status indicator per row", async () => {
+    const client = makeFake({
+      listPolls: vi
+        .fn()
+        .mockResolvedValue([
+          poll({ id: "p1", title: "X", slug: "x", status: "OPEN", publicUrl: "/x" })
+        ])
+    });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+    expect(wrapper.findAll('[data-testid="poll-row"] .pl__status-cell > *')).toHaveLength(1);
   });
 
   it("clones a poll and navigates to the new poll editor", async () => {

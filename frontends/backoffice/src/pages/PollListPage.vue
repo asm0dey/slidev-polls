@@ -143,7 +143,6 @@ function statusLabel(s: string): string {
           <Pill :tone="statusTone(poll.status)" :withDot="poll.status === 'OPEN'">
             {{ statusLabel(poll.status) }}
           </Pill>
-          <span class="pl__status-raw" aria-hidden="true">{{ poll.status }}</span>
         </span>
         <a
           :href="poll.publicUrl"
@@ -270,11 +269,6 @@ function statusLabel(s: string): string {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.pl__status-raw {
-  font-size: 10px;
-  color: var(--sp-fg-faint, transparent);
-  line-height: 1;
 }
 .pl__join {
   font-size: 12px;
