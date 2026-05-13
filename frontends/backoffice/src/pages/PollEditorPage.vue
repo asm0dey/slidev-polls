@@ -161,6 +161,22 @@ const canSubmit = computed(() => {
   return true;
 });
 
+const submitHint = computed(() => {
+  if (submitting.value) return "";
+  if (title.value.trim().length === 0) return "Add a title.";
+  if (!slugIsAcceptable.value) return "Fix the slug (lowercase letters, digits, hyphens).";
+  if (questions.length === 0) return "Add at least one question.";
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (q.prompt.trim().length === 0) return `Add a question prompt for question ${i + 1}.`;
+    if (q.options.length < 2) return `Add at least 2 options to question ${i + 1}.`;
+    for (const o of q.options) {
+      if (o.label.trim().length === 0) return `Fill every option in question ${i + 1}.`;
+    }
+  }
+  return "";
+});
+
 const dirty = computed(() => {
   if (!detail.value) return true; // create mode or never-loaded
   if (title.value.trim() !== detail.value.title) return true;
@@ -383,6 +399,9 @@ onMounted(() => {
             >
               Delete poll
             </button>
+            <span v-if="submitHint" class="pe__submit-hint" data-testid="poll-submit-hint">
+              {{ submitHint }}
+            </span>
             <Button :disabled="!canSubmit" data-testid="poll-editor-submit" @click="onSubmit">
               {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
             </Button>
@@ -799,5 +818,10 @@ onMounted(() => {
 }
 .pe__clear-votes:hover {
   background: var(--sp-bg-muted);
+}
+
+.pe__submit-hint {
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
 }
 </style>
