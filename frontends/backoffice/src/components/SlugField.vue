@@ -7,8 +7,10 @@ const props = withDefaults(
     modelValue: string;
     label?: string;
     placeholder?: string;
+    autoSeed?: string;
+    mode?: "create" | "edit";
   }>(),
-  { label: "Slug", placeholder: "my-talk" }
+  { label: "Slug", placeholder: "my-talk", autoSeed: "", mode: "create" }
 );
 
 const emit = defineEmits<{
@@ -42,8 +44,34 @@ watch(
   { immediate: true }
 );
 
+const userEdited = ref(false);
+
+function toSlug(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+watch(
+  () => props.autoSeed,
+  (next) => {
+    if (props.mode !== "create") return;
+    if (userEdited.value) return;
+    const seeded = toSlug(next);
+    if (seeded !== internalValue.value) {
+      internalValue.value = seeded;
+      emit("update:modelValue", seeded);
+    }
+  },
+  { immediate: true }
+);
+
 function onInput(event: Event) {
   const target = event.target as HTMLInputElement;
+  userEdited.value = true;
   internalValue.value = target.value;
   emit("update:modelValue", target.value);
 }
@@ -79,16 +107,27 @@ function onInput(event: Event) {
   font-weight: 600;
 }
 .slug-field__input {
-  font-family: ui-monospace, monospace;
+  font-family: var(--sp-font-mono);
   padding: 0.4rem 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+  color-scheme: inherit;
+}
+.slug-field__input::placeholder {
+  color: var(--sp-fg-faint);
+}
+.slug-field__input:focus {
+  outline: 2px solid var(--sp-accent-ring);
+  outline-offset: 0;
+  border-color: var(--sp-accent);
 }
 .slug-field__input[aria-invalid="true"] {
-  border-color: #c0392b;
+  border-color: var(--sp-danger);
 }
 .slug-field__error {
-  color: #c0392b;
+  color: var(--sp-danger);
   font-size: 0.875rem;
   margin: 0;
 }

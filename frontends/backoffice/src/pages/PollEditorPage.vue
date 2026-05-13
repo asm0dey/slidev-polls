@@ -424,10 +424,10 @@ onMounted(() => {
             </div>
 
             <div class="pe__field">
-              <label class="pe__label">Slug</label>
               <SlugField
                 v-model="slug"
                 :mode="mode"
+                :auto-seed="title"
                 @update:valid="(v: boolean) => (slugValid = v)"
               />
               <input type="hidden" data-testid="poll-slug" :value="slug" />
