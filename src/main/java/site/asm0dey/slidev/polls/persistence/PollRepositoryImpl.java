@@ -1,10 +1,9 @@
 package site.asm0dey.slidev.polls.persistence;
 
-import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
-import static org.jooq.impl.DSL.val;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 
@@ -57,10 +56,10 @@ public class PollRepositoryImpl implements PollRepository {
         .set(POLLS.SLUG, poll.slug())
         .set(POLLS.STATUS, poll.status().name())
         .set(POLLS.ACTIVE_QUESTION_ID, poll.activeQuestionId())
-        .set(POLLS.ALLOWED_ORIGINS, poll.allowedOrigins().toArray(new String[0]))
         .set(POLLS.CREATED_AT, now)
         .set(POLLS.UPDATED_AT, now)
         .execute();
+    writeOrigins(poll.id(), poll.allowedOrigins());
     insertQuestions(poll.id(), poll.questions());
     return findById(poll.id()).orElseThrow(() -> new NotFoundException(poll.id().toString()));
   }
@@ -69,6 +68,7 @@ public class PollRepositoryImpl implements PollRepository {
   public Optional<Poll> findById(UUID pollId) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
         .where(POLLS.ID.eq(pollId))
         .fetchOptional()
@@ -79,8 +79,9 @@ public class PollRepositoryImpl implements PollRepository {
   public Optional<Poll> findBySlug(String slug) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
-        .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()))
+        .where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()))
         .fetchOptional()
         .map(this::toPoll);
   }
@@ -89,6 +90,7 @@ public class PollRepositoryImpl implements PollRepository {
   public List<Poll> findByOwner(String ownerUsername) {
     return dsl.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
         .from(POLLS)
         .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
         .orderBy(POLLS.CREATED_AT.desc())
@@ -98,10 +100,7 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public boolean slugTaken(String slug, UUID excludingPollId) {
-    var base =
-        dsl.selectOne()
-            .from(POLLS)
-            .where(org.jooq.impl.DSL.lower(POLLS.SLUG).eq(slug.toLowerCase()));
+    var base = dsl.selectOne().from(POLLS).where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()));
     var scoped = excludingPollId == null ? base : base.and(POLLS.ID.ne(excludingPollId));
     return scoped.fetchOptional().isPresent();
   }
@@ -326,32 +325,34 @@ public class PollRepositoryImpl implements PollRepository {
   @Override
   public boolean isOriginAllowedByAnyPoll(String origin) {
     return dsl.fetchExists(
-        dsl.selectOne().from(POLLS).where(val(origin).eq(any(POLLS.ALLOWED_ORIGINS))));
+        dsl.selectOne().from(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.ORIGIN.eq(origin)));
   }
 
   @Override
   public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
-    return dsl.update(POLLS)
-        .set(POLLS.ALLOWED_ORIGINS, origins.toArray(new String[0]))
-        .set(POLLS.UPDATED_AT, OffsetDateTime.now())
-        .where(POLLS.ID.eq(pollId))
-        .returningResult(pollFieldsWithQuestions())
-        .fetchOptional()
-        .map(this::toPoll)
-        .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
+    dsl.deleteFrom(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(pollId)).execute();
+    writeOrigins(pollId, origins);
+    int touched =
+        dsl.update(POLLS)
+            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
+            .where(POLLS.ID.eq(pollId))
+            .execute();
+    if (touched == 0) throw new NotFoundException("poll " + pollId + " does not exist");
+    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
-  /**
-   * Combine the {@link site.asm0dey.slidev.polls.persistence.jooq.tables.Polls} columns with the
-   * {@link #QUESTIONS_FIELD} multiset so an {@code UPDATE … RETURNING} can hand back a fully
-   * hydrated poll aggregate in a single Postgres round-trip — no follow-up {@code SELECT}.
-   */
-  private static org.jooq.SelectField<?>[] pollFieldsWithQuestions() {
-    Field<?>[] cols = POLLS.fields();
-    org.jooq.SelectField<?>[] all = new org.jooq.SelectField<?>[cols.length + 1];
-    System.arraycopy(cols, 0, all, 0, cols.length);
-    all[cols.length] = QUESTIONS_FIELD;
-    return all;
+  private void writeOrigins(UUID pollId, List<String> origins) {
+    if (origins == null || origins.isEmpty()) return;
+    var rows =
+        java.util.stream.IntStream.range(0, origins.size())
+            .mapToObj(
+                i ->
+                    dsl.insertInto(POLL_ALLOWED_ORIGINS)
+                        .set(POLL_ALLOWED_ORIGINS.POLL_ID, pollId)
+                        .set(POLL_ALLOWED_ORIGINS.ORIGIN, origins.get(i))
+                        .set(POLL_ALLOWED_ORIGINS.POSITION, i))
+            .toList();
+    dsl.batch(rows).execute();
   }
 
   private List<Question> insertQuestions(UUID pollId, List<Question> questions) {
@@ -448,8 +449,15 @@ public class PollRepositoryImpl implements PollRepository {
                                   ? null
                                   : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
 
+  private static final Field<List<String>> ORIGINS_FIELD =
+      multiset(
+              select(POLL_ALLOWED_ORIGINS.ORIGIN)
+                  .from(POLL_ALLOWED_ORIGINS)
+                  .where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(POLLS.ID))
+                  .orderBy(POLL_ALLOWED_ORIGINS.POSITION.asc()))
+          .convertFrom(r -> r.map(o -> o.value1()));
+
   private Poll toPoll(Record row) {
-    String[] originsArr = row.get(POLLS.ALLOWED_ORIGINS);
     return new Poll(
         row.get(POLLS.ID),
         row.get(POLLS.OWNER_USERNAME),
@@ -458,7 +466,7 @@ public class PollRepositoryImpl implements PollRepository {
         PollStatus.valueOf(row.get(POLLS.STATUS)),
         row.get(POLLS.ACTIVE_QUESTION_ID),
         row.get(QUESTIONS_FIELD),
-        originsArr == null ? List.of() : List.of(originsArr),
+        row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
   }
