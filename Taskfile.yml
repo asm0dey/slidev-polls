@@ -136,6 +136,7 @@ tasks:
     desc: Launch the Slidev demo deck (auto-starts compose.dev.yml backend if :8080 is idle; tears down what it started). Sign into the backoffice yourself, create a poll, and use "Copy snippet" to paste <PollResults> tags into slides.md.
     dir: frontends/slidev-demo
     cmds:
+      - task: frontends
       - task: e2e:backend-up
       - defer: { task: e2e:backend-down }
       # Ensure slidev CLI + addon are resolved for the workspace — cheap when
