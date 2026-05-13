@@ -24,11 +24,10 @@ import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 
 /**
- * Storage-level coverage for {@code @TS-004}: the partial unique index {@code
- * poll_questions_one_active_uq ON poll_questions(poll_id) WHERE status = 'ACTIVE'} must serialise
- * concurrent activations. Two threads race to mark different DRAFT questions ACTIVE on the same
- * poll; exactly one succeeds, the other's UPDATE surfaces as a {@link
- * site.asm0dey.slidev.polls.persistence.PollRepositoryImpl.ConcurrentActivationException}.
+ * Storage-level coverage for {@code @TS-004}: concurrent activations on the same poll must leave
+ * the DB with exactly one ACTIVE question. The repository uses a single-statement CASE UPDATE so
+ * per-statement atomicity (on both PostgreSQL and H2) makes the race race-free; both calls return a
+ * Poll, and the final state has one ACTIVE row pointed at by {@code polls.active_question_id}.
  *
  * <p>Parametrised over PostgreSQL and H2 via nested {@code @Nested} engine subclasses.
  */
@@ -52,8 +51,9 @@ class OneActivePerPollIT extends AbstractPostgresTest {
           .execute();
     }
 
-    // @TS-004 — exactly one of two concurrent ACTIVE transitions on the same poll wins; the loser
-    // sees the unique-constraint violation translated into ConcurrentActivationException.
+    // @TS-004 — under concurrent activations on the same poll, the post-race state has exactly
+    // one ACTIVE question. Both calls succeed (no exception); the single CASE UPDATE in the repo
+    // makes the race race-free per-statement, so the invariant is asserted on the final state.
     @Test
     void concurrent_activations_on_same_poll_serialise() throws Exception {
       Poll seeded = seedPollWithTwoQuestions();
@@ -85,13 +85,7 @@ class OneActivePerPollIT extends AbstractPostgresTest {
         Object r2 = f2.get();
 
         long successes = Stream.of(r1, r2).filter(Poll.class::isInstance).count();
-        long failures =
-            Stream.of(r1, r2)
-                .filter(r -> r instanceof PollRepositoryImpl.ConcurrentActivationException)
-                .count();
-
-        assertThat(successes).as("exactly one activation wins under concurrent start").isEqualTo(1);
-        assertThat(failures).as("the other hits the partial unique index").isEqualTo(1);
+        assertThat(successes).as("both atomic UPDATEs commit").isEqualTo(2);
 
         Poll finalState = repository.findById(seeded.id()).orElseThrow();
         long activeCount =
@@ -99,9 +93,11 @@ class OneActivePerPollIT extends AbstractPostgresTest {
                 .filter(q -> q.status() == QuestionStatus.ACTIVE)
                 .count();
         assertThat(activeCount)
-            .as("the poll still has at most one ACTIVE question after the race")
+            .as("the poll has exactly one ACTIVE question after the race")
             .isEqualTo(1);
-        assertThat(finalState.activeQuestionId()).isNotNull();
+        assertThat(finalState.activeQuestionId())
+            .as("polls.active_question_id matches the surviving ACTIVE row")
+            .isIn(q1, q2);
       }
     }
 

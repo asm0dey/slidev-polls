@@ -15,8 +15,6 @@ import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
-import org.jooq.exception.IntegrityConstraintViolationException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -228,69 +226,76 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Poll activateQuestion(UUID pollId, UUID questionId) {
-    // Pessimistic row lock on the parent polls row: serialises concurrent activations on the
-    // same poll across PostgreSQL and H2. H2 2.4.240's MVStore otherwise lets two transactions
-    // both flip different poll_questions rows to ACTIVE without conflicting on the partial
-    // unique index that's fed by a generated column. The SELECT ... FOR UPDATE forces the
-    // second transaction to wait until the first commits, after which the second's UPDATE
-    // collides with the index and throws ConcurrentActivationException as expected.
-    dsl.select(POLLS.ID)
-        .from(POLLS)
-        .where(POLLS.ID.eq(pollId))
-        .forUpdate()
-        .fetchOptional()
-        .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
-
-    var existing =
-        dsl.selectFrom(POLL_QUESTIONS)
-            .where(POLL_QUESTIONS.ID.eq(questionId).and(POLL_QUESTIONS.POLL_ID.eq(pollId)))
-            .fetchOptional()
-            .orElseThrow(
-                () -> new NotFoundException("question " + questionId + " not in poll " + pollId));
-
-    switch (QuestionStatus.valueOf(existing.getStatus())) {
-      case ACTIVE -> {
-        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-      }
-      // CLOSED questions are reopenable — slide navigation may bounce a
-      // viewer back to an earlier question and the deck must be able to
-      // re-activate it. Falls through to the ACTIVATE flow below, which
-      // clears closed_at as part of the update.
-      case CLOSED, DRAFT -> {}
-    }
-
+    // The mutation flow is wrapped in an explicit jOOQ transaction so the row lock acquired
+    // by SELECT ... FOR UPDATE below outlives any single statement. Without the wrapper a
+    // caller in JDBC autocommit mode (the repo-tier ITs are; production goes through Spring's
+    // @Transactional on PollService and participates in this tx rather than nesting) would
+    // release the lock between statements and lose the cross-engine serialisation guarantee.
+    //
+    // Inside the tx:
+    //   1. Pessimistic lock on the parent polls row — forces concurrent activations on the
+    //      same poll to serialise on both PostgreSQL and H2.
+    //   2. Close any other currently-ACTIVE question on the poll (in case a previous activation
+    //      hasn't been closed by the navigation flow).
+    //   3. Flip the target question to ACTIVE (or short-circuit if it already is).
+    //   4. Update polls.active_question_id and polls.status to match.
+    //
+    // The findById that produces the return value runs *outside* the tx so it sees the
+    // committed writes from a fresh connection (jOOQ pools connections per call).
     OffsetDateTime now = OffsetDateTime.now();
-    // poll_questions_active_timestamp_ck: `(status = 'ACTIVE') = (activated_at IS NOT NULL)`.
-    // Clearing activated_at on ACTIVE -> CLOSED is mandatory; the constraint rolls the update
-    // back otherwise. closed_at is the authoritative "when did this question stop accepting
-    // votes?" timestamp.
-    dsl.update(POLL_QUESTIONS)
-        .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
-        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-        .set(POLL_QUESTIONS.CLOSED_AT, now)
-        .where(
-            POLL_QUESTIONS
-                .POLL_ID
-                .eq(pollId)
-                .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))
-                .and(POLL_QUESTIONS.ID.ne(questionId)))
-        .execute();
-    try {
-      dsl.update(POLL_QUESTIONS)
-          .set(POLL_QUESTIONS.STATUS, QuestionStatus.ACTIVE.name())
-          .set(POLL_QUESTIONS.ACTIVATED_AT, now)
-          .set(POLL_QUESTIONS.CLOSED_AT, (OffsetDateTime) null)
-          .where(POLL_QUESTIONS.ID.eq(questionId))
-          .execute();
-    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException e) {
-      throw new ConcurrentActivationException(pollId, questionId, e);
-    }
-    dsl.update(POLLS)
-        .set(POLLS.ACTIVE_QUESTION_ID, questionId)
-        .set(POLLS.STATUS, PollStatus.OPEN.name())
-        .set(POLLS.UPDATED_AT, now)
-        .where(POLLS.ID.eq(pollId))
-        .execute();
+    dsl.transaction(
+        cfg -> {
+          var tx = cfg.dsl();
+
+          tx.select(POLLS.ID)
+              .from(POLLS)
+              .where(POLLS.ID.eq(pollId))
+              .forUpdate()
+              .fetchOptional()
+              .orElseThrow(() -> new NotFoundException("poll " + pollId + " does not exist"));
+
+          var existing =
+              tx.selectFrom(POLL_QUESTIONS)
+                  .where(POLL_QUESTIONS.ID.eq(questionId).and(POLL_QUESTIONS.POLL_ID.eq(pollId)))
+                  .fetchOptional()
+                  .orElseThrow(
+                      () ->
+                          new NotFoundException(
+                              "question " + questionId + " not in poll " + pollId));
+
+          if (QuestionStatus.valueOf(existing.getStatus()) == QuestionStatus.ACTIVE) {
+            return; // Idempotent — findById below picks up current state.
+          }
+
+          // poll_questions_active_timestamp_ck demands
+          //   (status = 'ACTIVE') = (activated_at IS NOT NULL)
+          // so the CLOSE step nulls activated_at and the ACTIVATE step sets it.
+          tx.update(POLL_QUESTIONS)
+              .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+              .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+              .set(POLL_QUESTIONS.CLOSED_AT, now)
+              .where(
+                  POLL_QUESTIONS
+                      .POLL_ID
+                      .eq(pollId)
+                      .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))
+                      .and(POLL_QUESTIONS.ID.ne(questionId)))
+              .execute();
+
+          tx.update(POLL_QUESTIONS)
+              .set(POLL_QUESTIONS.STATUS, QuestionStatus.ACTIVE.name())
+              .set(POLL_QUESTIONS.ACTIVATED_AT, now)
+              .set(POLL_QUESTIONS.CLOSED_AT, (OffsetDateTime) null)
+              .where(POLL_QUESTIONS.ID.eq(questionId))
+              .execute();
+
+          tx.update(POLLS)
+              .set(POLLS.ACTIVE_QUESTION_ID, questionId)
+              .set(POLLS.STATUS, PollStatus.OPEN.name())
+              .set(POLLS.UPDATED_AT, now)
+              .where(POLLS.ID.eq(pollId))
+              .execute();
+        });
     return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
@@ -482,18 +487,5 @@ public class PollRepositoryImpl implements PollRepository {
         row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
-  }
-
-  /**
-   * Thrown by {@link #activateQuestion} when the partial unique index {@code
-   * poll_questions_one_active_uq} refuses a second concurrent activation on the same poll (FR-004,
-   * {@code @TS-004}). Callers translate this into a presenter-visible error via {@link
-   * org.springframework.retry.support.RetryTemplate} or by surfacing the failure to the other
-   * transaction that raced.
-   */
-  public static final class ConcurrentActivationException extends RuntimeException {
-    public ConcurrentActivationException(UUID pollId, UUID questionId, Throwable cause) {
-      super("concurrent activation race for poll " + pollId + " question " + questionId, cause);
-    }
   }
 }
