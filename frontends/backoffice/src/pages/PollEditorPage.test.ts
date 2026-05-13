@@ -287,7 +287,8 @@ describe("PollEditorPage — edit mode", () => {
     const client = makeFake({ deletePoll });
     const { wrapper, router } = await mountEdit(client);
 
-    await wrapper.find('[data-testid="poll-delete"]').trigger("click");
+    await wrapper.get('[data-testid="menu-trigger"]').trigger("click");
+    await wrapper.get('[data-testid="menu-item-delete"]').trigger("click");
     await flushPromises();
 
     // Typed-slug confirmation required — the delete dialog is the second
@@ -317,7 +318,8 @@ describe("PollEditorPage — edit mode", () => {
     const client = makeFake({ getPoll });
     const { wrapper } = await mountEdit(client);
 
-    await wrapper.get('[data-testid="poll-delete"]').trigger("click");
+    await wrapper.get('[data-testid="menu-trigger"]').trigger("click");
+    await wrapper.get('[data-testid="menu-item-delete"]').trigger("click");
     // The delete dialog is the one with the typed-confirm input.
     const typedInputs = wrapper.findAll('[data-testid="confirm-dialog-typed"]');
     expect(typedInputs).toHaveLength(1);
@@ -378,7 +380,8 @@ describe("PollEditorPage — edit mode", () => {
     const client = makeFake({ clearVotes });
     const { wrapper } = await mountEdit(client);
 
-    await wrapper.find('[data-testid="poll-clear-votes"]').trigger("click");
+    await wrapper.get('[data-testid="menu-trigger"]').trigger("click");
+    await wrapper.get('[data-testid="menu-item-clear-votes"]').trigger("click");
     await flushPromises();
 
     const dialog = wrapper.find('[data-testid="confirm-dialog"]').element as HTMLDialogElement;
@@ -396,7 +399,8 @@ describe("PollEditorPage — edit mode", () => {
     const { wrapper } = await mountEdit(client);
 
     // Open the dialog
-    await wrapper.find('[data-testid="poll-clear-votes"]').trigger("click");
+    await wrapper.get('[data-testid="menu-trigger"]').trigger("click");
+    await wrapper.get('[data-testid="menu-item-clear-votes"]').trigger("click");
     await flushPromises();
 
     // Click the confirm button inside the dialog
@@ -433,5 +437,25 @@ describe("PollEditorPage — edit mode", () => {
     // After save snippet button should be back, hint gone
     expect(wrapper.find('[data-testid="question-copy-snippet"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="copy-snippet-disabled-hint"]').exists()).toBe(false);
+  });
+
+  it("hides Clear votes and Delete behind an overflow menu", async () => {
+    const getPoll = vi.fn().mockResolvedValue(
+      pollDetail({
+        id: "p1",
+        title: "Workshop",
+        slug: "workshop",
+        questions: []
+      })
+    );
+    const client = makeFake({ getPoll });
+    const { wrapper } = await mountEdit(client);
+
+    expect(wrapper.find('[data-testid="poll-clear-votes"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="poll-delete"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="menu-trigger"]').trigger("click");
+    expect(wrapper.find('[data-testid="menu-item-clear-votes"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="menu-item-delete"]').exists()).toBe(true);
   });
 });
