@@ -30,6 +30,7 @@ defineEmits<{ "update:modelValue": [v: string] }>();
   border-radius: var(--sp-radius);
   background: var(--sp-bg);
   color: var(--sp-fg);
+  color-scheme: inherit;
 }
 .sp-input::placeholder {
   color: var(--sp-fg-faint);

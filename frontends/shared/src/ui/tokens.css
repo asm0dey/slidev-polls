@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --sp-bg: #ffffff;
   --sp-bg-muted: #fafafa;
   --sp-bg-subtle: #f4f4f5;
@@ -29,6 +30,7 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --sp-bg: #0a0a0a;
   --sp-bg-muted: #18181b;
   --sp-bg-subtle: #27272a;
