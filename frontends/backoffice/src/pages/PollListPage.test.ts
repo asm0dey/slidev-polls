@@ -204,17 +204,15 @@ describe("PollListPage", () => {
 
   it("Delete row opens ConfirmDialog with typed-slug guard", async () => {
     const client = makeFake({
-      listPolls: vi
-        .fn()
-        .mockResolvedValue([
-          poll({
-            id: "p1",
-            title: "Workshop",
-            slug: "workshop",
-            status: "OPEN",
-            publicUrl: "/workshop"
-          })
-        ])
+      listPolls: vi.fn().mockResolvedValue([
+        poll({
+          id: "p1",
+          title: "Workshop",
+          slug: "workshop",
+          status: "OPEN",
+          publicUrl: "/workshop"
+        })
+      ])
     });
     const wrapper = await mountPage(client);
     await flushPromises();
@@ -224,6 +222,10 @@ describe("PollListPage", () => {
     expect(
       wrapper.get('[data-testid="confirm-dialog-confirm"]').attributes("disabled")
     ).toBeDefined();
+    // Guard against HTML-entity escape regressions in the body prose.
+    expect(wrapper.find('[data-testid="confirm-dialog"]').text()).toMatch(
+      /Permanently removes [“"]Workshop[”"]/
+    );
   });
 
   it("clones a poll and navigates to the new poll editor", async () => {
