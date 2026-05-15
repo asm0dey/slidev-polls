@@ -320,5 +320,126 @@ describe("PollPanel", () => {
     uninstallFakeIO();
   });
 
+  it("activates on mount when wrapped in a visible .slidev-page (Slidev path)", async () => {
+    // Slidev path: when the panel finds a .slidev-page ancestor it uses a
+    // MutationObserver on the page's `style` attribute rather than IO. A panel
+    // mounted inside an already-visible slide must activate immediately.
+    authState.value = "signed-in";
+    const slidePage = document.createElement("div");
+    slidePage.className = "slidev-page";
+    document.body.appendChild(slidePage);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const w = mount(PollPanel, {
+      props: {
+        slug: "s",
+        pollId: "poll-slidev-visible",
+        questionId: "q-slidev-visible",
+        server: "https://api.test"
+      },
+      attachTo: slidePage
+    });
+    await flushPromises();
+
+    const activates = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).endsWith("/api/deck/polls/poll-slidev-visible/activate")
+    );
+    expect(activates.length).toBe(1);
+
+    w.unmount();
+    slidePage.remove();
+    fetchSpy.mockRestore();
+  });
+
+  it("POSTs /close when the .slidev-page parent toggles to display:none (slide navigated away)", async () => {
+    // The bug: Slidev sets `display: none` on the leaving slide. IO does not
+    // reliably deliver an entry for that state change, so the panel never
+    // posted /close and voters kept seeing the now-stale poll. The fix watches
+    // the slide-page's style attribute and drives close off the transition.
+    authState.value = "signed-in";
+    const slidePage = document.createElement("div");
+    slidePage.className = "slidev-page";
+    document.body.appendChild(slidePage);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const w = mount(PollPanel, {
+      props: {
+        slug: "s",
+        pollId: "poll-slide-leave",
+        questionId: "q-slide-leave",
+        server: "https://api.test"
+      },
+      attachTo: slidePage
+    });
+    await flushPromises();
+    fetchSpy.mockClear();
+
+    // Presenter navigates to a different slide — Slidev sets display:none
+    // on this slide's .slidev-page.
+    slidePage.style.display = "none";
+    await flushPromises();
+
+    const closeCalls = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).endsWith("/api/deck/polls/poll-slide-leave/close")
+    );
+    expect(closeCalls.length).toBe(1);
+    const [, init] = closeCalls[0];
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({
+      questionId: "q-slide-leave"
+    });
+
+    w.unmount();
+    slidePage.remove();
+    fetchSpy.mockRestore();
+  });
+
+  it("re-activates when the .slidev-page parent un-hides (slide navigated back)", async () => {
+    authState.value = "signed-in";
+    const slidePage = document.createElement("div");
+    slidePage.className = "slidev-page";
+    slidePage.style.display = "none";
+    document.body.appendChild(slidePage);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const w = mount(PollPanel, {
+      props: {
+        slug: "s",
+        pollId: "poll-slide-return",
+        questionId: "q-slide-return",
+        server: "https://api.test"
+      },
+      attachTo: slidePage
+    });
+    await flushPromises();
+
+    // Panel mounted while slide was hidden — must not activate yet.
+    expect(
+      fetchSpy.mock.calls.filter(([url]) =>
+        String(url).endsWith("/api/deck/polls/poll-slide-return/activate")
+      ).length
+    ).toBe(0);
+
+    // Presenter navigates back to this slide.
+    slidePage.style.display = "";
+    await flushPromises();
+
+    expect(
+      fetchSpy.mock.calls.filter(([url]) =>
+        String(url).endsWith("/api/deck/polls/poll-slide-return/activate")
+      ).length
+    ).toBe(1);
+
+    w.unmount();
+    slidePage.remove();
+    fetchSpy.mockRestore();
+  });
+
   it.todo("POSTs /close when the slide scrolls below the hysteresis threshold (intersect-leave)");
 });

@@ -13,7 +13,7 @@ import {
   type TallyDeltaEvent
 } from "@slidev-polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
-import { useSlidevTheme } from "../composables/useSlidevTheme";
+import { findSlideRoot, useSlidevTheme } from "../composables/useSlidevTheme";
 import { getConfiguredBackend } from "../composables/configureDeckAuthBackend";
 import { setPollResults } from "../composables/usePollResults";
 import { slideWidth, useSlideContext } from "@slidev/client";
@@ -188,6 +188,7 @@ async function closeFromDeck(base: string) {
 }
 
 let visibilityObserver: IntersectionObserver | null = null;
+let slideDisplayObserver: MutationObserver | null = null;
 
 onMounted(async () => {
   // Resolve the backend URL in this priority order:
@@ -233,7 +234,40 @@ onMounted(async () => {
       }
     }
   );
-  if (root.value && typeof IntersectionObserver !== "undefined") {
+  const slidePage = root.value ? findSlideRoot(root.value) : null;
+  if (slidePage) {
+    // Slidev path: every slide stays in the DOM and the framework toggles the
+    // current slide's `style="display: none"` off and the previous slide's on.
+    // IntersectionObserver does not reliably deliver callbacks for elements
+    // that become display:none (the spec leaves it implementation-defined and
+    // Chromium does not fire one), so a slide that loses focus never produced
+    // a close event under the IO branch — voters kept seeing the last poll
+    // even after the presenter navigated past it. Watch the slide-page's
+    // style attribute instead and drive activate/close off display transitions.
+    let slideVisible = slidePage.style.display !== "none";
+    if (slideVisible) {
+      observerOpened = true;
+      void activateFromDeck(base);
+    }
+    slideDisplayObserver = new MutationObserver(() => {
+      const visible = slidePage.style.display !== "none";
+      if (visible && !slideVisible) {
+        slideVisible = true;
+        observerOpened = true;
+        void activateFromDeck(base);
+      } else if (!visible && slideVisible) {
+        slideVisible = false;
+        if (observerOpened) void closeFromDeck(base);
+      }
+    });
+    slideDisplayObserver.observe(slidePage, {
+      attributes: true,
+      attributeFilter: ["style"]
+    });
+  } else if (root.value && typeof IntersectionObserver !== "undefined") {
+    // Non-Slidev embed (e.g., the panel mounted on a plain page). Fall back to
+    // IntersectionObserver so the activate/close edges still fire on real
+    // viewport visibility changes.
     visibilityObserver = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -241,8 +275,6 @@ onMounted(async () => {
             observerOpened = true;
             void activateFromDeck(base);
           } else if (observerOpened && e.intersectionRatio < 0.1) {
-            // Slide left the viewport (and was previously visible): close so attendees
-            // see "waiting" until it returns. Re-entry triggers the open branch above.
             void closeFromDeck(base);
           }
         }
@@ -293,6 +325,7 @@ onUnmounted(() => {
   void closeFromDeck(base);
   stop?.();
   visibilityObserver?.disconnect();
+  slideDisplayObserver?.disconnect();
 });
 </script>
 
