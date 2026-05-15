@@ -20,7 +20,8 @@ class Argon2EncoderSanityTest {
     assertThat(hash).contains("p=4");
     assertThat(encoder.matches("correct-horse", hash)).isTrue();
     assertThat(encoder.matches("wrong-horse", hash)).isFalse();
-    // Tripwire: blow up if someone bumps params and encode time drifts past 1s on CI.
-    assertThat(elapsedMs).isLessThan(1_000L);
+    // Tripwire: blow up if someone bumps params and encode time drifts past 2s on CI.
+    // 2000ms accommodates slow shared GitHub runners while still catching real param bloat.
+    assertThat(elapsedMs).isLessThan(2_000L);
   }
 }
