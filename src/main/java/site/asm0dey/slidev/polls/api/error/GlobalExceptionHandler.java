@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.api.error;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -157,8 +159,18 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(Exception.class)
-  ResponseEntity<Problem> handleUnexpected(Exception ex) {
+  ResponseEntity<Problem> handleUnexpected(Exception ex, HttpServletResponse response) {
     LOG.error("unexpected server fault", ex);
+    // SseEmitter pins the response Content-Type to text/event-stream before the body
+    // is streamed. Once an async fault surfaces (typically a ClientAbortException
+    // when the subscriber drops or nginx times the connection out), Spring routes
+    // here and tries to serialise Problem as JSON — but the converter cannot honour
+    // text/event-stream and throws HttpMessageNotWritableException, masking the
+    // actual root cause. The HTTP response is already lost to the client at this
+    // point; just return an empty body so the dispatch completes cleanly.
+    if (MediaType.TEXT_EVENT_STREAM_VALUE.equals(response.getContentType())) {
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
     return respond(
         HttpStatus.INTERNAL_SERVER_ERROR,
         ProblemCode.TRANSPORT_FAILURE,

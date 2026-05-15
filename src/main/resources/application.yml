@@ -48,6 +48,12 @@ spring:
       on-profile: prod
 
 server:
+  # Honour X-Forwarded-* from the reverse proxy so Tomcat sees the public scheme/
+  # host/port. Without this, Spring's CorsUtils#isCorsRequest treats a same-origin
+  # voter POST as cross-origin (the request URI's host is the container's, while
+  # the browser-set Origin header is the public host) and PerPollCorsConfiguration
+  # rejects it with 403 unless the public host is in allowed_origins.
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:
