@@ -162,8 +162,8 @@ jobs:
           retention-days: 7
 
   publish-backend:
-    name: Publish backend image to GHCR
-    runs-on: ubuntu-latest
+    name: Publish backend image (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     needs: [backend, frontends, e2e]
     # Only on a semver tag push. Skipped for branch pushes and pull_request.
@@ -171,34 +171,22 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      # Each matrix entry builds and pushes the image by digest only (no tags),
+      # then the publish-backend-manifest job below stitches the digests into
+      # a multi-arch manifest list under the real tags. Native ARM runners
+      # avoid QEMU emulation entirely.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Derive image tags
-        id: tags
-        env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/slidev-polls-backend
-          SHA: ${{ github.sha }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          # github.ref_name is the tag name (e.g. v0.0.1)
-          if [[ "${REF_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            major="${BASH_REMATCH[1]}"
-            minor="${BASH_REMATCH[2]}"
-            patch="${BASH_REMATCH[3]}"
-          else
-            echo "::error::Ref '${REF_NAME}' is not a vX.Y.Z tag" >&2
-            exit 1
-          fi
-          {
-            echo "list<<EOF"
-            echo "${IMAGE}:${major}.${minor}.${patch}"
-            echo "${IMAGE}:${major}.${minor}"
-            echo "${IMAGE}:sha-${SHA}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 25
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -224,15 +212,96 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ./Dockerfile
-          push: true
-          tags: ${{ steps.tags.outputs.list }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: ${{ matrix.platform }}
+          # No tags here — the manifest job assigns them once both arches are pushed.
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/slidev-polls-backend,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-digests-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-backend-manifest:
+    name: Combine backend image manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [publish-backend]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digest artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: /tmp/digests
+          pattern: backend-digests-*
+          merge-multiple: true
+
+      - name: Derive image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/slidev-polls-backend
+          SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "${REF_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+          else
+            echo "::error::Ref '${REF_NAME}' is not a vX.Y.Z tag" >&2
+            exit 1
+          fi
+          # imagetools create --tag accepts repeated --tag flags. Emit one line
+          # per tag, picked up by the create step below as -t arguments.
+          {
+            echo "args<<EOF"
+            echo "-t ${IMAGE}:${major}.${minor}.${patch}"
+            echo "-t ${IMAGE}:${major}.${minor}"
+            echo "-t ${IMAGE}:sha-${SHA}"
+            echo "-t ${IMAGE}:latest"
+            echo "EOF"
+            echo "image=${IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ${{ steps.tags.outputs.image }}
+          TAG_ARGS: ${{ steps.tags.outputs.args }}
+        run: |
+          # shellcheck disable=SC2086 — TAG_ARGS is a deliberate flag list.
+          docker buildx imagetools create $TAG_ARGS \
+            $(printf "${IMAGE}@sha256:%s " *)
 
   publish-npm:
     name: Publish npm packages
