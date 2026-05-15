@@ -1,6 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import PollPanel from "./PollPanel.vue";
+
+// jsdom does not implement IntersectionObserver. PollPanel relies on IO as the
+// single source of truth for "this panel is on-screen, activate now" (since
+// commit-9864688 removed the mount-time activate race), so tests that exercise
+// activate/close edges need a stub they can drive manually.
+class FakeIntersectionObserver {
+  static instances: FakeIntersectionObserver[] = [];
+  callback: IntersectionObserverCallback;
+  targets: Element[] = [];
+  root = null;
+  rootMargin = "";
+  thresholds: number[] = [];
+  constructor(cb: IntersectionObserverCallback) {
+    this.callback = cb;
+    FakeIntersectionObserver.instances.push(this);
+  }
+  observe(t: Element) {
+    this.targets.push(t);
+  }
+  unobserve() {}
+  disconnect() {
+    this.targets = [];
+  }
+  takeRecords() {
+    return [];
+  }
+  trigger(ratio: number) {
+    const entries = this.targets.map(
+      (t) =>
+        ({
+          target: t,
+          isIntersecting: ratio >= 0.1,
+          intersectionRatio: ratio,
+          boundingClientRect: t.getBoundingClientRect(),
+          intersectionRect: t.getBoundingClientRect(),
+          rootBounds: null,
+          time: 0
+        }) as IntersectionObserverEntry
+    );
+    this.callback(entries, this as unknown as IntersectionObserver);
+  }
+}
+
+function installFakeIO(): typeof FakeIntersectionObserver {
+  FakeIntersectionObserver.instances = [];
+  (globalThis as { IntersectionObserver: unknown }).IntersectionObserver = FakeIntersectionObserver;
+  return FakeIntersectionObserver;
+}
+function uninstallFakeIO() {
+  delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
+  FakeIntersectionObserver.instances = [];
+}
 
 vi.mock("@slidev-polls/shared", async () => {
   const actual =
@@ -156,8 +208,9 @@ describe("PollPanel", () => {
     w.unmount();
   });
 
-  it("POSTs /close when the panel unmounts while active", async () => {
+  it("POSTs /close when the panel unmounts after IntersectionObserver activated it", async () => {
     authState.value = "signed-in";
+    const FakeIO = installFakeIO();
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
@@ -168,11 +221,17 @@ describe("PollPanel", () => {
         pollId: "poll-close-test",
         questionId: "q-close-test",
         server: "https://api.test"
-      }
+      },
+      attachTo: document.body
     });
     await flushPromises();
 
-    // Reset spy after the initial activate call
+    // Simulate the slide becoming visible — IO is the only path that drives
+    // activate, so without this the panel never marks itself active and the
+    // unmount has nothing to close.
+    FakeIO.instances[0]!.trigger(1);
+    await flushPromises();
+
     fetchSpy.mockClear();
     fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
 
@@ -193,58 +252,18 @@ describe("PollPanel", () => {
     });
 
     fetchSpy.mockRestore();
+    uninstallFakeIO();
   });
 
-  it("re-POSTs /activate on first IntersectionObserver enter after a mount-time race set lastSentIntent='open'", async () => {
-    // Slidev mounts every slide simultaneously, so all N panels race the
-    // mount-time activateFromDeck POST. Each panel marks lastSentIntent="open"
-    // speculatively even though the server only honours the last write. When
-    // the user navigates to a slide whose panel lost the race, the IO-enter
-    // must clear that speculative state and re-fire activate — otherwise the
-    // server keeps the wrong active question and voters see the wrong poll.
+  it("does NOT POST /activate at mount time (avoids the slidev all-slides-mounted race)", async () => {
+    // Slidev keeps every slide mounted simultaneously. An eager mount-time
+    // activate would race across N PollPanels and the server would honour the
+    // last write — voters watch the active question cycle through every poll
+    // in the deck before settling on whichever panel finished its POST last.
+    // Only the panel the IntersectionObserver confirms is on-screen should
+    // activate.
     authState.value = "signed-in";
-
-    class FakeIntersectionObserver {
-      static lastInstance: FakeIntersectionObserver | null = null;
-      callback: IntersectionObserverCallback;
-      targets: Element[] = [];
-      root = null;
-      rootMargin = "";
-      thresholds: number[] = [];
-      constructor(cb: IntersectionObserverCallback) {
-        this.callback = cb;
-        FakeIntersectionObserver.lastInstance = this;
-      }
-      observe(t: Element) {
-        this.targets.push(t);
-      }
-      unobserve() {}
-      disconnect() {
-        this.targets = [];
-      }
-      takeRecords() {
-        return [];
-      }
-      trigger(ratio: number) {
-        const entries = this.targets.map(
-          (t) =>
-            ({
-              target: t,
-              isIntersecting: ratio >= 0.1,
-              intersectionRatio: ratio,
-              boundingClientRect: t.getBoundingClientRect(),
-              intersectionRect: t.getBoundingClientRect(),
-              rootBounds: null,
-              time: 0
-            }) as IntersectionObserverEntry
-        );
-        this.callback(entries, this as unknown as IntersectionObserver);
-      }
-    }
-    const originalIO = (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-    (globalThis as { IntersectionObserver: unknown }).IntersectionObserver =
-      FakeIntersectionObserver;
-
+    installFakeIO();
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
@@ -252,40 +271,53 @@ describe("PollPanel", () => {
     const w = mount(PollPanel, {
       props: {
         slug: "s",
-        pollId: "poll-race",
-        questionId: "q-race",
+        pollId: "poll-no-mount-race",
+        questionId: "q-no-mount-race",
         server: "https://api.test"
       },
       attachTo: document.body
     });
     await flushPromises();
 
-    // Mount-time activate fired exactly once. lastSentIntent="open" inside the panel.
-    const mountActivates = fetchSpy.mock.calls.filter(([url]) =>
-      String(url).endsWith("/api/deck/polls/poll-race/activate")
+    const activates = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).endsWith("/api/deck/polls/poll-no-mount-race/activate")
     );
-    expect(mountActivates.length).toBe(1);
-
-    fetchSpy.mockClear();
-    // Simulate the slide entering the viewport for the first time.
-    FakeIntersectionObserver.lastInstance!.trigger(1);
-    await flushPromises();
-
-    // IO-enter cleared the speculative lastSentIntent and re-POSTed activate so
-    // the visible panel reclaims server-side active-question status from
-    // whichever sibling won the mount-time race.
-    const ioActivates = fetchSpy.mock.calls.filter(([url]) =>
-      String(url).endsWith("/api/deck/polls/poll-race/activate")
-    );
-    expect(ioActivates.length).toBe(1);
+    expect(activates.length).toBe(0);
 
     w.unmount();
     fetchSpy.mockRestore();
-    if (originalIO === undefined) {
-      delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-    } else {
-      (globalThis as { IntersectionObserver: unknown }).IntersectionObserver = originalIO;
-    }
+    uninstallFakeIO();
+  });
+
+  it("POSTs /activate when IntersectionObserver reports the panel is visible", async () => {
+    authState.value = "signed-in";
+    const FakeIO = installFakeIO();
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const w = mount(PollPanel, {
+      props: {
+        slug: "s",
+        pollId: "poll-io-activate",
+        questionId: "q-io-activate",
+        server: "https://api.test"
+      },
+      attachTo: document.body
+    });
+    await flushPromises();
+
+    FakeIO.instances[0]!.trigger(1);
+    await flushPromises();
+
+    const activates = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).endsWith("/api/deck/polls/poll-io-activate/activate")
+    );
+    expect(activates.length).toBe(1);
+
+    w.unmount();
+    fetchSpy.mockRestore();
+    uninstallFakeIO();
   });
 
   it.todo("POSTs /close when the slide scrolls below the hysteresis threshold (intersect-leave)");

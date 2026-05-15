@@ -215,7 +215,12 @@ onMounted(async () => {
         /* noop — paused indicator / SSE handle live state */
       });
   }
-  await activateFromDeck(base);
+  // Do not fire activateFromDeck here. Slidev mounts every slide simultaneously,
+  // so an eager mount-time activate would race across N panels — last write wins
+  // server-side and voters watch the active question cycle through every poll
+  // in the deck before settling on whichever panel finished its POST last.
+  // IntersectionObserver below is the single source of truth for "this panel
+  // is the one the presenter is looking at, activate now".
   watch(
     () => auth.status.value,
     (s) => {
@@ -233,16 +238,6 @@ onMounted(async () => {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting && e.intersectionRatio >= 0.5) {
-            if (!observerOpened) {
-              // Slidev mounts every slide at once, so the mount-time
-              // activateFromDeck above races across N panels and each sets
-              // lastSentIntent="open" speculatively. Once the IntersectionObserver
-              // confirms this panel is actually on-screen for the first time,
-              // clear that speculative state so we re-POST activate and reclaim
-              // server-side active-question status from whichever sibling won
-              // the mount-time race.
-              lastSentIntent = null;
-            }
             observerOpened = true;
             void activateFromDeck(base);
           } else if (observerOpened && e.intersectionRatio < 0.1) {

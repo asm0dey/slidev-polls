@@ -10,6 +10,49 @@ import type {
 import type { DeckAuthState, DeckAuthStatus, UseDeckAuthReturn } from "../composables/useDeckAuth";
 import PollResults from "./PollResults.vue";
 
+// jsdom does not implement IntersectionObserver. PollPanel uses IO as the sole
+// trigger for activateFromDeck — mount-time activate was removed (commit
+// post-9864688) because Slidev keeps every slide mounted and an eager mount
+// activate would race across N panels, cycling the active question through the
+// whole deck. Tests that exercise the activation POST must drive IO manually.
+class FakeIntersectionObserver {
+  static instances: FakeIntersectionObserver[] = [];
+  callback: IntersectionObserverCallback;
+  targets: Element[] = [];
+  root = null;
+  rootMargin = "";
+  thresholds: number[] = [];
+  constructor(cb: IntersectionObserverCallback) {
+    this.callback = cb;
+    FakeIntersectionObserver.instances.push(this);
+  }
+  observe(t: Element) {
+    this.targets.push(t);
+  }
+  unobserve() {}
+  disconnect() {
+    this.targets = [];
+  }
+  takeRecords() {
+    return [];
+  }
+  trigger(ratio: number) {
+    const entries = this.targets.map(
+      (t) =>
+        ({
+          target: t,
+          isIntersecting: ratio >= 0.1,
+          intersectionRatio: ratio,
+          boundingClientRect: t.getBoundingClientRect(),
+          intersectionRect: t.getBoundingClientRect(),
+          rootBounds: null,
+          time: 0
+        }) as IntersectionObserverEntry
+    );
+    this.callback(entries, this as unknown as IntersectionObserver);
+  }
+}
+
 // Tests mirror the live-results + activation-gating scenarios:
 //   @TS-030 — snapshot renders the active question with options and initial tallies
 //   @TS-031 — an active-question-change snapshot rotates the UI
@@ -112,9 +155,12 @@ describe("PollResults", () => {
     unsubscribeCalls = 0;
     authStub = makeAuthStub();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+    FakeIntersectionObserver.instances = [];
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    FakeIntersectionObserver.instances = [];
   });
 
   // @TS-030 — snapshot populates the question + options + initial tallies.
@@ -264,6 +310,10 @@ describe("PollResults", () => {
       questionId: "q-active"
     });
     await flushPromises();
+    // IO drives activate now (no mount-time POST race). Simulate the slide
+    // becoming visible to trigger the activation POST under test.
+    FakeIntersectionObserver.instances[0]!.trigger(1);
+    await flushPromises();
     const activationCalls = fetchMock.mock.calls.filter(([url]) =>
       String(url).includes("/api/deck/polls/")
     );
@@ -300,6 +350,9 @@ describe("PollResults", () => {
       pollId: "p-1",
       questionId: "q-active"
     });
+    await flushPromises();
+    // IO-driven activate POST is the one that hits 401 and marks the token revoked.
+    FakeIntersectionObserver.instances[0]!.trigger(1);
     await flushPromises();
     await nextTick();
     expect(authStub._calls.markRevoked).toBe(1);
