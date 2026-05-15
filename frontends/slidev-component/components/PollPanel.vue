@@ -219,7 +219,13 @@ onMounted(async () => {
   watch(
     () => auth.status.value,
     (s) => {
-      if (s === "signed-in") void activateFromDeck(base);
+      // Only the currently-visible panel should reclaim activation on sign-in.
+      // Without the visibility gate, every poll panel in the deck races the POST
+      // and whichever loses the race overwrites the active question the user is
+      // actually looking at.
+      if (s === "signed-in" && root.value && isElementVisible(root.value)) {
+        void activateFromDeck(base);
+      }
     }
   );
   if (root.value && typeof IntersectionObserver !== "undefined") {
@@ -227,6 +233,16 @@ onMounted(async () => {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+            if (!observerOpened) {
+              // Slidev mounts every slide at once, so the mount-time
+              // activateFromDeck above races across N panels and each sets
+              // lastSentIntent="open" speculatively. Once the IntersectionObserver
+              // confirms this panel is actually on-screen for the first time,
+              // clear that speculative state so we re-POST activate and reclaim
+              // server-side active-question status from whichever sibling won
+              // the mount-time race.
+              lastSentIntent = null;
+            }
             observerOpened = true;
             void activateFromDeck(base);
           } else if (observerOpened && e.intersectionRatio < 0.1) {
