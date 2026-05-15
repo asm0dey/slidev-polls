@@ -8,8 +8,8 @@ vi.mock("@slidev-polls/shared", async () => {
 
 import { flushPromises, mount } from "@vue/test-utils";
 import PollView from "./PollView.vue";
-import { ApiClient, ApiError } from "@slidev-polls/shared";
-import type { PublicPollView, VoteAccepted } from "@slidev-polls/shared";
+import { ApiClient, ApiError, openPollStream } from "@slidev-polls/shared";
+import type { PublicPollView, StreamHandlers, VoteAccepted } from "@slidev-polls/shared";
 
 // Coverage for the voter PollView page. The ApiClient is injected via the `apiClient` prop so
 // the tests can stub `publicPoll` / `submitVote` without monkey-patching the global fetch.
@@ -177,6 +177,37 @@ describe("PollView", () => {
     const wrapper = await mountView(client);
 
     expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
+  });
+
+  // Server emits `question-closed` standalone (no follow-up snapshot) when the presenter
+  // navigates away from the poll slide. Voter must drop back to WAITING so the option
+  // buttons + Submit are no longer clickable — otherwise the user can keep voting against
+  // a question the backend will reject with QUESTION_NOT_ACTIVE.
+  it("flips back to WAITING and disables voting on a question-closed SSE event", async () => {
+    let captured: StreamHandlers | null = null;
+    vi.mocked(openPollStream).mockImplementation((_base, _slug, handlers) => {
+      captured = handlers;
+      return () => {};
+    });
+
+    const client = makeClient();
+    const wrapper = await mountView(client);
+
+    // Pre-condition: active UI is rendered.
+    expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="poll-submit"]').exists()).toBe(true);
+
+    // Server fires question-closed (no follow-up snapshot).
+    captured!.onQuestionClosed?.({
+      pollId: "poll-uuid",
+      questionId: "q1",
+      emittedAt: "2026-04-19T12:00:00Z"
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="poll-waiting"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="poll-submit"]').exists()).toBe(false);
   });
 
   // When the server reports a 404 for the slug (typo, deleted poll), the error state renders

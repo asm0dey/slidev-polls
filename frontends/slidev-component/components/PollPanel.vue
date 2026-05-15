@@ -306,12 +306,15 @@ onMounted(async () => {
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
+        // Keep the panel rendering the final results. The deck embeds these
+        // panels so the presenter (and anyone reviewing an exported PDF) can
+        // see what the audience voted; wiping back to "waiting" hid the data
+        // the moment the presenter navigated past the slide, and the printed
+        // deck ended up with every poll panel blank. The voter SPA still flips
+        // to "waiting" on its own question-closed handler — different concern,
+        // different component. Mark closed via closedNotice for the optional
+        // styling hook; snapshot stays populated.
         closedNotice.value = snapshot.value.activeQuestion.prompt;
-        // Wipe local panel state so it shows the "closed" notice, but leave
-        // the shared store's snapshot intact. Aggregator slides
-        // (usePollResults) need the last-known activeQuestion + tally to
-        // render combined results after individual slides leave.
-        snapshot.value = { ...snapshot.value, activeQuestion: null, tally: [] };
       }
     },
     onConnectionStateChange: (state) => {

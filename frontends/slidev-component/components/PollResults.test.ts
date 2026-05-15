@@ -255,8 +255,10 @@ describe("PollResults", () => {
     expect(wrapper.find("[data-testid='poll-paused']").exists()).toBe(false);
   });
 
-  // question-closed keeps the slide navigable and shows a soft waiting message (Principle IV).
-  it("handles a question-closed event without unmounting", async () => {
+  // question-closed keeps the panel rendering the final tally so the deck (and
+  // any PDF export of it) preserves the results — wiping back to a waiting
+  // placeholder used to leave every poll panel blank in the downloaded deck.
+  it("handles a question-closed event without unmounting and keeps the results visible", async () => {
     const wrapper = mountResults();
     await flushPromises();
     capturedHandlers!.onSnapshot(
@@ -272,7 +274,9 @@ describe("PollResults", () => {
       emittedAt: new Date().toISOString()
     } satisfies QuestionClosedEvent);
     await flushPromises();
-    expect(wrapper.get("[data-testid='poll-waiting']").text()).toMatch(/closed/i);
+    expect(wrapper.find("[data-testid='results-panel']").exists()).toBe(true);
+    expect(wrapper.find("[data-testid='poll-waiting']").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Question q-1");
   });
 
   // @TS-120 / @TS-121 — anonymous mount MUST NOT issue any activation fetch (FR-007).

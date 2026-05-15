@@ -186,10 +186,13 @@ describe("PollPanel", () => {
 
     const w = mount(PollPanel, { props: { slug: "closing-slug" } });
     await flushPromises();
-    // Local panel shows the "closed" notice, but the shared store keeps the
-    // last-known activeQuestion + tally so aggregator slides can compose
-    // combined results after individual slides have left.
-    expect(w.find("[data-testid='poll-waiting']").text()).toContain("Question closed");
+    // Panel keeps rendering ResultsPanel with the final tally so the deck
+    // (and any PDF export) preserves the visible results after the presenter
+    // closes the question. The shared store also retains the snapshot for
+    // aggregator slides composing combined results across the deck.
+    expect(w.find("[data-testid='results-panel']").exists()).toBe(true);
+    expect(w.find("[data-testid='poll-waiting']").exists()).toBe(false);
+    expect(w.text()).toContain("Pick");
     const { usePollResults } = await import("../composables/usePollResults");
     expect(usePollResults("closing-slug").value?.activeQuestion?.id).toBe("q9");
     expect(usePollResults("closing-slug").value?.tally).toEqual([{ optionId: "a", count: 2 }]);

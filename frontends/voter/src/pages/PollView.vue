@@ -118,7 +118,18 @@ function ensureStream() {
       else liveTally.value.push({ optionId: ev.optionId, count: ev.count });
     },
     onQuestionClosed: () => {
-      // Server closed the question — keep the snapshot frozen until next load() resets state.
+      // Server emits `question-closed` standalone (no follow-up snapshot) when
+      // the presenter navigates off the slide. Without flipping the local view
+      // back to WAITING here, the form stays in "active" status with the option
+      // buttons + Submit still enabled — the user can keep clicking even though
+      // the backend would reject the POST with QUESTION_NOT_ACTIVE.
+      const current = poll.value;
+      if (!current) return;
+      poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
+      selectedOptionId.value = null;
+      liveTally.value = [];
+      clearAlreadyVoted(props.slug);
+      status.value = "waiting";
     },
     onConnectionStateChange: () => {
       // No paused indicator on the voter post-vote screen; keep last known tally.
