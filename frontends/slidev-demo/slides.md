@@ -65,9 +65,9 @@ Example shape:
 -->
 
 <PollResults
-  slug="test-talk"
-  pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
-  questionId="bc81b41a-0306-401b-9f81-4d98c1226580"
+  slug="my-first-poll"
+  pollId="b5d7771d-e50a-460a-b488-a920c3967a95"
+  questionId="d18df60c-f86f-4fed-9093-3c227bfcf4f4"
   name="q1"
 />
 
@@ -83,10 +83,9 @@ layout: center
 ## Q2 — paste your second snippet here
 
 <PollResults
-  slug="test-talk"
-  pollId="5021236f-8d18-4e33-82fe-8b807dc6eab9"
-  questionId="7d0a8041-8836-4414-b66c-4baf70249b70"
-  name="q2"
+  slug="my-first-poll"
+  pollId="b5d7771d-e50a-460a-b488-a920c3967a95"
+  questionId="cd390cf9-492b-44b4-9931-595d0975a9bc"
 />
 
 ---
