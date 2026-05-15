@@ -148,6 +148,14 @@ async function deletePoll(request: APIRequestContext, baseURL: string, pollId: s
   expect([204, 404], `delete poll ${pollId}`).toContain(res.status());
 }
 
+// Serial mode: both tests share `seededData` via beforeAll and the underlying
+// seedPoll rewrites the on-disk frontends/slidev-demo/data.ts each invocation.
+// Under the repo's fullyParallel Playwright config the two tests can land on
+// different workers, each runs its own beforeAll → both workers race writes to
+// the same data.ts and whichever loses sees the wrong slug rendered by the deck.
+// Pinning the describe to serial keeps beforeAll single-fire and the on-disk
+// state coherent for both tests.
+test.describe.configure({ mode: "serial" });
 test.describe("cross-origin slidev deck activation", () => {
   let seededData: SeededData;
 

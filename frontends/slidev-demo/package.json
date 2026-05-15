@@ -15,6 +15,7 @@
     "@slidev-polls/component": "workspace:*",
     "@slidev/cli": "^52.15.1",
     "@slidev/theme-default": "^0.25.0",
+    "qr-code-styling": "^1.9.2",
     "vue": "^3.5.0"
   }
 }
