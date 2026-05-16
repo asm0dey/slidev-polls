@@ -7,6 +7,7 @@ import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
 import site.asm0dey.slidev.polls.core.event.PollVotesClearedEvent;
 import site.asm0dey.slidev.polls.core.event.VoteCastEvent;
+import site.asm0dey.slidev.polls.core.event.VoteRetractedEvent;
 import site.asm0dey.slidev.polls.realtime.SseHub;
 
 /**
@@ -15,6 +16,8 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  * <ul>
  *   <li>{@link VoteCastEvent} → {@code tally} SSE event with the new absolute count
  *       ({@code @TS-030})
+ *   <li>{@link VoteRetractedEvent} → {@code tally} SSE event with the new absolute count
+ *       (post-decrement)
  *   <li>{@link PollActiveQuestionChangedEvent} → fresh {@code snapshot} with the new active
  *       question and a zeroed tally ({@code @TS-031})
  *   <li>{@link PollQuestionClosedEvent} → {@code question-closed} SSE event
@@ -36,6 +39,19 @@ public class TallyBroadcaster {
 
   @EventListener
   public void onVoteCast(VoteCastEvent event) {
+    hub.broadcast(
+        event.pollId(),
+        "tally",
+        new TallyPayload(
+            event.pollId(),
+            event.questionId(),
+            event.optionId(),
+            event.newOptionCount(),
+            event.occurredAt()));
+  }
+
+  @EventListener
+  public void onVoteRetracted(VoteRetractedEvent event) {
     hub.broadcast(
         event.pollId(),
         "tally",
