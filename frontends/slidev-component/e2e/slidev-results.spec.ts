@@ -132,39 +132,52 @@ test.describe("slidev addon sse smoke", () => {
       activeQuestion: expect.objectContaining({ id: fixture.questionId })
     });
 
-    // Fire a vote through the backend and watch for the follow-up tally event on a fresh
-    // EventSource (the previous one was closed on receipt). The contract: the tally carries the
-    // new absolute count for the voted option.
-    const tallyPromise = page.evaluate(
-      ({ slug, questionId }) => {
+    // Fire a vote through the backend and watch for the follow-up snapshot on a fresh
+    // EventSource (the previous one was closed on receipt). The contract: post-vote, the next
+    // snapshot's tally array carries the new absolute count for the voted option.
+    const snapshotPromise = page.evaluate(
+      ({ slug, questionId, optionId }) => {
         return new Promise<unknown>((resolve, reject) => {
           const es = new EventSource(`/api/polls/${slug}/stream`);
+          let initialSeen = false;
           const timeout = window.setTimeout(() => {
             es.close();
-            reject(new Error("timed out waiting for tally"));
-          }, 3000);
-          es.addEventListener("tally", (e) => {
+            reject(new Error("timed out waiting for post-vote snapshot"));
+          }, 5000);
+          es.addEventListener("snapshot", (e) => {
             const data = JSON.parse((e as MessageEvent).data);
-            if (data.questionId === questionId) {
+            if (!data.activeQuestion || data.activeQuestion.id !== questionId) return;
+            if (!initialSeen) {
+              initialSeen = true;
+              return;
+            }
+            const voted = (data.tally as Array<{ optionId: string; count: number }>).find(
+              (t) => t.optionId === optionId
+            );
+            if (voted && voted.count >= 1) {
               window.clearTimeout(timeout);
               es.close();
-              resolve(data);
+              resolve(voted);
             }
           });
         });
       },
-      { slug: fixture.slug, questionId: fixture.questionId }
+      {
+        slug: fixture.slug,
+        questionId: fixture.questionId,
+        optionId: fixture.firstOptionId
+      }
     );
 
     // Give the second EventSource a moment to register with the hub before voting.
     await page.waitForTimeout(200);
     const vote = await request.post(`/api/polls/${fixture.slug}/votes`, {
       headers: { "content-type": "application/json" },
-      data: { optionId: fixture.firstOptionId }
+      data: { optionIds: [fixture.firstOptionId] }
     });
     expect(vote.status()).toBe(201);
 
-    const tally = (await tallyPromise) as { optionId: string; count: number };
+    const tally = (await snapshotPromise) as { optionId: string; count: number };
     expect(tally.optionId).toBe(fixture.firstOptionId);
     expect(tally.count).toBeGreaterThanOrEqual(1);
   });
@@ -201,7 +214,7 @@ test.describe("slidev addon sse smoke", () => {
     // Vote so the historical tally is non-trivial. Use the public voter endpoint (anonymous).
     const vote = await request.post(`/api/polls/${fixture.slug}/votes`, {
       headers: { "content-type": "application/json" },
-      data: { optionId: fixture.firstOptionId }
+      data: { optionIds: [fixture.firstOptionId] }
     });
     expect(vote.status()).toBe(201);
 
