@@ -39,7 +39,6 @@ function collectStubs() {
     "my-talk",
     {
       onSnapshot: () => {},
-      onTally: () => {},
       onConnectionStateChange: (s) => stateChanges.push(s)
     },
     {
@@ -149,7 +148,7 @@ describe("openPollStream bounded-backoff reconnect", () => {
     expect(stubs).toHaveLength(1);
   });
 
-  it("dispatches snapshot, tally, and question-closed events to their handlers", () => {
+  it("dispatches snapshot and question-closed events to their handlers", () => {
     const stubs: StubEventSource[] = [];
     const scheduled: ScheduledTask[] = [];
     const seen: string[] = [];
@@ -158,7 +157,6 @@ describe("openPollStream bounded-backoff reconnect", () => {
       "my-talk",
       {
         onSnapshot: (ev) => seen.push(`snapshot:${ev.pollId}`),
-        onTally: (ev) => seen.push(`tally:${ev.optionId}:${ev.count}`),
         onQuestionClosed: (ev) => seen.push(`closed:${ev.questionId}`)
       },
       {
@@ -181,16 +179,46 @@ describe("openPollStream bounded-backoff reconnect", () => {
       tally: [],
       emittedAt: "2026-04-19T10:00:00Z"
     });
-    stubs[0].emit("tally", {
-      pollId: "p1",
-      questionId: "q1",
-      optionId: "o1",
-      count: 3,
-      emittedAt: "2026-04-19T10:00:01Z"
-    });
     stubs[0].emit("question-closed", { pollId: "p1", questionId: "q1" });
 
-    expect(seen).toEqual(["snapshot:p1", "tally:o1:3", "closed:q1"]);
+    expect(seen).toEqual(["snapshot:p1", "closed:q1"]);
+    unsubscribe();
+  });
+
+  it("ignores legacy `tally` events — snapshot is the only update path", () => {
+    const stubs: StubEventSource[] = [];
+    const seen: string[] = [];
+    const unsubscribe = openPollStream(
+      "http://localhost:8080",
+      "my-talk",
+      {
+        onSnapshot: (ev) => seen.push(`snapshot:${ev.pollId}`)
+      },
+      {
+        eventSourceFactory: (url) => {
+          const s = new StubEventSource(url);
+          stubs.push(s);
+          return s as unknown as EventSource;
+        },
+        scheduler: () => () => {}
+      }
+    );
+
+    // A server still emitting `tally` deltas must not crash the client; the
+    // listener simply isn't registered, so the event is dropped on the floor.
+    stubs[0].emit("tally", { pollId: "p1", optionId: "o1", count: 3 });
+    expect(seen).toEqual([]);
+
+    // The canonical update path is a fresh snapshot. After it, callers see the
+    // new state.
+    stubs[0].emit("snapshot", {
+      pollId: "p1",
+      slug: "my-talk",
+      activeQuestion: null,
+      tally: [{ optionId: "o1", count: 3 }],
+      emittedAt: "2026-04-19T10:00:01Z"
+    });
+    expect(seen).toEqual(["snapshot:p1"]);
     unsubscribe();
   });
 });
