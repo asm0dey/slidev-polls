@@ -109,4 +109,9 @@ public class VoteRepositoryImpl implements VoteRepository {
   public int deleteForPoll(UUID pollId) {
     return dsl.deleteFrom(VOTES).where(VOTES.POLL_ID.eq(pollId)).execute();
   }
+
+  @Override
+  public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    throw new UnsupportedOperationException("implemented in Task 6");
+  }
 }
