@@ -27,6 +27,7 @@ import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
+import site.asm0dey.slidev.polls.core.error.ResourceHasVotesException;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
@@ -80,6 +81,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ActivationRejectedException.class)
   ResponseEntity<Problem> handleActivationRejected(ActivationRejectedException ex) {
     return respond(HttpStatus.CONFLICT, ProblemCode.ACTIVATION_REJECTED, safe(ex));
+  }
+
+  @ExceptionHandler(ResourceHasVotesException.class)
+  ResponseEntity<Problem> handleResourceHasVotes(ResourceHasVotesException ex) {
+    String key = ex.kind() + "." + ex.resourceId();
+    return respond(
+        HttpStatus.CONFLICT,
+        ProblemCode.RESOURCE_HAS_VOTES,
+        safe(ex),
+        Map.of(key, List.of(safe(ex))));
   }
 
   @ExceptionHandler(SlugTakenException.class)
