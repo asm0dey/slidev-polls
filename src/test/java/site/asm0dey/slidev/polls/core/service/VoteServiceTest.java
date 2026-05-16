@@ -87,6 +87,18 @@ class VoteServiceTest {
     assertThat(events.published()).isEmpty();
   }
 
+  // Retract path mirror of the @TS-021 reject — caller invokes retract while the poll has no
+  // active question, the service early-exits with QuestionNotActiveException before touching
+  // the repository, and no event is published.
+  @Test
+  void rejects_retract_when_poll_has_no_active_question() {
+    Poll seeded = seedPollWithoutActiveQuestion();
+
+    assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1"))
+        .isInstanceOf(QuestionNotActiveException.class);
+    assertThat(events.published()).isEmpty();
+  }
+
   // A submitted optionId that does not belong to the currently-active question is a 404-shaped
   // failure: the caller referenced an option that is not on the board. Validates that the service
   // does not accept cross-question option IDs (e.g., an option from the prior, now-CLOSED,
@@ -335,6 +347,11 @@ class VoteServiceTest {
     @Override
     public int deleteForPoll(UUID pollId) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
+
+    @Override
+    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+      throw new UnsupportedOperationException("implemented in Task 4");
     }
   }
 

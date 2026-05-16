@@ -707,6 +707,11 @@ class PollServiceTest {
       rows.removeIf(v -> v.pollId().equals(pollId));
       return before - rows.size();
     }
+
+    @Override
+    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+      throw new UnsupportedOperationException("not needed for PollServiceTest");
+    }
   }
 
   /** No-op event sink — individual tests that care about events can subclass and inspect. */
