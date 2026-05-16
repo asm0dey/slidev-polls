@@ -235,6 +235,7 @@ describe("PollView", () => {
 
     expect(retractVote).toHaveBeenCalledWith("my-talk");
     expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(true);
+    expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk:q1")).toBeNull();
   });
 
   // When the server reports a 404 for the slug (typo, deleted poll), the error state renders
