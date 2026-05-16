@@ -22,6 +22,7 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
 import site.asm0dey.slidev.polls.core.event.VoteCastEvent;
+import site.asm0dey.slidev.polls.core.event.VoteRetractedEvent;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
 import site.asm0dey.slidev.polls.core.service.VoteRepository;
@@ -79,6 +80,31 @@ class TallyBroadcastTest {
     assertThat(payload.questionId()).isEqualTo(poll.activeQuestionId());
     assertThat(payload.optionId()).isEqualTo(optionA);
     assertThat(payload.count()).isEqualTo(7L);
+    assertThat(payload.emittedAt()).isEqualTo(at);
+  }
+
+  // A VoteRetractedEvent fans out as a "tally" SSE event carrying the post-decrement absolute count
+  // for the option that was un-voted. Same payload shape as a VoteCastEvent — the client treats it
+  // as an authoritative new count, not a delta.
+  @Test
+  void vote_retracted_event_broadcasts_tally_with_new_count() throws Exception {
+    Poll poll = seedPollWithActiveQuestion("retract-talk");
+    UUID optionA = poll.questions().get(0).options().get(0).id();
+    CapturingEmitter emitter = new CapturingEmitter();
+    hub.register(poll.id(), emitter);
+
+    Instant at = Instant.parse("2026-04-19T10:05:00Z");
+    broadcaster.onVoteRetracted(
+        new VoteRetractedEvent(poll.id(), poll.activeQuestionId(), optionA, 3L, at));
+
+    assertThat(emitter.events).hasSize(1);
+    CapturingEmitter.Captured event = emitter.events.get(0);
+    assertThat(event.name).isEqualTo("tally");
+    TallyPayload payload = (TallyPayload) event.data;
+    assertThat(payload.pollId()).isEqualTo(poll.id());
+    assertThat(payload.questionId()).isEqualTo(poll.activeQuestionId());
+    assertThat(payload.optionId()).isEqualTo(optionA);
+    assertThat(payload.count()).isEqualTo(3L);
     assertThat(payload.emittedAt()).isEqualTo(at);
   }
 
