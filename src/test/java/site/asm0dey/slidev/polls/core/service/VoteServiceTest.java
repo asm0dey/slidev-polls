@@ -99,6 +99,35 @@ class VoteServiceTest {
     assertThat(events.published()).isEmpty();
   }
 
+  @Test
+  void retract_deletes_row_and_publishes_event_with_decremented_tally() {
+    Poll seeded = seedPollWithActiveQuestion();
+    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    service.recordVote(seeded.slug(), optionA, "v-1");
+
+    service.retractVote(seeded.slug(), "v-1");
+
+    assertThat(votes.rowsFor(seeded.activeQuestionId())).isEmpty();
+    assertThat(events.published()).hasSize(2);
+    Object second = events.published().get(1);
+    assertThat(second).isInstanceOf(site.asm0dey.slidev.polls.core.event.VoteRetractedEvent.class);
+    var retracted = (site.asm0dey.slidev.polls.core.event.VoteRetractedEvent) second;
+    assertThat(retracted.pollId()).isEqualTo(seeded.id());
+    assertThat(retracted.questionId()).isEqualTo(seeded.activeQuestionId());
+    assertThat(retracted.optionId()).isEqualTo(optionA);
+    assertThat(retracted.newOptionCount()).isEqualTo(0L);
+  }
+
+  @Test
+  void retract_with_no_row_is_silent_no_op() {
+    Poll seeded = seedPollWithActiveQuestion();
+
+    service.retractVote(seeded.slug(), "v-never-voted");
+
+    assertThat(votes.allRows()).isEmpty();
+    assertThat(events.published()).isEmpty();
+  }
+
   // A submitted optionId that does not belong to the currently-active question is a 404-shaped
   // failure: the caller referenced an option that is not on the board. Validates that the service
   // does not accept cross-question option IDs (e.g., an option from the prior, now-CLOSED,
@@ -351,7 +380,15 @@ class VoteServiceTest {
 
     @Override
     public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
-      throw new UnsupportedOperationException("implemented in Task 4");
+      if (closedQuestions.contains(questionId)) {
+        throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
+      }
+      var match =
+          rows.stream()
+              .filter(r -> r.questionId().equals(questionId) && r.voterToken().equals(voterToken))
+              .findFirst();
+      match.ifPresent(rows::remove);
+      return match.map(Vote::optionId);
     }
   }
 
