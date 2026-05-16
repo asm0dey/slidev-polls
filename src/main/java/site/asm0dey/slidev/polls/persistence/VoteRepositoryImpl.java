@@ -28,6 +28,13 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * violations on {@code (question_id, voter_token)} are translated to {@link AlreadyVotedException}
  * in the same way {@link PollRepositoryImpl} handles the partial activation index ({@code @TS-023},
  * {@code @TS-024}).
+ *
+ * <p>{@link #deleteByQuestionAndVoter} is the symmetric path on the delete side: a gated {@code
+ * DELETE … WHERE EXISTS (… status='ACTIVE')} translates a zero-rows-affected race against the
+ * status flip into {@link QuestionNotActiveException}. The method first reads the row's {@code
+ * option_id} so the caller can publish a tally event; if a concurrent transaction deletes the row
+ * between the preflight and the gated DELETE, we re-read the question status to disambiguate "row
+ * vanished concurrently" (idempotent no-op) from "question flipped to CLOSED" (FR-010 violation).
  */
 @Repository
 public class VoteRepositoryImpl implements VoteRepository {
@@ -142,7 +149,19 @@ public class VoteRepositoryImpl implements VoteRepository {
                                                 QuestionStatus.ACTIVE.name()))))))
             .execute();
     if (deleted == 0) {
-      throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
+      // Disambiguate: either the question flipped to CLOSED (FR-010 enforcement) or
+      // a concurrent transaction deleted the row between our preflight and our DELETE
+      // (two-tab retract race, deleteForPoll). Re-read status to decide.
+      String status =
+          dsl.select(POLL_QUESTIONS.STATUS)
+              .from(POLL_QUESTIONS)
+              .where(POLL_QUESTIONS.ID.eq(questionId))
+              .fetchOne(POLL_QUESTIONS.STATUS);
+      if (status == null || !QuestionStatus.ACTIVE.name().equals(status)) {
+        throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
+      }
+      // Question still ACTIVE but row gone — idempotent no-op.
+      return Optional.empty();
     }
     return Optional.of(optionId);
   }
