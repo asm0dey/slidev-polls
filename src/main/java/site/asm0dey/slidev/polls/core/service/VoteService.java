@@ -1,6 +1,7 @@
 package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -73,12 +74,15 @@ public class VoteService {
 
     Vote pending =
         new Vote(
-            UUID.randomUUID(), poll.id(), activeQuestionId, optionId, voterToken, Instant.now());
+            UUID.randomUUID(),
+            poll.id(),
+            activeQuestionId,
+            List.of(optionId),
+            voterToken,
+            Instant.now());
     Vote stored = voteRepository.insert(pending);
 
-    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
-    events.publishEvent(
-        new VoteCastEvent(poll.id(), activeQuestionId, optionId, newCount, stored.createdAt()));
+    events.publishEvent(new VoteCastEvent(poll.id(), activeQuestionId, stored.createdAt()));
     return stored;
   }
 
@@ -97,16 +101,13 @@ public class VoteService {
   public void retractVote(String slug, String voterToken) {
     Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
     UUID activeQuestionId = getActiveQuestionId(slug, poll);
-    Optional<UUID> deletedOption =
+    Optional<List<UUID>> deletedOption =
         voteRepository.deleteByQuestionAndVoter(activeQuestionId, voterToken);
     if (deletedOption.isEmpty()) {
       // Idempotent no-op — voter had no row on the active question. No event.
       return;
     }
-    UUID optionId = deletedOption.get();
-    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
-    events.publishEvent(
-        new VoteRetractedEvent(poll.id(), activeQuestionId, optionId, newCount, Instant.now()));
+    events.publishEvent(new VoteRetractedEvent(poll.id(), activeQuestionId, Instant.now()));
   }
 
   private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {

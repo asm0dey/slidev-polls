@@ -70,7 +70,7 @@ class TallyBroadcastTest {
     hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:00:00Z");
-    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), optionA, 7L, at));
+    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), at));
 
     assertThat(emitter.events).hasSize(1);
     CapturingEmitter.Captured event = emitter.events.get(0);
@@ -94,8 +94,7 @@ class TallyBroadcastTest {
     hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:05:00Z");
-    broadcaster.onVoteRetracted(
-        new VoteRetractedEvent(poll.id(), poll.activeQuestionId(), optionA, 3L, at));
+    broadcaster.onVoteRetracted(new VoteRetractedEvent(poll.id(), poll.activeQuestionId(), at));
 
     assertThat(emitter.events).hasSize(1);
     CapturingEmitter.Captured event = emitter.events.get(0);
@@ -150,8 +149,7 @@ class TallyBroadcastTest {
     // Fire an event whose questionId intentionally does not match the current active. The
     // broadcaster still forwards it verbatim — the client is the one that filters stray tallies
     // by cross-referencing its latest snapshot's activeQuestion.id.
-    broadcaster.onVoteCast(
-        new VoteCastEvent(poll.id(), someOtherQuestion, optionA, 1L, Instant.now()));
+    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), someOtherQuestion, Instant.now()));
 
     TallyPayload payload = (TallyPayload) emitter.events.get(0).data;
     assertThat(payload.questionId())
@@ -185,8 +183,7 @@ class TallyBroadcastTest {
     Poll poll = seedPollWithActiveQuestion("silent-talk");
     UUID optionA = poll.questions().get(0).options().get(0).id();
     // No emitters registered.
-    broadcaster.onVoteCast(
-        new VoteCastEvent(poll.id(), poll.activeQuestionId(), optionA, 1L, Instant.now()));
+    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), Instant.now()));
     // Nothing to assert besides "did not throw"; reaching here is the assertion.
     assertThat(hub.subscriberCount(poll.id())).isZero();
   }
@@ -423,7 +420,8 @@ class TallyBroadcastTest {
     }
 
     @Override
-    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    public java.util.Optional<List<UUID>> deleteByQuestionAndVoter(
+        UUID questionId, String voterToken) {
       throw new UnsupportedOperationException();
     }
   }

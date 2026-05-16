@@ -56,7 +56,7 @@ class VoteServiceTest {
 
     Vote stored = service.recordVote(seeded.slug(), optionA, "v-123");
 
-    assertThat(stored.optionId()).isEqualTo(optionA);
+    assertThat(stored.optionIds()).containsExactly(optionA);
     assertThat(stored.voterToken()).isEqualTo("v-123");
     assertThat(stored.questionId()).isEqualTo(seeded.activeQuestionId());
     assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
@@ -67,9 +67,7 @@ class VoteServiceTest {
               assertThat(e).isInstanceOf(VoteCastEvent.class);
               VoteCastEvent ev = (VoteCastEvent) e;
               assertThat(ev.pollId()).isEqualTo(seeded.id());
-              assertThat(ev.optionId()).isEqualTo(optionA);
-              // Post-write tally for optionA is exactly one (the vote we just recorded).
-              assertThat(ev.newOptionCount()).isEqualTo(1L);
+              assertThat(ev.questionId()).isEqualTo(seeded.activeQuestionId());
             });
   }
 
@@ -114,8 +112,6 @@ class VoteServiceTest {
     var retracted = (site.asm0dey.slidev.polls.core.event.VoteRetractedEvent) second;
     assertThat(retracted.pollId()).isEqualTo(seeded.id());
     assertThat(retracted.questionId()).isEqualTo(seeded.activeQuestionId());
-    assertThat(retracted.optionId()).isEqualTo(optionA);
-    assertThat(retracted.newOptionCount()).isEqualTo(0L);
   }
 
   @Test
@@ -375,7 +371,9 @@ class VoteServiceTest {
       Map<UUID, Long> out = new HashMap<>();
       for (Vote v : rows) {
         if (v.questionId().equals(questionId)) {
-          out.merge(v.optionId(), 1L, Long::sum);
+          for (UUID oid : v.optionIds()) {
+            out.merge(oid, 1L, Long::sum);
+          }
         }
       }
       return out;
@@ -399,7 +397,8 @@ class VoteServiceTest {
     }
 
     @Override
-    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    public java.util.Optional<List<UUID>> deleteByQuestionAndVoter(
+        UUID questionId, String voterToken) {
       if (closedQuestions.contains(questionId)) {
         throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
       }
@@ -408,7 +407,7 @@ class VoteServiceTest {
               .filter(r -> r.questionId().equals(questionId) && r.voterToken().equals(voterToken))
               .findFirst();
       match.ifPresent(rows::remove);
-      return match.map(Vote::optionId);
+      return match.map(Vote::optionIds);
     }
   }
 

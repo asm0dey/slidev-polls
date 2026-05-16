@@ -39,28 +39,12 @@ public class TallyBroadcaster {
 
   @EventListener
   public void onVoteCast(VoteCastEvent event) {
-    hub.broadcast(
-        event.pollId(),
-        "tally",
-        new TallyPayload(
-            event.pollId(),
-            event.questionId(),
-            event.optionId(),
-            event.newOptionCount(),
-            event.occurredAt()));
+    // Task 10 will rewrite this to a full resnapshot. Placeholder no-op to unblock build.
   }
 
   @EventListener
   public void onVoteRetracted(VoteRetractedEvent event) {
-    hub.broadcast(
-        event.pollId(),
-        "tally",
-        new TallyPayload(
-            event.pollId(),
-            event.questionId(),
-            event.optionId(),
-            event.newOptionCount(),
-            event.occurredAt()));
+    // Task 10 will rewrite this to a full resnapshot. Placeholder no-op to unblock build.
   }
 
   @EventListener

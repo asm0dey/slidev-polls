@@ -347,7 +347,7 @@ class PollServiceTest {
     service.activateQuestionForOwner(created.id(), "alice", qid);
 
     fakeVoteRepository.insert(
-        new Vote(UUID.randomUUID(), created.id(), qid, oid, "voter-1", Instant.now()));
+        new Vote(UUID.randomUUID(), created.id(), qid, List.of(oid), "voter-1", Instant.now()));
 
     Poll after = service.clearVotesForOwner(created.id(), "alice");
 
@@ -708,7 +708,9 @@ class PollServiceTest {
       Map<UUID, Long> out = new HashMap<>();
       for (Vote v : rows) {
         if (v.questionId().equals(questionId)) {
-          out.merge(v.optionId(), 1L, Long::sum);
+          for (UUID oid : v.optionIds()) {
+            out.merge(oid, 1L, Long::sum);
+          }
         }
       }
       return out;
@@ -722,7 +724,8 @@ class PollServiceTest {
     }
 
     @Override
-    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    public java.util.Optional<List<UUID>> deleteByQuestionAndVoter(
+        UUID questionId, String voterToken) {
       throw new UnsupportedOperationException("not needed for PollServiceTest");
     }
   }
