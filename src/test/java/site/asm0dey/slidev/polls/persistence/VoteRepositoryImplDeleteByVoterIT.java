@@ -95,9 +95,12 @@ class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
           new Vote(UUID.randomUUID(), seeded.id(), questionId, optionA, "v-1", Instant.now()));
 
       // Flip the question to CLOSED out of band; emulates the presenter closing while a retract
-      // is in flight.
+      // is in flight. The poll_questions_active_timestamp_ck constraint requires
+      // activated_at IS NULL whenever status != 'ACTIVE', so mirror the production close path
+      // (PollRepositoryImpl.deactivate/close — setNull(ACTIVATED_AT)) here.
       dsl.update(POLL_QUESTIONS)
           .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+          .setNull(POLL_QUESTIONS.ACTIVATED_AT)
           .where(POLL_QUESTIONS.ID.eq(questionId))
           .execute();
 
