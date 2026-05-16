@@ -330,6 +330,11 @@ class VoteServiceTest {
     public Poll resetQuestionsToDraft(UUID pollId) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
+
+    @Override
+    public java.util.Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+      return java.util.Map.of();
+    }
   }
 
   /**

@@ -668,6 +668,11 @@ class PollServiceTest {
       }
       return existing;
     }
+
+    @Override
+    public java.util.Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+      return java.util.Map.of();
+    }
   }
 
   /**

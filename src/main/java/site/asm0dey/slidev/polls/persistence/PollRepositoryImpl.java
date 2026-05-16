@@ -8,13 +8,17 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jooq.Field;
 import org.jooq.Record;
 import org.springframework.stereotype.Repository;
@@ -473,5 +477,17 @@ public class PollRepositoryImpl implements PollRepository {
         row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
+  }
+
+  @Override
+  public Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+    Map<UUID, Long> out = new HashMap<>();
+    dsl.select(VOTES.QUESTION_ID, DSL.count())
+        .from(VOTES)
+        .where(VOTES.POLL_ID.eq(pollId))
+        .groupBy(VOTES.QUESTION_ID)
+        .fetch()
+        .forEach(r -> out.put(r.value1(), (long) r.value2()));
+    return out;
   }
 }

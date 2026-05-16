@@ -393,6 +393,11 @@ class TallyBroadcastTest {
     public Poll resetQuestionsToDraft(UUID pollId) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public java.util.Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+      return java.util.Map.of();
+    }
   }
 
   private static final class InMemoryVoteRepository implements VoteRepository {
