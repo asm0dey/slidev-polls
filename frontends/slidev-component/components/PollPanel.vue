@@ -9,8 +9,7 @@ import {
   openPollStream,
   ResultsPanel,
   type QuestionClosedEvent,
-  type SnapshotEvent,
-  type TallyDeltaEvent
+  type SnapshotEvent
 } from "@slidev-polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { findSlideRoot, useSlidevTheme } from "../composables/useSlidevTheme";
@@ -301,13 +300,6 @@ onMounted(async () => {
       paused.value = false;
       closedNotice.value = null;
       setPollResults(resultsKey.value, ev);
-    },
-    onTally: (ev: TallyDeltaEvent) => {
-      if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
-      const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
-      if (entry) entry.count = ev.count;
-      else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
-      setPollResults(resultsKey.value, snapshot.value);
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {

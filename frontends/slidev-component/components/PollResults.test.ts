@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
-import type {
-  QuestionClosedEvent,
-  SnapshotEvent,
-  StreamHandlers,
-  TallyDeltaEvent
-} from "@slidev-polls/shared";
+import type { QuestionClosedEvent, SnapshotEvent, StreamHandlers } from "@slidev-polls/shared";
 import type { DeckAuthState, DeckAuthStatus, UseDeckAuthReturn } from "../composables/useDeckAuth";
 import PollResults from "./PollResults.vue";
 
@@ -56,7 +51,8 @@ class FakeIntersectionObserver {
 // Tests mirror the live-results + activation-gating scenarios:
 //   @TS-030 — snapshot renders the active question with options and initial tallies
 //   @TS-031 — an active-question-change snapshot rotates the UI
-//   @TS-032 — a stray tally whose questionId does NOT match the current snapshot is ignored
+//   @TS-032 — a follow-up snapshot for a different question swaps the view (tally-delta SSE
+//             was collapsed into snapshot-only updates in task 10)
 //   @TS-033 — connection loss renders the "live updates paused" badge; component does not throw
 //   @TS-034 — a later snapshot clears the paused indicator
 //   @TS-050 / @TS-053 / @TS-054 / @TS-055 — activation POST drives off the composable stub now
@@ -136,9 +132,12 @@ function snapshot(
       id: questionId,
       prompt: `Question ${questionId}`,
       ordinal: 1,
+      minSelections: 1,
+      maxSelections: 1,
       options
     },
     tally: options.map((o) => ({ optionId: o.id, count: counts[o.id] ?? 0 })),
+    voterCount: Object.values(counts).reduce((a, b) => a + b, 0),
     emittedAt: new Date().toISOString()
   };
 }
@@ -180,8 +179,8 @@ describe("PollResults", () => {
     expect(wrapper.get("[data-option-id='opt-b']").text()).toContain("GraalVM");
   });
 
-  // @TS-030 / @TS-031 — a tally event rotates the count for the matching option.
-  it("updates a bar when a matching tally event arrives", async () => {
+  // @TS-030 / @TS-031 — a follow-up snapshot rotates the count for the matching option.
+  it("updates a bar when a new snapshot with a higher tally arrives", async () => {
     const wrapper = mountResults();
     await flushPromises();
     capturedHandlers!.onSnapshot(
@@ -191,19 +190,22 @@ describe("PollResults", () => {
       ])
     );
     await flushPromises();
-    capturedHandlers!.onTally({
-      pollId: "p-1",
-      questionId: "q-1",
-      optionId: "opt-a",
-      count: 3,
-      emittedAt: new Date().toISOString()
-    } satisfies TallyDeltaEvent);
+    capturedHandlers!.onSnapshot(
+      snapshot(
+        "q-1",
+        [
+          { id: "opt-a", label: "OpenJDK", position: 0 },
+          { id: "opt-b", label: "GraalVM", position: 1 }
+        ],
+        { "opt-a": 3 }
+      )
+    );
     await flushPromises();
     expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("3");
   });
 
-  // @TS-032 — a stray tally (wrong questionId) is ignored; the prior view is preserved.
-  it("ignores a tally whose questionId does not match the current snapshot", async () => {
+  // @TS-032 — a snapshot for a different question swaps the view entirely.
+  it("swaps the view when a snapshot arrives for a different question", async () => {
     const wrapper = mountResults();
     await flushPromises();
     capturedHandlers!.onSnapshot(
@@ -216,14 +218,6 @@ describe("PollResults", () => {
         { "opt-a": 5, "opt-b": 7 }
       )
     );
-    await flushPromises();
-    capturedHandlers!.onTally({
-      pollId: "p-1",
-      questionId: "q-1-STALE",
-      optionId: "opt-a",
-      count: 9999,
-      emittedAt: new Date().toISOString()
-    });
     await flushPromises();
     expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("5");
     expect(wrapper.get("[data-option-id='opt-b']").text()).toContain("7");
@@ -406,7 +400,7 @@ describe("PollResults", () => {
     expect(wrapper.find("[data-testid='deck-activate']").exists()).toBe(false);
   });
 
-  // @TS-141 — a TallyDeltaEvent arriving at t=0 is reflected in the DOM at t ≤ 2000 ms.
+  // @TS-141 — a tally update arriving via snapshot at t=0 is reflected in the DOM at t ≤ 2000 ms.
   it("TS-141: tally update reflected within the 2s live-update budget", async () => {
     vi.useFakeTimers();
     try {
@@ -419,13 +413,16 @@ describe("PollResults", () => {
         ])
       );
       await flushPromises();
-      capturedHandlers!.onTally({
-        pollId: "p-1",
-        questionId: "q-1",
-        optionId: "opt-a",
-        count: 7,
-        emittedAt: new Date().toISOString()
-      });
+      capturedHandlers!.onSnapshot(
+        snapshot(
+          "q-1",
+          [
+            { id: "opt-a", label: "A", position: 0 },
+            { id: "opt-b", label: "B", position: 1 }
+          ],
+          { "opt-a": 7 }
+        )
+      );
       vi.advanceTimersByTime(2000);
       await flushPromises();
       expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("7");
@@ -491,14 +488,17 @@ describe("PollResults", () => {
     // The Q1 slide continues to render Q1's options — a Q2 option MUST NOT appear.
     expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("Alpha");
     expect(wrapper.find("[data-option-id='opt-c']").exists()).toBe(false);
-    // Tallies for Q1 still land on the Q1 view.
-    capturedHandlers!.onTally({
-      pollId: "p-1",
-      questionId: "q-1",
-      optionId: "opt-a",
-      count: 9,
-      emittedAt: new Date().toISOString()
-    });
+    // Snapshots for Q1 still land on the Q1 view.
+    capturedHandlers!.onSnapshot(
+      snapshot(
+        "q-1",
+        [
+          { id: "opt-a", label: "Alpha", position: 0 },
+          { id: "opt-b", label: "Bravo", position: 1 }
+        ],
+        { "opt-a": 9, "opt-b": 3 }
+      )
+    );
     await flushPromises();
     expect(wrapper.get("[data-option-id='opt-a']").text()).toContain("9");
   });

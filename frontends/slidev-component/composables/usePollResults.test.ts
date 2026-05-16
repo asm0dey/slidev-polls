@@ -12,6 +12,8 @@ function makeSnapshot(slug: string, count = 1): SnapshotEvent {
       id: `q-${slug}`,
       prompt: `Prompt for ${slug}`,
       ordinal: 1,
+      minSelections: 1,
+      maxSelections: 1,
       options: [
         { id: "a", label: "A", position: 0 },
         { id: "b", label: "B", position: 1 }
@@ -20,7 +22,8 @@ function makeSnapshot(slug: string, count = 1): SnapshotEvent {
     tally: [
       { optionId: "a", count },
       { optionId: "b", count: count + 1 }
-    ]
+    ],
+    voterCount: 0
   };
 }
 

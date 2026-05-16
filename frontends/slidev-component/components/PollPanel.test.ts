@@ -64,7 +64,6 @@ vi.mock("@slidev-polls/shared", async () => {
       _slug: string,
       handlers: {
         onSnapshot: (e: unknown) => void;
-        onTally: (e: unknown) => void;
         onQuestionClosed: (e: unknown) => void;
         onConnectionStateChange: (s: string) => void;
       }
@@ -77,6 +76,8 @@ vi.mock("@slidev-polls/shared", async () => {
           id: "q1",
           prompt: "Pick",
           ordinal: 1,
+          minSelections: 1,
+          maxSelections: 1,
           options: [
             { id: "a", label: "React", position: 0 },
             { id: "b", label: "Vue", position: 1 }
@@ -85,7 +86,8 @@ vi.mock("@slidev-polls/shared", async () => {
         tally: [
           { optionId: "a", count: 1 },
           { optionId: "b", count: 3 }
-        ]
+        ],
+        voterCount: 4
       });
       return () => {};
     }
@@ -176,9 +178,12 @@ describe("PollPanel", () => {
           id: "q9",
           prompt: "Pick",
           ordinal: 1,
+          minSelections: 1,
+          maxSelections: 1,
           options: [{ id: "a", label: "A", position: 0 }]
         },
-        tally: [{ optionId: "a", count: 2 }]
+        tally: [{ optionId: "a", count: 2 }],
+        voterCount: 2
       });
       handlers.onQuestionClosed({ pollId: "p1", questionId: "q9", emittedAt: "now" });
       return () => {};
