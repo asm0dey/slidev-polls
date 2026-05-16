@@ -35,4 +35,20 @@ public interface VoteRepository {
 
   /** Delete every row in {@code votes} bound to {@code pollId}. Returns the rows deleted. */
   int deleteForPoll(UUID pollId);
+
+  /**
+   * Delete the vote cast by {@code voterToken} on {@code questionId}, only when the question is
+   * still {@code ACTIVE} at delete time. Mirror of the status guard on {@link #insert}: a
+   * concurrent {@code ACTIVE → CLOSED} transition observed by the same statement deletes zero rows,
+   * which the caller translates into {@link
+   * site.asm0dey.slidev.polls.core.error.QuestionNotActiveException}.
+   *
+   * @return the {@code option_id} of the deleted row when a row was deleted; {@link
+   *     java.util.Optional#empty()} when the voter had no vote on this question (idempotent no-op)
+   *     — the caller distinguishes this from the not-ACTIVE case by checking the question status
+   *     before attempting the delete
+   * @throws site.asm0dey.slidev.polls.core.error.QuestionNotActiveException when the question is
+   *     not {@code ACTIVE} at delete time
+   */
+  java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken);
 }
