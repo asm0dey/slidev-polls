@@ -6,6 +6,7 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.exception.IntegrityConstraintViolationException;
@@ -111,7 +112,38 @@ public class VoteRepositoryImpl implements VoteRepository {
   }
 
   @Override
-  public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
-    throw new UnsupportedOperationException("implemented in Task 6");
+  public Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    UUID optionId =
+        dsl.select(VOTES.OPTION_ID)
+            .from(VOTES)
+            .where(VOTES.QUESTION_ID.eq(questionId).and(VOTES.VOTER_TOKEN.eq(voterToken)))
+            .fetchOne(VOTES.OPTION_ID);
+    if (optionId == null) {
+      return Optional.empty();
+    }
+
+    int deleted =
+        dsl.deleteFrom(VOTES)
+            .where(
+                VOTES
+                    .QUESTION_ID
+                    .eq(questionId)
+                    .and(VOTES.VOTER_TOKEN.eq(voterToken))
+                    .and(
+                        DSL.exists(
+                            dsl.selectOne()
+                                .from(POLL_QUESTIONS)
+                                .where(
+                                    POLL_QUESTIONS
+                                        .ID
+                                        .eq(questionId)
+                                        .and(
+                                            POLL_QUESTIONS.STATUS.eq(
+                                                QuestionStatus.ACTIVE.name()))))))
+            .execute();
+    if (deleted == 0) {
+      throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
+    }
+    return Optional.of(optionId);
   }
 }
