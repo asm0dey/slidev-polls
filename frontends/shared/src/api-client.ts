@@ -76,6 +76,19 @@ export class ApiClient {
     }
     return (await res.json()) as VoteAccepted;
   }
+
+  async retractVote(slug: string): Promise<void> {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/api/polls/${encodeURIComponent(slug)}/votes`,
+      {
+        method: "DELETE",
+        credentials: "same-origin"
+      }
+    );
+    if (!res.ok) {
+      throw await toApiError(res);
+    }
+  }
 }
 
 /**
