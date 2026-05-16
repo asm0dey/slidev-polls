@@ -12,6 +12,11 @@ interface TallyLite {
 }
 interface QuestionLite {
   prompt: string;
+  /** Per-question arity. Optional so callers that only have legacy single-choice fixtures still
+   *  type-check; missing/undefined is treated as single-choice (1, 1) and suppresses the
+   *  voters/selections footer. */
+  minSelections?: number;
+  maxSelections?: number;
   options: OptionLite[];
   tally: TallyLite[];
 }
@@ -21,11 +26,19 @@ const props = withDefaults(
     question: QuestionLite;
     mode?: "flat" | "scrim-dark" | "scrim-light";
     showLive?: boolean;
+    /** Ballots-cast figure from the snapshot. Drives the "{voterCount} voters · {selections}
+     *  selections" footer when {@link QuestionLite.maxSelections} is > 1. Defaults to 0 so legacy
+     *  single-choice callers don't need to thread it. */
+    voterCount?: number;
   }>(),
-  { mode: "flat", showLive: true }
+  { mode: "flat", showLive: true, voterCount: 0 }
 );
 
 const total = computed(() => props.question.tally.reduce((s, t) => s + t.count, 0));
+// A question is "multi-choice" when the panel can show more selections than voters. Single-choice
+// questions (the legacy default) hide the footer entirely — voters == selections by construction
+// so the extra line is redundant noise.
+const isMulti = computed(() => (props.question.maxSelections ?? 1) > 1);
 
 const leaderId = computed(() => {
   if (total.value === 0) return null;
@@ -81,6 +94,10 @@ function pctOf(id: string): number {
         <span class="sp-rp__pct">{{ total === 0 ? "—" : pctOf(opt.id) + "%" }}</span>
       </li>
     </ol>
+    <p v-if="isMulti" class="sp-rp__footer" data-testid="results-footer">
+      {{ voterCount }} {{ voterCount === 1 ? "voter" : "voters" }} · {{ total }}
+      {{ total === 1 ? "selection" : "selections" }}
+    </p>
   </section>
 </template>
 
@@ -219,5 +236,13 @@ function pctOf(id: string): number {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.sp-rp__footer {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  letter-spacing: 0.01em;
 }
 </style>

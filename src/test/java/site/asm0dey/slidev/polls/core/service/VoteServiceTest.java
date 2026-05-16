@@ -391,6 +391,11 @@ class VoteServiceTest {
       return out;
     }
 
+    @Override
+    public long voterCount(UUID questionId) {
+      return rows.stream().filter(v -> v.questionId().equals(questionId)).count();
+    }
+
     List<Vote> rowsFor(UUID questionId) {
       return rows.stream().filter(r -> r.questionId().equals(questionId)).toList();
     }

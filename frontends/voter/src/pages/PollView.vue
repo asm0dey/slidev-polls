@@ -78,6 +78,7 @@ function ensureStream() {
   stopStream = openPollStream(props.serverBase, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
       liveTally.value = ev.tally.slice();
+      liveVoterCount.value = ev.voterCount;
       // The presenter can rotate the active question (Q1 → Q2, then back to
       // Q1 after re-OPEN). Each snapshot carries the current activeQuestion;
       // when its id changes we have to swap PollView's local model in place
@@ -267,13 +268,21 @@ function describeSubmitError(err: unknown): string {
 
 const resultsForPanel = computed(() => {
   const q = poll.value?.activeQuestion;
-  if (!q) return { prompt: "", options: [], tally: [] };
+  if (!q) return { prompt: "", minSelections: 1, maxSelections: 1, options: [], tally: [] };
   return {
     prompt: q.prompt,
+    // Thread arity into the panel so the multi-choice footer ({voters} voters · {selections}
+    // selections) renders when the active question is multi-choice. Single-choice questions
+    // keep the legacy bare-bars look — the footer would just duplicate the row counts.
+    minSelections: q.minSelections,
+    maxSelections: q.maxSelections,
     options: q.options.map((o) => ({ id: o.id, label: o.label })),
     tally: liveTally.value
   };
 });
+// Ballots-cast figure for the post-vote ResultsPanel footer. Sourced from the SSE snapshot —
+// the same envelope drives `liveTally`, so the two stay consistent without a separate fetch.
+const liveVoterCount = ref(0);
 
 const votedOptionLabels = computed(() => {
   const q = poll.value?.activeQuestion;
@@ -357,7 +366,7 @@ onUnmounted(() => stopStream?.());
           >
         </div>
         <h2 class="pv__prompt pv__prompt--small">{{ poll.activeQuestion.prompt }}</h2>
-        <ResultsPanel :question="resultsForPanel" mode="flat" />
+        <ResultsPanel :question="resultsForPanel" :voter-count="liveVoterCount" mode="flat" />
         <Button
           class="pv__retract"
           :disabled="retracting"

@@ -34,6 +34,13 @@ public interface VoteRepository {
    */
   Map<UUID, Long> tally(UUID questionId);
 
+  /**
+   * Distinct voter count (ballots-cast, not selections-summed) for {@code questionId} — backs the
+   * "{voters} voters · {selections} selections" footer of the multi-choice results panel. One row
+   * in {@code votes} == one ballot regardless of how many options the ballot picked.
+   */
+  long voterCount(UUID questionId);
+
   /** Delete every row in {@code votes} bound to {@code pollId}. Returns the rows deleted. */
   int deleteForPoll(UUID pollId);
 

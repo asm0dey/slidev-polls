@@ -167,12 +167,16 @@ export interface SnapshotActiveQuestion {
   options: Option[];
 }
 
-/** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect. */
+/** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect.
+ *  `voterCount` is the ballots-cast figure (one row in `votes`, regardless of how many options
+ *  the ballot picked) and is distinct from the selections-summed totals in `tally`. The
+ *  multi-choice results footer renders both as "{voterCount} voters · {sum(tally)} selections". */
 export interface SnapshotEvent {
   pollId: string;
   slug: string;
   activeQuestion: SnapshotActiveQuestion | null;
   tally: TallyEntry[];
+  voterCount: number;
   emittedAt: string;
 }
 

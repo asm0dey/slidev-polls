@@ -135,6 +135,20 @@ public class VoteRepositoryImpl implements VoteRepository {
   }
 
   @Override
+  public long voterCount(UUID questionId) {
+    // One row in `votes` is exactly one ballot (the unique index on
+    // (question_id, voter_token) is what enforces this). COUNT(*) is the
+    // ballots-cast figure the multi-choice footer needs — distinct from the
+    // selections-summed total returned by tally().
+    Integer count =
+        dsl.selectCount()
+            .from(VOTES)
+            .where(VOTES.QUESTION_ID.eq(questionId))
+            .fetchOne(0, Integer.class);
+    return count == null ? 0L : count.longValue();
+  }
+
+  @Override
   public int deleteForPoll(UUID pollId) {
     return dsl.deleteFrom(VOTES).where(VOTES.POLL_ID.eq(pollId)).execute();
   }

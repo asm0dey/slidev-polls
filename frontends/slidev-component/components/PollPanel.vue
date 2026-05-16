@@ -105,10 +105,15 @@ const panelQuestion = computed(() => {
   if (!s?.activeQuestion) return null;
   return {
     prompt: s.activeQuestion.prompt,
+    // Pass arity through so ResultsPanel can decide whether to render the
+    // "{voters} voters · {selections} selections" footer (multi-choice only).
+    minSelections: s.activeQuestion.minSelections,
+    maxSelections: s.activeQuestion.maxSelections,
     options: s.activeQuestion.options.map((o) => ({ id: o.id, label: o.label })),
     tally: s.tally
   };
 });
+const panelVoterCount = computed(() => snapshot.value?.voterCount ?? 0);
 
 function isElementVisible(el: HTMLElement): boolean {
   const r = el.getBoundingClientRect();
@@ -347,6 +352,7 @@ onUnmounted(() => {
     <ResultsPanel
       v-if="panelQuestion"
       :question="panelQuestion"
+      :voter-count="panelVoterCount"
       :mode="theme.scrim === 'none' ? 'flat' : theme.scrim"
     />
     <p v-else-if="closedNotice" class="sp-pollpanel__waiting" data-testid="poll-waiting">

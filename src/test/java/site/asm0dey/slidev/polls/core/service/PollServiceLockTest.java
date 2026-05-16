@@ -358,6 +358,11 @@ class PollServiceLockTest {
     }
 
     @Override
+    public long voterCount(UUID questionId) {
+      return rows.stream().filter(v -> v.questionId().equals(questionId)).count();
+    }
+
+    @Override
     public int deleteForPoll(UUID pollId) {
       int before = rows.size();
       rows.removeIf(v -> v.pollId().equals(pollId));

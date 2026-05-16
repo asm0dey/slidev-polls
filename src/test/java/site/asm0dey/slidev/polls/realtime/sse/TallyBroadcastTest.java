@@ -177,6 +177,34 @@ class TallyBroadcastTest {
     SnapshotPayload payload = builder.build(poll.id()).orElseThrow();
     assertThat(payload.activeQuestion()).isNull();
     assertThat(payload.tally()).isEmpty();
+    assertThat(payload.voterCount()).isZero();
+  }
+
+  // voterCount carries the ballots-cast figure (one row per ballot, regardless of how many options
+  // the ballot picked). The multi-choice results footer needs this distinct from the
+  // selections-summed totals in `tally` so it can render "{voters} voters · {selections} sel...".
+  @Test
+  void snapshot_carries_voter_count_distinct_from_selections() {
+    Poll poll = seedPollWithActiveQuestion("voter-count-talk");
+    UUID activeQ = poll.activeQuestionId();
+    UUID optionA = poll.questions().get(0).options().get(0).id();
+    UUID optionB = poll.questions().get(0).options().get(1).id();
+    // Selections sum to 7, but the fake's voterCount is max-per-option (4) — see
+    // InMemoryVoteRepository#voterCount javadoc for why that's good enough here.
+    votes.seedTally(activeQ, Map.of(optionA, 4L, optionB, 3L));
+    CapturingEmitter emitter = new CapturingEmitter();
+    hub.register(poll.id(), emitter);
+
+    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), activeQ, Instant.now()));
+
+    SnapshotPayload payload = (SnapshotPayload) emitter.events.get(0).data;
+    long selections = payload.tally().stream().mapToLong(SnapshotPayload.TallyEntry::count).sum();
+    assertThat(selections).isEqualTo(7L);
+    assertThat(payload.voterCount()).isEqualTo(4L);
+    // Per-question arity rides on the snapshot now too (so the voter UI / panel footer can
+    // branch on it without a separate fetch).
+    assertThat(payload.activeQuestion().minSelections()).isEqualTo(1);
+    assertThat(payload.activeQuestion().maxSelections()).isEqualTo(1);
   }
 
   // ---------- fixtures -----------------------------------------------------
@@ -399,6 +427,17 @@ class TallyBroadcastTest {
     @Override
     public Map<UUID, Long> tally(UUID questionId) {
       return tallies.getOrDefault(questionId, Map.of());
+    }
+
+    @Override
+    public long voterCount(UUID questionId) {
+      // Test fake: VoteRepositoryImpl returns COUNT(*) on votes. Without a
+      // ballot ledger here we approximate via the largest per-option count
+      // (≥ true ballot count when the same voter picks multiple options;
+      // equal in the single-choice tests this fake currently serves).
+      Map<UUID, Long> t = tallies.get(questionId);
+      if (t == null || t.isEmpty()) return 0L;
+      return t.values().stream().mapToLong(Long::longValue).max().orElse(0L);
     }
 
     @Override
