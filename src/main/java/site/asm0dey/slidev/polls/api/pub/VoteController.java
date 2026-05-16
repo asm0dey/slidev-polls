@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,5 +62,19 @@ public class VoteController {
       response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
     }
     return response.body(new VoteAccepted(recorded.id(), recorded.createdAt()));
+  }
+
+  @DeleteMapping("/{slug}/votes")
+  public ResponseEntity<Void> retract(@PathVariable String slug, HttpServletRequest request) {
+    if (!SlugValidator.isValidFormat(slug)) {
+      throw new NotFoundException("no poll with slug '" + slug + "'");
+    }
+    String voterToken = VoterTokenCookie.read(request);
+    if (voterToken == null) {
+      // No cookie → no row this voter could ever own. Return 204 without touching the service.
+      return ResponseEntity.noContent().build();
+    }
+    voteService.retractVote(slug, voterToken);
+    return ResponseEntity.noContent().build();
   }
 }
