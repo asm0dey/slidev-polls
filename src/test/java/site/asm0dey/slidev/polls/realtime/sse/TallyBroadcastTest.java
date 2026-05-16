@@ -90,7 +90,7 @@ class TallyBroadcastTest {
   // A VoteRetractedEvent fans out as a fresh "snapshot" SSE event reflecting the post-retraction
   // tally. Same payload shape as the cast path — the client is fully snapshot-driven.
   @Test
-  void vote_retracted_event_broadcasts_fresh_snapshot() throws Exception {
+  void vote_retracted_event_broadcasts_fresh_snapshot() {
     Poll poll = seedPollWithActiveQuestion("retract-talk");
     UUID activeQ = poll.activeQuestionId();
     UUID optionA = poll.questions().get(0).options().get(0).id();
@@ -108,7 +108,7 @@ class TallyBroadcastTest {
     assertThat(payload.activeQuestion().id()).isEqualTo(activeQ);
     Map<UUID, Long> byOption = new HashMap<>();
     payload.tally().forEach(t -> byOption.put(t.optionId(), t.count()));
-    assertThat(byOption.get(optionA)).isEqualTo(3L);
+    assertThat(byOption).containsEntry(optionA, 3L);
   }
 
   // @TS-031 — ActiveQuestionChangedEvent triggers a fresh snapshot whose activeQuestion.id matches
@@ -431,10 +431,6 @@ class TallyBroadcastTest {
 
     @Override
     public long voterCount(UUID questionId) {
-      // Test fake: VoteRepositoryImpl returns COUNT(*) on votes. Without a
-      // ballot ledger here we approximate via the largest per-option count
-      // (≥ true ballot count when the same voter picks multiple options;
-      // equal in the single-choice tests this fake currently serves).
       Map<UUID, Long> t = tallies.get(questionId);
       if (t == null || t.isEmpty()) return 0L;
       return t.values().stream().mapToLong(Long::longValue).max().orElse(0L);

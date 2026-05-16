@@ -31,6 +31,8 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
 @Component
 public class TallyBroadcaster {
 
+  private static final String SNAPSHOT_EVENT = "snapshot";
+
   private final SseHub hub;
   private final SnapshotBuilder snapshots;
 
@@ -53,7 +55,7 @@ public class TallyBroadcaster {
   public void onActiveQuestionChanged(PollActiveQuestionChangedEvent event) {
     snapshots
         .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), "snapshot", payload));
+        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
   }
 
   @EventListener
@@ -68,7 +70,7 @@ public class TallyBroadcaster {
   public void onVotesCleared(PollVotesClearedEvent event) {
     snapshots
         .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), "snapshot", payload));
+        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
   }
 
   private void resnapshotForQuestion(UUID pollId, UUID questionId) {
@@ -76,6 +78,6 @@ public class TallyBroadcaster {
     // after every ballot change keeps the client purely snapshot-driven (no delta application).
     snapshots
         .buildForQuestion(pollId, questionId)
-        .ifPresent(payload -> hub.broadcast(pollId, "snapshot", payload));
+        .ifPresent(payload -> hub.broadcast(pollId, SNAPSHOT_EVENT, payload));
   }
 }

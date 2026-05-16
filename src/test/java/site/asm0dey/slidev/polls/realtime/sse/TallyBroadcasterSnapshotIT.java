@@ -205,7 +205,7 @@ class TallyBroadcasterSnapshotIT {
           }
         }
       }
-    } catch (Exception ex) {
+    } catch (Exception _) {
       // Best-effort reader; failures surface through Awaitility timing out on the expected event.
     }
   }

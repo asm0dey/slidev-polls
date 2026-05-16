@@ -2,6 +2,7 @@ package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -136,52 +137,83 @@ public class PollService {
     if (counts.isEmpty()) {
       return;
     }
-    Set<UUID> incomingQuestionIds = new HashSet<>();
+    Set<UUID> incomingQuestionIds = collectIncomingQuestionIds(incoming);
+    lockQuestionDelete(existing, counts, incomingQuestionIds);
+    Map<UUID, Question> storedById = new HashMap<>();
+    for (Question q : existing.questions()) {
+      storedById.put(q.id(), q);
+    }
+    for (CreatePollCommand.QuestionUpdate qu : incoming) {
+      Question stored = resolveVotedStored(qu, storedById, counts);
+      if (stored == null) {
+        continue;
+      }
+      lockArityChange(stored, qu);
+      lockOptionDelete(stored, qu);
+    }
+  }
+
+  private static Set<UUID> collectIncomingQuestionIds(
+      List<CreatePollCommand.QuestionUpdate> incoming) {
+    Set<UUID> ids = new HashSet<>();
     for (CreatePollCommand.QuestionUpdate qu : incoming) {
       if (qu.id() != null) {
-        incomingQuestionIds.add(qu.id());
+        ids.add(qu.id());
       }
     }
-    // Question-delete: any stored question with voteCount>0 that is missing from the payload.
+    return ids;
+  }
+
+  /** Question-delete: any stored question with voteCount>0 missing from the payload. */
+  private static void lockQuestionDelete(
+      Poll existing, Map<UUID, Long> counts, Set<UUID> incomingQuestionIds) {
     for (Question stored : existing.questions()) {
       long voteCount = counts.getOrDefault(stored.id(), 0L);
       if (voteCount > 0 && !incomingQuestionIds.contains(stored.id())) {
         throw new ResourceHasVotesException("QUESTION", stored.id());
       }
     }
-    // Per-question structural diff for any voted question that is still present.
-    java.util.Map<UUID, Question> storedById = new java.util.HashMap<>();
-    for (Question q : existing.questions()) {
-      storedById.put(q.id(), q);
+  }
+
+  /**
+   * Returns the stored counterpart of {@code qu} if it carries votes and is structurally relevant
+   * (known id, voteCount>0); {@code null} when the update should be ignored by the lock checks.
+   */
+  private static Question resolveVotedStored(
+      CreatePollCommand.QuestionUpdate qu, Map<UUID, Question> storedById, Map<UUID, Long> counts) {
+    if (qu.id() == null) {
+      return null; // a brand-new question can't carry votes
     }
-    for (CreatePollCommand.QuestionUpdate qu : incoming) {
-      if (qu.id() == null) {
-        continue; // a brand-new question can't carry votes
+    Question stored = storedById.get(qu.id());
+    if (stored == null) {
+      return null; // unknown id — replaceQuestions will treat it as a new question
+    }
+    long voteCount = counts.getOrDefault(stored.id(), 0L);
+    if (voteCount == 0) {
+      return null;
+    }
+    return stored;
+  }
+
+  /** Arity change on a voted question is a structural mutation. */
+  private static void lockArityChange(Question stored, CreatePollCommand.QuestionUpdate qu) {
+    if (qu.minSelections() != stored.minSelections()
+        || qu.maxSelections() != stored.maxSelections()) {
+      throw new ResourceHasVotesException("QUESTION", stored.id());
+    }
+  }
+
+  /** Option-delete: any stored option id not present in the incoming option list. */
+  private static void lockOptionDelete(Question stored, CreatePollCommand.QuestionUpdate qu) {
+    Set<UUID> incomingOptionIds = new HashSet<>();
+    for (CreatePollCommand.OptionUpdate ou : qu.options()) {
+      if (ou.id() != null) {
+        incomingOptionIds.add(ou.id());
       }
-      Question stored = storedById.get(qu.id());
-      if (stored == null) {
-        continue; // unknown id — replaceQuestions will treat it as a new question
-      }
-      long voteCount = counts.getOrDefault(stored.id(), 0L);
-      if (voteCount == 0) {
-        continue;
-      }
-      // Arity change is a structural mutation.
-      if (qu.minSelections() != stored.minSelections()
-          || qu.maxSelections() != stored.maxSelections()) {
-        throw new ResourceHasVotesException("QUESTION", stored.id());
-      }
-      // Option-delete: any stored option id not present in the incoming option list.
-      Set<UUID> incomingOptionIds = new HashSet<>();
-      for (CreatePollCommand.OptionUpdate ou : qu.options()) {
-        if (ou.id() != null) {
-          incomingOptionIds.add(ou.id());
-        }
-      }
-      for (Option storedOpt : stored.options()) {
-        if (!incomingOptionIds.contains(storedOpt.id())) {
-          throw new ResourceHasVotesException("OPTION", storedOpt.id());
-        }
+    }
+    for (Option storedOpt : stored.options()) {
+      if (!incomingOptionIds.contains(storedOpt.id())) {
+        throw new ResourceHasVotesException("OPTION", storedOpt.id());
       }
     }
   }
