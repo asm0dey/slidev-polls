@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -13,12 +14,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
+import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 
 /**
@@ -50,7 +53,14 @@ class VoteServiceArityTest {
   void abstainAcceptedWhenMinZero() {
     Fixture f = fixture(0, 3, 3);
     when(f.repo.insert(any())).thenAnswer(inv -> inv.getArgument(0));
-    f.service.recordVote("p", List.of(), "v");
+
+    Vote stored = f.service.recordVote("p", List.of(), "v");
+
+    assertThat(stored.optionIds()).isEmpty();
+    ArgumentCaptor<Vote> inserted = ArgumentCaptor.forClass(Vote.class);
+    verify(f.repo).insert(inserted.capture());
+    assertThat(inserted.getValue().optionIds()).isEmpty();
+    verify(f.events).publishEvent((Object) any());
   }
 
   @Test
