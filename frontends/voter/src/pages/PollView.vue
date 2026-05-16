@@ -30,6 +30,7 @@ const client = props.apiClient ?? new ApiClient();
 const status = ref<ViewStatus>("loading");
 const poll = ref<PublicPollView | null>(null);
 const submitting = ref(false);
+const retracting = ref(false);
 const errorMessage = ref<string | null>(null);
 const selectedOptionId = ref<string | null>(null);
 const liveTally = ref<{ optionId: string; count: number }[]>([]);
@@ -135,6 +136,29 @@ function ensureStream() {
       // No paused indicator on the voter post-vote screen; keep last known tally.
     }
   });
+}
+
+async function retract() {
+  const qid = poll.value?.activeQuestion?.id;
+  if (!qid || retracting.value) return;
+  retracting.value = true;
+  errorMessage.value = null;
+  try {
+    await client.retractVote(props.slug);
+    clearAlreadyVoted(props.slug, qid);
+    selectedOptionId.value = null;
+    status.value = "active";
+  } catch (err) {
+    if (err instanceof ApiError && err.code === "QUESTION_NOT_ACTIVE") {
+      errorMessage.value =
+        "That question was just closed by the presenter. Hang tight — another one may be coming.";
+      await load();
+      return;
+    }
+    errorMessage.value = describeSubmitError(err);
+  } finally {
+    retracting.value = false;
+  }
 }
 
 async function submit() {
@@ -277,6 +301,14 @@ onUnmounted(() => stopStream?.());
         </div>
         <h2 class="pv__prompt pv__prompt--small">{{ poll.activeQuestion.prompt }}</h2>
         <ResultsPanel :question="resultsForPanel" mode="flat" />
+        <Button
+          class="pv__retract"
+          :disabled="retracting"
+          data-testid="poll-retract"
+          @click="retract"
+        >
+          {{ retracting ? "Retracting…" : "Change my answer" }}
+        </Button>
         <p class="pv__waiting-card">Waiting for next question…</p>
       </div>
     </template>
@@ -393,6 +425,13 @@ onUnmounted(() => stopStream?.());
   color: var(--sp-accent);
   font-weight: 500;
   margin-bottom: 6px;
+}
+.pv__retract {
+  margin-top: 12px;
+  width: 100%;
+  background: transparent;
+  color: var(--sp-fg);
+  border: 1px solid var(--sp-border);
 }
 .pv__waiting-card {
   margin: 14px 0 0;
