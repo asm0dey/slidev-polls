@@ -49,14 +49,20 @@ function makeClient(
   overrides: {
     publicPoll?: (slug: string) => Promise<PublicPollView>;
     submitVote?: (slug: string, body: unknown) => Promise<VoteAccepted | null>;
+    retractVote?: (slug: string) => Promise<void>;
   } = {}
 ): ApiClient {
   const accepted: VoteAccepted = { voteId: "vote-uuid", recordedAt: "2026-04-19T12:00:00Z" };
   return {
     publicPoll: vi.fn().mockResolvedValue(makeActiveView()),
     submitVote: vi.fn().mockResolvedValue(accepted),
+    retractVote: vi.fn().mockResolvedValue(undefined),
     ...overrides
   } as unknown as ApiClient;
+}
+
+function makeActiveViewVoted(): PublicPollView {
+  return { ...makeActiveView(), alreadyVoted: true };
 }
 
 async function mountView(client: ApiClient, slug = "my-talk") {
@@ -208,6 +214,27 @@ describe("PollView", () => {
     expect(wrapper.find('[data-testid="poll-waiting"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="poll-submit"]').exists()).toBe(false);
+  });
+
+  // Change-my-answer flow: a voter who already cast a vote (alreadyVoted: true from server) can
+  // click the retract button to wipe their vote and return to the option picker. The button
+  // must call ApiClient.retractVote with the slug, clear the localStorage cache, and flip the
+  // view back to the active picker.
+  it("retracts the vote and returns to the active picker", async () => {
+    const retractVote = vi.fn().mockResolvedValue(undefined);
+    const client = makeClient({
+      publicPoll: vi.fn().mockResolvedValue(makeActiveViewVoted()),
+      retractVote
+    });
+
+    const wrapper = await mountView(client);
+    expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
+
+    await wrapper.find('[data-testid="poll-retract"]').trigger("click");
+    await flushPromises();
+
+    expect(retractVote).toHaveBeenCalledWith("my-talk");
+    expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(true);
   });
 
   // When the server reports a 404 for the slug (typo, deleted poll), the error state renders
