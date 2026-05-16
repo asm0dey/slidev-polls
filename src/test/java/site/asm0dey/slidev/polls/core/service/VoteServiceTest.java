@@ -128,6 +128,21 @@ class VoteServiceTest {
     assertThat(events.published()).isEmpty();
   }
 
+  @Test
+  void retract_propagates_question_not_active_when_question_closes_mid_flight() {
+    Poll seeded = seedPollWithActiveQuestion();
+    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    service.recordVote(seeded.slug(), optionA, "v-1");
+    votes.simulateConcurrentClose(seeded.activeQuestionId());
+
+    assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1"))
+        .isInstanceOf(QuestionNotActiveException.class);
+    // Row stays — the DELETE was refused by the status guard.
+    assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
+    // Only the original VoteCastEvent landed; no retract event.
+    assertThat(events.published()).hasSize(1);
+  }
+
   // A submitted optionId that does not belong to the currently-active question is a 404-shaped
   // failure: the caller referenced an option that is not on the board. Validates that the service
   // does not accept cross-question option IDs (e.g., an option from the prior, now-CLOSED,
