@@ -15,9 +15,9 @@ import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
  * bound to it); unmatched ids in the existing row set are deleted (cascading their votes).
  *
  * <p>{@code minSelections} / {@code maxSelections} are nullable on the wire: when both are omitted
- * the draft defaults to the classic single-choice {@code (1, 1)}. When either is supplied the
- * other is taken as-is (null → defaulted to 1) so the service-layer validation in {@code
- * QuestionUpdate} sees a coherent pair.
+ * the draft defaults to the classic single-choice {@code (1, 1)}. When either is supplied the other
+ * is taken as-is (null → defaulted to 1) so the service-layer validation in {@code QuestionUpdate}
+ * sees a coherent pair.
  */
 public record UpdateQuestionRequest(
     UUID id,

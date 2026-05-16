@@ -19,15 +19,13 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
-import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 
 /**
  * Drives the per-question ballot arity contract on {@link VoteService#recordVote}. Validates that
  * single-choice questions reject ballots of size ≠ 1, multi-choice questions honor the [min, max]
- * range, abstain (size 0) is gated by minSelections == 0, and ballot-level invariants (no
- * duplicate options, every option belongs to the active question) trip before the repository is
- * touched.
+ * range, abstain (size 0) is gated by minSelections == 0, and ballot-level invariants (no duplicate
+ * options, every option belongs to the active question) trip before the repository is touched.
  */
 class VoteServiceArityTest {
 
@@ -68,9 +66,7 @@ class VoteServiceArityTest {
     assertThatThrownBy(
             () ->
                 f.service.recordVote(
-                    "p",
-                    List.of(f.options.get(0), f.options.get(1), f.options.get(2)),
-                    "v"))
+                    "p", List.of(f.options.get(0), f.options.get(1), f.options.get(2)), "v"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

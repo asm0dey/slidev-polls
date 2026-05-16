@@ -132,7 +132,8 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
               PollStatus.DRAFT,
               null,
               List.of(
-                  new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
+                  new Question(
+                      q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
               List.of(), // allowedOrigins
               null,
               null);

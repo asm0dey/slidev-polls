@@ -31,10 +31,10 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * in the same way {@link PollRepositoryImpl} handles the partial activation index ({@code @TS-023},
  * {@code @TS-024}).
  *
- * <p>The ballot itself rides in {@code option_ids uuid[]}; an empty array is a valid
- * "abstain" ballot and still occupies a row, so the unique index keeps refusing second submissions
- * even from abstainers. The aggregate projection in {@link #tally} unnests the array so a single
- * multi-select ballot contributes a count to every option it picked.
+ * <p>The ballot itself rides in {@code option_ids uuid[]}; an empty array is a valid "abstain"
+ * ballot and still occupies a row, so the unique index keeps refusing second submissions even from
+ * abstainers. The aggregate projection in {@link #tally} unnests the array so a single multi-select
+ * ballot contributes a count to every option it picked.
  *
  * <p>{@link #deleteByQuestionAndVoter} is the symmetric path on the delete side: a gated {@code
  * DELETE … WHERE EXISTS (… status='ACTIVE')} translates a zero-rows-affected race against the

@@ -94,9 +94,10 @@ class StreamIT {
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> received.stream().anyMatch(e -> "snapshot".equals(e.name)));
 
-    // Vote, then verify the resnapshot arrives within the 2s budget. (Task 12 will swap the
-    // request shape to {optionIds: [...]}; the snapshot-driven SSE contract is independent.)
-    String voteBody = String.format("{\"optionId\":\"%s\"}", poll.optionAId());
+    // Vote, then verify the resnapshot arrives within the 2s budget. The snapshot-driven SSE
+    // contract is independent of the ballot shape — Task 12 swapped the request body to
+    // {optionIds: [...]} but the stream still re-snapshots on every vote.
+    String voteBody = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     ResponseEntity<String> voteResponse =
         rest.exchange(
             "http://localhost:" + port + "/api/polls/stream-talk/votes",

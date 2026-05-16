@@ -161,6 +161,17 @@ public class GlobalExceptionHandler {
         HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, "request body is invalid");
   }
 
+  // Service-layer rejections of malformed inputs (e.g. a multi-option ballot on a single-choice
+  // question, or a duplicate option in a ballot) surface here. They are semantic 400s — the
+  // request body parsed and bind-validated cleanly, but the values violate a domain rule that the
+  // service is closer to than the DTO. The message is authored in our own code, so {@link #safe}
+  // is safe; we do not key the entry to a specific field because the violations span the whole
+  // {@code optionIds} array.
+  @ExceptionHandler(IllegalArgumentException.class)
+  ResponseEntity<Problem> handleIllegalArgument(IllegalArgumentException ex) {
+    return respond(HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, safe(ex));
+  }
+
   // A missing static resource (e.g. /admin/assets/foo.js when no such file was packaged) is a
   // 404, not a transport fault. Without this handler the catch-all {@link Exception} branch
   // below maps it to 500 and the browser sees a JSON Problem envelope in place of the asset.

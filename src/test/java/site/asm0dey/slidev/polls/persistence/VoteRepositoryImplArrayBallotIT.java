@@ -69,9 +69,7 @@ class VoteRepositoryImplArrayBallotIT extends AbstractPostgresTest {
                   Instant.now()));
 
       assertThat(stored.optionIds()).containsExactly(a, c);
-      assertThat(voteRepository.tally(p.questionId()))
-          .containsEntry(a, 1L)
-          .containsEntry(c, 1L);
+      assertThat(voteRepository.tally(p.questionId())).containsEntry(a, 1L).containsEntry(c, 1L);
       assertThat(voteRepository.alreadyVoted(p.questionId(), "voter-1")).isTrue();
     }
 
@@ -100,12 +98,7 @@ class VoteRepositoryImplArrayBallotIT extends AbstractPostgresTest {
       UUID a = p.options().get(0);
       voteRepository.insert(
           new Vote(
-              UUID.randomUUID(),
-              p.pollId(),
-              p.questionId(),
-              List.of(a),
-              "voter",
-              Instant.now()));
+              UUID.randomUUID(), p.pollId(), p.questionId(), List.of(a), "voter", Instant.now()));
 
       assertThatThrownBy(
               () ->

@@ -11,8 +11,18 @@ class QuestionArityTest {
 
   @Test
   void defaultArityIsOneToOne() {
-    Question q = new Question(UUID.randomUUID(), UUID.randomUUID(), "p", 0,
-        QuestionStatus.DRAFT, 1, 1, List.of(), null, null);
+    Question q =
+        new Question(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "p",
+            0,
+            QuestionStatus.DRAFT,
+            1,
+            1,
+            List.of(),
+            null,
+            null);
     assertThat(q.minSelections()).isEqualTo(1);
     assertThat(q.maxSelections()).isEqualTo(1);
   }
@@ -20,23 +30,53 @@ class QuestionArityTest {
   @Test
   void minMustNotExceedMax() {
     assertThatThrownBy(
-            () -> new Question(UUID.randomUUID(), UUID.randomUUID(), "p", 0,
-                QuestionStatus.DRAFT, 3, 2, List.of(), null, null))
+            () ->
+                new Question(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "p",
+                    0,
+                    QuestionStatus.DRAFT,
+                    3,
+                    2,
+                    List.of(),
+                    null,
+                    null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void minMayBeZero() {
-    Question q = new Question(UUID.randomUUID(), UUID.randomUUID(), "p", 0,
-        QuestionStatus.DRAFT, 0, 3, List.of(), null, null);
+    Question q =
+        new Question(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "p",
+            0,
+            QuestionStatus.DRAFT,
+            0,
+            3,
+            List.of(),
+            null,
+            null);
     assertThat(q.minSelections()).isZero();
   }
 
   @Test
   void maxMustBeAtLeastOne() {
     assertThatThrownBy(
-            () -> new Question(UUID.randomUUID(), UUID.randomUUID(), "p", 0,
-                QuestionStatus.DRAFT, 0, 0, List.of(), null, null))
+            () ->
+                new Question(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "p",
+                    0,
+                    QuestionStatus.DRAFT,
+                    0,
+                    0,
+                    List.of(),
+                    null,
+                    null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

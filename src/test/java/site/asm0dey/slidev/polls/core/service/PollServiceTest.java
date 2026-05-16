@@ -489,7 +489,8 @@ class PollServiceTest {
           opts.add(new Option(oid, qid, ou.label(), j));
         }
         rebuilt.add(
-            new Question(qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, 1, 1, opts, null, null));
+            new Question(
+                qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, 1, 1, opts, null, null));
       }
       Poll updated =
           new Poll(

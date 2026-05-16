@@ -12,38 +12,33 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.domain.Vote;
-import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.ResourceHasVotesException;
 
 /**
  * Unit coverage for the FR-013 RESOURCE_HAS_VOTES lock at {@link PollService#updateForOwner}: once
- * a question has recorded votes, deleting it, deleting any of its options, or changing its arity
- * is rejected; reword-only edits are still allowed.
+ * a question has recorded votes, deleting it, deleting any of its options, or changing its arity is
+ * rejected; reword-only edits are still allowed.
  */
 class PollServiceLockTest {
 
   @Test
   void deletingOptionWithVotesRejected() {
     Fixture f = pollWithVotedOption();
-    assertThatThrownBy(
-            () -> f.service.updateForOwner(f.pollId, "alice", f.removeFirstOption()))
+    assertThatThrownBy(() -> f.service.updateForOwner(f.pollId, "alice", f.removeFirstOption()))
         .isInstanceOf(ResourceHasVotesException.class);
   }
 
   @Test
   void deletingQuestionWithVotesRejected() {
     Fixture f = pollWithVotedOption();
-    assertThatThrownBy(
-            () -> f.service.updateForOwner(f.pollId, "alice", f.removeActiveQuestion()))
+    assertThatThrownBy(() -> f.service.updateForOwner(f.pollId, "alice", f.removeActiveQuestion()))
         .isInstanceOf(ResourceHasVotesException.class);
   }
 
@@ -51,16 +46,14 @@ class PollServiceLockTest {
   void changingArityWithVotesRejected() {
     Fixture f = pollWithVotedOption();
     assertThatThrownBy(
-            () ->
-                f.service.updateForOwner(f.pollId, "alice", f.flipArityOnActiveQuestion(0, 3)))
+            () -> f.service.updateForOwner(f.pollId, "alice", f.flipArityOnActiveQuestion(0, 3)))
         .isInstanceOf(ResourceHasVotesException.class);
   }
 
   @Test
   void editingPromptOrOptionLabelAllowed() {
     Fixture f = pollWithVotedOption();
-    assertThatCode(
-            () -> f.service.updateForOwner(f.pollId, "alice", f.rewordPromptAndLabels()))
+    assertThatCode(() -> f.service.updateForOwner(f.pollId, "alice", f.rewordPromptAndLabels()))
         .doesNotThrowAnyException();
   }
 
@@ -242,9 +235,7 @@ class PollServiceLockTest {
         for (int j = 0; j < qu.options().size(); j++) {
           CreatePollCommand.OptionUpdate ou = qu.options().get(j);
           UUID oid =
-              (ou.id() != null && existingOpts.containsKey(ou.id()))
-                  ? ou.id()
-                  : UUID.randomUUID();
+              (ou.id() != null && existingOpts.containsKey(ou.id())) ? ou.id() : UUID.randomUUID();
           opts.add(new Option(oid, qid, ou.label(), j));
         }
         rebuilt.add(

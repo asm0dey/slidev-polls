@@ -8,8 +8,8 @@ import java.util.UUID;
  * A single question within a poll. {@code ordinal} controls the presenter-authored order.
  * Lifecycle: DRAFT → ACTIVE → CLOSED; DRAFT → CLOSED is also permitted. {@code activatedAt} and
  * {@code closedAt} mirror the transitions. {@code minSelections}/{@code maxSelections} define the
- * per-question ballot arity: a voter must pick at least {@code minSelections} and at most
- * {@code maxSelections} options.
+ * per-question ballot arity: a voter must pick at least {@code minSelections} and at most {@code
+ * maxSelections} options.
  */
 public record Question(
     UUID id,

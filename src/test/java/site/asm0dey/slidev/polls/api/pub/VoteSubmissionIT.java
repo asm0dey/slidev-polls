@@ -73,7 +73,7 @@ class VoteSubmissionIT {
     String voterToken = sessionCookie.getValue();
 
     String body =
-        String.format("{\"optionId\":\"%s\",\"voterToken\":\"ignored\"}", poll.optionAId());
+        String.format("{\"optionIds\":[\"%s\"],\"voterToken\":\"ignored\"}", poll.optionAId());
     MvcResult result =
         mvc.perform(
                 post("/api/polls/vote-happy/votes")
@@ -106,7 +106,7 @@ class VoteSubmissionIT {
         mvc.perform(get("/api/polls/by-slug/vote-dup")).andExpect(status().isOk()).andReturn();
     Cookie sessionCookie = seen.getResponse().getCookie("sp_voter");
 
-    String body = String.format("{\"optionId\":\"%s\"}", poll.optionAId());
+    String body = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     mvc.perform(
             post("/api/polls/vote-dup/votes")
                 .cookie(sessionCookie)
@@ -116,7 +116,7 @@ class VoteSubmissionIT {
 
     // Second submit with the same cookie — whether the caller aims at the same option or the
     // other option, the (question_id, voter_token) unique index refuses the row.
-    String second = String.format("{\"optionId\":\"%s\"}", poll.optionBId());
+    String second = String.format("{\"optionIds\":[\"%s\"]}", poll.optionBId());
     mvc.perform(
             post("/api/polls/vote-dup/votes")
                 .cookie(sessionCookie)
@@ -150,7 +150,7 @@ class VoteSubmissionIT {
     // After close the poll has no activeQuestionId — the active-question option id from the
     // fixture is therefore no longer on the board; the service short-circuits to
     // QUESTION_NOT_ACTIVE (TS-025) rather than NOT_FOUND for the now-orphaned optionId.
-    String body = String.format("{\"optionId\":\"%s\"}", poll.optionAId());
+    String body = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     MvcResult conflict =
         mvc.perform(
                 post("/api/polls/vote-closed/votes")
@@ -183,7 +183,7 @@ class VoteSubmissionIT {
 
     String body =
         String.format(
-            "{\"optionId\":\"%s\",\"email\":\"alice@example.com\",\"name\":\"Alice\"}",
+            "{\"optionIds\":[\"%s\"],\"email\":\"alice@example.com\",\"name\":\"Alice\"}",
             poll.optionAId());
     mvc.perform(
             post("/api/polls/vote-extra/votes")

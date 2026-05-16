@@ -225,8 +225,18 @@ class VoteServiceTest {
             q1,
             List.of(
                 new Question(
-                    q1, pollId, "Q1", 0, QuestionStatus.ACTIVE, 1, 1, q1Options, Instant.now(), null),
-                new Question(q2, pollId, "Q2", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null)),
+                    q1,
+                    pollId,
+                    "Q1",
+                    0,
+                    QuestionStatus.ACTIVE,
+                    1,
+                    1,
+                    q1Options,
+                    Instant.now(),
+                    null),
+                new Question(
+                    q2, pollId, "Q2", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null)),
             List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
@@ -248,7 +258,9 @@ class VoteServiceTest {
             "waiting-poll",
             PollStatus.DRAFT,
             null,
-            List.of(new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
+            List.of(
+                new Question(
+                    q1, pollId, "Q1", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
             List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());

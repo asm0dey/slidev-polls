@@ -136,7 +136,7 @@ class TallyBroadcasterSnapshotIT {
   // ---------- HTTP helpers -------------------------------------------------
 
   private void cast(String slug, UUID optionId) {
-    String body = String.format("{\"optionId\":\"%s\"}", optionId);
+    String body = String.format("{\"optionIds\":[\"%s\"]}", optionId);
     HttpHeaders headers = jsonHeaders();
     if (voterCookie != null) {
       headers.add(HttpHeaders.COOKIE, voterCookie);

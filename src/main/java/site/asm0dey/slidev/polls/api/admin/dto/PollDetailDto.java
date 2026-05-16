@@ -25,8 +25,7 @@ public record PollDetailDto(
     List<QuestionDto> questions,
     List<String> allowedOrigins) {
 
-  public static PollDetailDto from(
-      Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts) {
+  public static PollDetailDto from(Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts) {
     PollDto summary = PollDto.from(domain, publicUrlBase);
     List<QuestionDto> questions =
         domain.questions().stream()
