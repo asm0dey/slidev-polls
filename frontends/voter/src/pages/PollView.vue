@@ -65,9 +65,9 @@ function applyServerView(view: PublicPollView) {
     status.value = "active";
     return;
   }
-  // No active question — drop any cached flags for this slug so the next
-  // activate (possibly a re-opened earlier question) starts clean.
-  clearAlreadyVoted(props.slug);
+  // No active question. Keep the per-(slug, questionId) localStorage flags intact: the
+  // presenter may re-open a question the voter already answered (CLOSE then re-OPEN), and the
+  // flag is what lets the snapshot path below render the voted state on re-activation.
   status.value = "waiting";
 }
 
@@ -129,7 +129,9 @@ function ensureStream() {
       poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
       selectedOptionId.value = null;
       liveTally.value = [];
-      clearAlreadyVoted(props.slug);
+      // Preserve the per-(slug, questionId) localStorage flags: the presenter can re-OPEN the
+      // same question (or an earlier one) and the snapshot path below relies on the flag to
+      // render the voted state on re-activation. Retraction is the only path that clears.
       status.value = "waiting";
     },
     onConnectionStateChange: () => {

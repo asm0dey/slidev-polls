@@ -216,6 +216,90 @@ describe("PollView", () => {
     expect(wrapper.find('[data-testid="poll-submit"]').exists()).toBe(false);
   });
 
+  // Defense: a voter in the voted state must NOT see the retract button once the question is
+  // closed. Backend status-gates DELETE /votes on ACTIVE — keeping the button live across a
+  // close would funnel users into a QUESTION_NOT_ACTIVE error instead of disabling the
+  // affordance up front.
+  it("hides the retract button when the question closes while in voted state", async () => {
+    let captured: StreamHandlers | null = null;
+    vi.mocked(openPollStream).mockImplementation((_base, _slug, handlers) => {
+      captured = handlers;
+      return () => {};
+    });
+
+    const client = makeClient({ publicPoll: vi.fn().mockResolvedValue(makeActiveViewVoted()) });
+    const wrapper = await mountView(client);
+
+    expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="poll-retract"]').exists()).toBe(true);
+
+    captured!.onQuestionClosed?.({
+      pollId: "poll-uuid",
+      questionId: "q1",
+      emittedAt: "2026-04-19T12:00:00Z"
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="poll-retract"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="poll-waiting"]').exists()).toBe(true);
+  });
+
+  // Regression: presenter navigates off the poll slide (question-closed fires), then back
+  // (snapshot re-activates the same question id). The server still owns the voter's vote (cookie),
+  // so the voter UI must stay in the voted state on re-OPEN instead of flipping back to the
+  // option picker. Previously a blanket clearAlreadyVoted(slug) on question-closed wiped the
+  // per-question localStorage flag, so the snapshot path couldn't tell the voter had answered.
+  it("stays in the voted state when the same question re-activates after close", async () => {
+    let captured: StreamHandlers | null = null;
+    vi.mocked(openPollStream).mockImplementation((_base, _slug, handlers) => {
+      captured = handlers;
+      return () => {};
+    });
+
+    const submitVote = vi
+      .fn()
+      .mockResolvedValue({ voteId: "vote-uuid", recordedAt: "2026-04-19T12:00:00Z" });
+    const client = makeClient({ submitVote });
+    const wrapper = await mountView(client);
+
+    await wrapper.find('[data-testid="option-opt-a"]').trigger("click");
+    await wrapper.find('[data-testid="poll-submit"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
+
+    // Presenter navigates away — backend emits question-closed (no follow-up snapshot).
+    captured!.onQuestionClosed?.({
+      pollId: "poll-uuid",
+      questionId: "q1",
+      emittedAt: "2026-04-19T12:00:01Z"
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="poll-waiting"]').exists()).toBe(true);
+
+    // Presenter navigates back to the same poll slide — backend re-activates the same question
+    // and emits a fresh snapshot.
+    captured!.onSnapshot?.({
+      pollId: "poll-uuid",
+      activeQuestion: {
+        id: "q1",
+        prompt: "Which JVM?",
+        ordinal: 0,
+        status: "ACTIVE",
+        options: [
+          { id: "opt-a", label: "OpenJDK", position: 0 },
+          { id: "opt-b", label: "GraalVM", position: 1 }
+        ]
+      },
+      tally: [{ optionId: "opt-a", count: 1 }],
+      emittedAt: "2026-04-19T12:00:02Z"
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="poll-active"]').exists()).toBe(false);
+  });
+
   // Change-my-answer flow: a voter who already cast a vote (alreadyVoted: true from server) can
   // click the retract button to wipe their vote and return to the option picker. The button
   // must call ApiClient.retractVote with the slug, clear the localStorage cache, and flip the
