@@ -386,5 +386,10 @@ class TallyBroadcastTest {
     public int deleteForPoll(UUID pollId) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+      throw new UnsupportedOperationException();
+    }
   }
 }

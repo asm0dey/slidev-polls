@@ -1,6 +1,7 @@
 package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,6 +14,7 @@ import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
 import site.asm0dey.slidev.polls.core.event.VoteCastEvent;
+import site.asm0dey.slidev.polls.core.event.VoteRetractedEvent;
 
 /**
  * Anonymous voting flow. Resolves slug → poll → active question, checks that the submitted option
@@ -78,6 +80,33 @@ public class VoteService {
     events.publishEvent(
         new VoteCastEvent(poll.id(), activeQuestionId, optionId, newCount, stored.createdAt()));
     return stored;
+  }
+
+  /**
+   * Retract the vote cast by {@code voterToken} on the poll's currently-active question. Mirror of
+   * {@link #recordVote}: status check at the service layer for the no-active-question case so the
+   * storage round-trip is skipped, then the storage layer enforces the ACTIVE invariant on the
+   * delete itself. Idempotent: if the voter has no row on the active question, the call returns
+   * without publishing an event.
+   *
+   * @throws NotFoundException when the slug does not resolve to a poll
+   * @throws QuestionNotActiveException when the poll has no active question, or the active question
+   *     transitioned to CLOSED between the check and the delete
+   */
+  @Transactional
+  public void retractVote(String slug, String voterToken) {
+    Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
+    UUID activeQuestionId = getActiveQuestionId(slug, poll);
+    Optional<UUID> deletedOption =
+        voteRepository.deleteByQuestionAndVoter(activeQuestionId, voterToken);
+    if (deletedOption.isEmpty()) {
+      // Idempotent no-op — voter had no row on the active question. No event.
+      return;
+    }
+    UUID optionId = deletedOption.get();
+    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
+    events.publishEvent(
+        new VoteRetractedEvent(poll.id(), activeQuestionId, optionId, newCount, Instant.now()));
   }
 
   private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {
