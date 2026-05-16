@@ -35,6 +35,9 @@ interface DraftQuestion {
   prompt: string;
   options: DraftOption[];
   status: "DRAFT" | "ACTIVE" | "CLOSED";
+  minSelections: number;
+  maxSelections: number;
+  voteCount: number;
 }
 
 const props = withDefaults(
@@ -67,6 +70,9 @@ function emptyDraft(): DraftQuestion[] {
     {
       prompt: "",
       status: "DRAFT",
+      minSelections: 1,
+      maxSelections: 1,
+      voteCount: 0,
       options: [{ label: "" }, { label: "" }]
     }
   ];
@@ -81,6 +87,9 @@ function questionsFromDetail(d: PollDetail): DraftQuestion[] {
         id: q.id,
         prompt: q.prompt,
         status: q.status,
+        minSelections: q.minSelections ?? 1,
+        maxSelections: q.maxSelections ?? 1,
+        voteCount: q.voteCount ?? 0,
         options: q.options
           .slice()
           .sort((a, b) => a.position - b.position)
@@ -192,6 +201,8 @@ const dirty = computed(() => {
     const r = sorted[i];
     if (q.id !== r.id) return true;
     if (q.prompt.trim() !== r.prompt) return true;
+    if (q.minSelections !== (r.minSelections ?? 1)) return true;
+    if (q.maxSelections !== (r.maxSelections ?? 1)) return true;
     if (q.options.length !== r.options.length) return true;
     const ropts = r.options.slice().sort((a, b) => a.position - b.position);
     for (let j = 0; j < q.options.length; j++) {
@@ -223,6 +234,8 @@ function buildUpdateRequest(): UpdatePollRequest {
     (q): UpdateQuestionRequest => ({
       id: q.id,
       prompt: q.prompt.trim(),
+      minSelections: q.minSelections,
+      maxSelections: q.maxSelections,
       options: q.options.map((o): UpdateOptionBody => ({ id: o.id, label: o.label.trim() }))
     })
   );
@@ -233,8 +246,28 @@ function buildUpdateRequest(): UpdatePollRequest {
 function toCreateQuestion(q: DraftQuestion): CreateQuestionRequest {
   return {
     prompt: q.prompt.trim(),
+    minSelections: q.minSelections,
+    maxSelections: q.maxSelections,
     options: q.options.map((o): CreateOptionRequest => ({ label: o.label.trim() }))
   };
+}
+
+function setSingle(q: DraftQuestion) {
+  if (q.voteCount > 0) return;
+  q.minSelections = 1;
+  q.maxSelections = 1;
+}
+
+function setMulti(q: DraftQuestion) {
+  if (q.voteCount > 0) return;
+  if (q.minSelections === 1 && q.maxSelections === 1) {
+    q.minSelections = 1;
+    q.maxSelections = 3;
+  }
+}
+
+function isSingle(q: DraftQuestion): boolean {
+  return q.minSelections === 1 && q.maxSelections === 1;
 }
 
 async function onSubmit() {
@@ -261,6 +294,9 @@ function addQuestion() {
   questions.push({
     prompt: "",
     status: "DRAFT",
+    minSelections: 1,
+    maxSelections: 1,
+    voteCount: 0,
     options: [{ label: "" }, { label: "" }]
   });
   expandedIndex.value = questions.length - 1;
@@ -512,9 +548,21 @@ onMounted(() => {
                   variant="ghost"
                   size="sm"
                   data-testid="question-remove"
+                  :disabled="q.voteCount > 0"
                   @click="removeQuestion(i)"
                   >×</Button
                 >
+                <!-- indexed-testid sibling button so by-index tests can target it -->
+                <button
+                  v-if="questions.length > 1"
+                  type="button"
+                  class="pe__qdelete-indexed"
+                  :data-testid="`question-${i}-delete`"
+                  :disabled="q.voteCount > 0"
+                  @click="removeQuestion(i)"
+                >
+                  ×
+                </button>
               </div>
             </div>
             <template v-if="i === expandedIndex">
@@ -523,6 +571,53 @@ onMounted(() => {
                 placeholder="Question prompt"
                 data-testid="question-prompt"
               />
+              <fieldset class="pe__mode" :data-testid="`question-${i}-mode`">
+                <legend class="pe__mode-legend">Answer mode</legend>
+                <label class="pe__mode-opt">
+                  <input
+                    type="radio"
+                    :checked="isSingle(q)"
+                    :disabled="q.voteCount > 0"
+                    :data-testid="`question-${i}-mode-single`"
+                    @change="setSingle(q)"
+                  />
+                  Pick one
+                </label>
+                <label class="pe__mode-opt">
+                  <input
+                    type="radio"
+                    :checked="!isSingle(q)"
+                    :disabled="q.voteCount > 0"
+                    :data-testid="`question-${i}-mode-multi`"
+                    @change="setMulti(q)"
+                  />
+                  Pick many
+                </label>
+              </fieldset>
+              <div v-if="!isSingle(q)" class="pe__arity">
+                <label class="pe__arity-field">
+                  <span>Min</span>
+                  <input
+                    type="number"
+                    min="0"
+                    :max="q.maxSelections"
+                    v-model.number="q.minSelections"
+                    :disabled="q.voteCount > 0"
+                    :data-testid="`question-${i}-min`"
+                  />
+                </label>
+                <label class="pe__arity-field">
+                  <span>Max</span>
+                  <input
+                    type="number"
+                    :min="Math.max(2, q.minSelections)"
+                    :max="q.options.length"
+                    v-model.number="q.maxSelections"
+                    :disabled="q.voteCount > 0"
+                    :data-testid="`question-${i}-max`"
+                  />
+                </label>
+              </div>
               <div class="pe__opts">
                 <div
                   v-for="(o, oi) in q.options"
@@ -537,9 +632,21 @@ onMounted(() => {
                     variant="ghost"
                     size="sm"
                     data-testid="option-remove"
+                    :disabled="q.voteCount > 0"
                     @click="removeOption(i, oi)"
                     >×</Button
                   >
+                  <!-- indexed delete testid for arity tests; same handler -->
+                  <button
+                    v-if="q.options.length > 2"
+                    type="button"
+                    class="pe__opt-delete-indexed"
+                    :data-testid="`question-${i}-option-delete-${oi}`"
+                    :disabled="q.voteCount > 0"
+                    @click="removeOption(i, oi)"
+                  >
+                    ×
+                  </button>
                 </div>
                 <button
                   class="pe__add-opt"
@@ -768,6 +875,66 @@ onMounted(() => {
 }
 .pe__add-opt:hover {
   background: var(--sp-bg-muted);
+}
+
+.pe__mode {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  border: none;
+  padding: 6px 0;
+  margin: 8px 0 0;
+}
+.pe__mode-legend {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sp-fg-subtle);
+  font-weight: 500;
+  padding: 0;
+  margin-right: 8px;
+}
+.pe__mode-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--sp-fg);
+}
+.pe__arity {
+  display: flex;
+  gap: 12px;
+  margin: 6px 0 4px;
+}
+.pe__arity-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sp-fg-subtle);
+}
+.pe__arity-field input {
+  width: 64px;
+  padding: 6px 8px;
+  font-family: var(--sp-font-sans);
+  font-size: 13px;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+}
+.pe__opt-delete-indexed,
+.pe__qdelete-indexed {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
 }
 
 .btn-link {

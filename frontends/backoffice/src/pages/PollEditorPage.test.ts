@@ -40,6 +40,9 @@ function pollDetail(over: Partial<PollDetail> = {}): PollDetail {
         prompt: "Which JVM?",
         ordinal: 0,
         status: "DRAFT",
+        minSelections: 1,
+        maxSelections: 1,
+        voteCount: 0,
         options: [
           { id: "o1", label: "OpenJDK", position: 0 },
           { id: "o2", label: "GraalVM", position: 1 }
