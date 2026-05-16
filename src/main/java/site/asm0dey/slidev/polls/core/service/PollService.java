@@ -271,7 +271,7 @@ public class PollService {
         options.add(new Option(UUID.randomUUID(), qid, draft.options().get(j).label(), j));
       }
       out.add(
-          new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+          new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, 1, 1, options, null, null));
     }
     return out;
   }

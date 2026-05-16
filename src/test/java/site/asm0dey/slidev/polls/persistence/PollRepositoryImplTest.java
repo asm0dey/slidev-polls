@@ -229,7 +229,7 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
         }
         questions.add(
             new Question(
-                qid, pollId, seeds[i].prompt(), i, QuestionStatus.DRAFT, options, null, null));
+                qid, pollId, seeds[i].prompt(), i, QuestionStatus.DRAFT, 1, 1, options, null, null));
       }
       Poll poll =
           new Poll(
@@ -261,7 +261,7 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
           slugSuffix + "-" + pollId.toString().substring(0, 8),
           PollStatus.DRAFT,
           null,
-          List.of(new Question(q1, pollId, "Q?", 0, QuestionStatus.DRAFT, options, null, null)),
+          List.of(new Question(q1, pollId, "Q?", 0, QuestionStatus.DRAFT, 1, 1, options, null, null)),
           allowedOrigins,
           null,
           null);

@@ -489,7 +489,7 @@ class PollServiceTest {
           opts.add(new Option(oid, qid, ou.label(), j));
         }
         rebuilt.add(
-            new Question(qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
+            new Question(qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, 1, 1, opts, null, null));
       }
       Poll updated =
           new Poll(
@@ -527,6 +527,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.ACTIVE,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   Instant.now(),
                   null));
@@ -538,6 +540,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.CLOSED,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   q.activatedAt(),
                   Instant.now()));
@@ -574,6 +578,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.CLOSED,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   q.activatedAt(),
                   Instant.now()));
@@ -633,6 +639,8 @@ class PollServiceTest {
                 q.prompt(),
                 q.ordinal(),
                 QuestionStatus.DRAFT,
+                q.minSelections(),
+                q.maxSelections(),
                 q.options(),
                 null,
                 null));

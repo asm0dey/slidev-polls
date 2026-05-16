@@ -363,7 +363,7 @@ public class PollRepositoryImpl implements PollRepository {
       }
       ordered.add(
           new Question(
-              qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
+              qid, pollId, q.prompt(), q.ordinal(), q.status(), 1, 1, insertedOptions, null, null));
     }
     return ordered;
   }
@@ -415,6 +415,8 @@ public class PollRepositoryImpl implements PollRepository {
                               q.get(POLL_QUESTIONS.PROMPT),
                               q.get(POLL_QUESTIONS.ORDINAL),
                               QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
+                              1,
+                              1,
                               q.get(OPTIONS_FIELD),
                               q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
                                   ? null

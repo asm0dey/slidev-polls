@@ -220,9 +220,9 @@ class TallyBroadcastTest {
         List.of(
             new Option(UUID.randomUUID(), q2, "A", 0), new Option(UUID.randomUUID(), q2, "B", 1));
     Question question1 =
-        new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null);
+        new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null);
     Question question2 =
-        new Question(q2, pollId, "Q2?", 1, QuestionStatus.DRAFT, q2Options, null, null);
+        new Question(q2, pollId, "Q2?", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null);
     Poll poll =
         new Poll(
             pollId,
@@ -336,6 +336,8 @@ class TallyBroadcastTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.ACTIVE,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   Instant.now(),
                   null));
@@ -347,6 +349,8 @@ class TallyBroadcastTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.CLOSED,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   q.activatedAt(),
                   Instant.now()));
