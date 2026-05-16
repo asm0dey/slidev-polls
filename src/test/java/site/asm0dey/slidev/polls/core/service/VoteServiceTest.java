@@ -54,7 +54,7 @@ class VoteServiceTest {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
 
-    Vote stored = service.recordVote(seeded.slug(), optionA, "v-123");
+    Vote stored = service.recordVote(seeded.slug(), List.of(optionA), "v-123");
 
     assertThat(stored.optionIds()).containsExactly(optionA);
     assertThat(stored.voterToken()).isEqualTo("v-123");
@@ -79,7 +79,7 @@ class VoteServiceTest {
     Poll seeded = seedPollWithoutActiveQuestion();
     UUID anyOption = seeded.questions().get(0).options().get(0).id();
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), anyOption, "v-999"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(anyOption), "v-999"))
         .isInstanceOf(QuestionNotActiveException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -101,7 +101,7 @@ class VoteServiceTest {
   void retract_deletes_row_and_publishes_event_with_decremented_tally() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-1");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-1");
 
     service.retractVote(seeded.slug(), "v-1");
 
@@ -128,7 +128,7 @@ class VoteServiceTest {
   void retract_propagates_question_not_active_when_question_closes_mid_flight() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-1");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-1");
     votes.simulateConcurrentClose(seeded.activeQuestionId());
 
     assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1"))
@@ -149,7 +149,7 @@ class VoteServiceTest {
     // Options of the non-active question are not valid submissions.
     UUID otherQuestionOption = seeded.questions().get(1).options().get(0).id();
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), otherQuestionOption, "v-1"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(otherQuestionOption), "v-1"))
         .isInstanceOf(NotFoundException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -162,9 +162,9 @@ class VoteServiceTest {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
 
-    service.recordVote(seeded.slug(), optionA, "v-dup");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-dup");
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), optionA, "v-dup"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(optionA), "v-dup"))
         .isInstanceOf(AlreadyVotedException.class);
     // Only the first insert landed; the second never reached storage.
     assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
@@ -182,7 +182,7 @@ class VoteServiceTest {
     // real VoteRepositoryImpl sees this via the INSERT ... SELECT returning zero rows.
     votes.simulateConcurrentClose(seeded.activeQuestionId());
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), optionA, "v-late"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(optionA), "v-late"))
         .isInstanceOf(QuestionNotActiveException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -194,7 +194,7 @@ class VoteServiceTest {
   void already_voted_reports_cookie_state() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-seen");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-seen");
 
     assertThat(service.alreadyVoted(seeded.activeQuestionId(), "v-seen")).isTrue();
     assertThat(service.alreadyVoted(seeded.activeQuestionId(), "v-new")).isFalse();

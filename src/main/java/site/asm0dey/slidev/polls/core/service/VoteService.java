@@ -2,8 +2,11 @@ package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -54,7 +57,12 @@ public class VoteService {
    *     {@code (question_id, voter_token)} refuses a second row ({@code @TS-023}, {@code @TS-024})
    */
   @Transactional
-  public Vote recordVote(String slug, UUID optionId, String voterToken) {
+  public Vote recordVote(String slug, List<UUID> optionIds, String voterToken) {
+    Objects.requireNonNull(optionIds, "optionIds");
+    if (optionIds.size() != Set.copyOf(optionIds).size()) {
+      throw new IllegalArgumentException("duplicate option in ballot");
+    }
+
     Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
     UUID activeQuestionId = getActiveQuestionId(slug, poll);
     Question activeQuestion =
@@ -65,11 +73,23 @@ public class VoteService {
                 () ->
                     new NotFoundException(
                         "active question " + activeQuestionId + " not in poll " + poll.id()));
-    boolean optionBelongs =
-        activeQuestion.options().stream().map(Option::id).anyMatch(id -> id.equals(optionId));
-    if (!optionBelongs) {
-      throw new NotFoundException(
-          "option " + optionId + " does not belong to active question " + activeQuestionId);
+
+    if (optionIds.size() < activeQuestion.minSelections()
+        || optionIds.size() > activeQuestion.maxSelections()) {
+      throw new IllegalArgumentException(
+          "ballot size must be between "
+              + activeQuestion.minSelections()
+              + " and "
+              + activeQuestion.maxSelections());
+    }
+
+    Set<UUID> known =
+        activeQuestion.options().stream().map(Option::id).collect(Collectors.toUnmodifiableSet());
+    for (UUID oid : optionIds) {
+      if (!known.contains(oid)) {
+        throw new NotFoundException(
+            "option " + oid + " does not belong to active question " + activeQuestionId);
+      }
     }
 
     Vote pending =
@@ -77,7 +97,7 @@ public class VoteService {
             UUID.randomUUID(),
             poll.id(),
             activeQuestionId,
-            List.of(optionId),
+            List.copyOf(optionIds),
             voterToken,
             Instant.now());
     Vote stored = voteRepository.insert(pending);

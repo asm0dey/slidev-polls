@@ -55,7 +55,9 @@ public class VoteController {
     }
 
     VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
-    Vote recorded = voteService.recordVote(slug, body.optionId(), voter.token());
+    // Task 12 rewrites VoteRequest to carry List<UUID>; for now wrap the legacy single id.
+    Vote recorded =
+        voteService.recordVote(slug, java.util.List.of(body.optionId()), voter.token());
 
     ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.CREATED);
     if (voter.setCookieHeader() != null) {
