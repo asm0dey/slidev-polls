@@ -146,6 +146,8 @@ public class PollRepositoryImpl implements PollRepository {
         dsl.update(POLL_QUESTIONS)
             .set(POLL_QUESTIONS.PROMPT, q.prompt())
             .set(POLL_QUESTIONS.ORDINAL, i)
+            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
             .where(POLL_QUESTIONS.ID.eq(qid))
             .execute();
         syncOptions(qid, q.options());
@@ -155,6 +157,8 @@ public class PollRepositoryImpl implements PollRepository {
             .set(POLL_QUESTIONS.ID, newQid)
             .set(POLL_QUESTIONS.POLL_ID, pollId)
             .set(POLL_QUESTIONS.PROMPT, q.prompt())
+            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
             .set(POLL_QUESTIONS.ORDINAL, i)
             .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
             .execute();
@@ -340,6 +344,8 @@ public class PollRepositoryImpl implements PollRepository {
           .set(POLL_QUESTIONS.ID, qid)
           .set(POLL_QUESTIONS.POLL_ID, pollId)
           .set(POLL_QUESTIONS.PROMPT, q.prompt())
+          .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+          .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
           .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
           .set(POLL_QUESTIONS.STATUS, q.status().name())
           .execute();
@@ -363,7 +369,16 @@ public class PollRepositoryImpl implements PollRepository {
       }
       ordered.add(
           new Question(
-              qid, pollId, q.prompt(), q.ordinal(), q.status(), 1, 1, insertedOptions, null, null));
+              qid,
+              pollId,
+              q.prompt(),
+              q.ordinal(),
+              q.status(),
+              q.minSelections(),
+              q.maxSelections(),
+              insertedOptions,
+              null,
+              null));
     }
     return ordered;
   }
@@ -399,6 +414,8 @@ public class PollRepositoryImpl implements PollRepository {
                       POLL_QUESTIONS.PROMPT,
                       POLL_QUESTIONS.ORDINAL,
                       POLL_QUESTIONS.STATUS,
+                      POLL_QUESTIONS.MIN_SELECTIONS,
+                      POLL_QUESTIONS.MAX_SELECTIONS,
                       POLL_QUESTIONS.ACTIVATED_AT,
                       POLL_QUESTIONS.CLOSED_AT,
                       OPTIONS_FIELD)
@@ -415,8 +432,8 @@ public class PollRepositoryImpl implements PollRepository {
                               q.get(POLL_QUESTIONS.PROMPT),
                               q.get(POLL_QUESTIONS.ORDINAL),
                               QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
-                              1,
-                              1,
+                              q.get(POLL_QUESTIONS.MIN_SELECTIONS),
+                              q.get(POLL_QUESTIONS.MAX_SELECTIONS),
                               q.get(OPTIONS_FIELD),
                               q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
                                   ? null
