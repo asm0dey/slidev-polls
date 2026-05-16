@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import site.asm0dey.slidev.polls.api.PollApiApplication;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
 import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
@@ -22,7 +23,9 @@ import site.asm0dey.slidev.polls.core.service.PollService;
  * application against Testcontainers Postgres so the column defaults / NOT NULL constraints from
  * Flyway V11 are exercised end-to-end.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@SpringBootTest(
+    classes = PollApiApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @Import(TestcontainersConfiguration.class)
 class PollRepositoryImplArityRoundTripIT {
 
