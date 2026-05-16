@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
-import org.jooq.Field;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.impl.DSL;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -111,14 +110,27 @@ public class VoteRepositoryImpl implements VoteRepository {
 
   @Override
   public Map<UUID, Long> tally(UUID questionId) {
-    Field<UUID> unnested = DSL.field("unnest({0})", UUID.class, VOTES.OPTION_IDS);
+    // Fetch ballots as raw arrays and tally in-process. H2 supports UNNEST only as a constant
+    // table-valued source (no implicit lateral join to outer columns), and the cross-dialect
+    // alternatives (CROSS JOIN LATERAL, explicit unnest derived table) are not parsed by H2's
+    // SQL parser. A read-side fanout in Java sidesteps the portability gap; the row volume per
+    // question is bounded by the active voter count, which is the same upper bound the index
+    // scan would have hit anyway.
     Map<UUID, Long> out = new HashMap<>();
-    dsl.select(unnested, DSL.count())
+    dsl.select(VOTES.OPTION_IDS)
         .from(VOTES)
         .where(VOTES.QUESTION_ID.eq(questionId))
-        .groupBy(unnested)
         .fetch()
-        .forEach(r -> out.put(r.value1(), (long) r.value2()));
+        .forEach(
+            r -> {
+              UUID[] ids = r.value1();
+              if (ids == null) {
+                return;
+              }
+              for (UUID id : ids) {
+                out.merge(id, 1L, Long::sum);
+              }
+            });
     return out;
   }
 
