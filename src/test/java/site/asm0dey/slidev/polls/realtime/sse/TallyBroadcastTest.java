@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,16 +33,15 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  * Covers the SSE broadcast contract:
  *
  * <ul>
- *   <li>{@code @TS-030} — snapshot on connect / tally on vote
+ *   <li>{@code @TS-030} — snapshot on connect / fresh snapshot on every vote
  *   <li>{@code @TS-031} — fresh snapshot on active-question change
- *   <li>{@code @TS-032} — stray tally (wrong questionId) is still broadcast by the server and
- *       filtered by the client; the server-side assertion is that a {@code tally} event carries the
- *       exact {@code questionId} the broadcaster observed, so a stale event can be detected
  *   <li>{@code question-closed} on presenter-driven close
  * </ul>
  *
- * Pure-Java fakes; no Spring. The {@link SseHub} is a real instance (its concurrency is pinned by
- * {@code SseHubConcurrencyTest}); everything else is in-memory.
+ * <p>Every ballot change re-broadcasts a full {@link SnapshotPayload}; the legacy delta-shaped
+ * {@code tally} event has been removed. Pure-Java fakes; no Spring. The {@link SseHub} is a real
+ * instance (its concurrency is pinned by {@code SseHubConcurrencyTest}); everything else is
+ * in-memory.
  */
 class TallyBroadcastTest {
 
@@ -60,51 +60,55 @@ class TallyBroadcastTest {
     broadcaster = new TallyBroadcaster(hub, builder);
   }
 
-  // @TS-030 — a VoteCastEvent fans out as a "tally" SSE event carrying the new absolute count for
-  // the voted option. The subscriber captures the event name and payload so we can assert both.
+  // @TS-030 — a VoteCastEvent fans out as a fresh "snapshot" SSE event whose tally reflects the
+  // VoteRepository's current absolute counts for the voted question.
   @Test
-  void vote_cast_event_broadcasts_tally_with_new_count() throws Exception {
+  void vote_cast_event_broadcasts_fresh_snapshot() throws Exception {
     Poll poll = seedPollWithActiveQuestion("tally-talk");
+    UUID activeQ = poll.activeQuestionId();
     UUID optionA = poll.questions().get(0).options().get(0).id();
+    UUID optionB = poll.questions().get(0).options().get(1).id();
+    votes.seedTally(activeQ, Map.of(optionA, 7L, optionB, 2L));
     CapturingEmitter emitter = new CapturingEmitter();
     hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:00:00Z");
-    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), at));
+    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), activeQ, at));
 
     assertThat(emitter.events).hasSize(1);
     CapturingEmitter.Captured event = emitter.events.get(0);
-    assertThat(event.name).isEqualTo("tally");
-    TallyPayload payload = (TallyPayload) event.data;
+    assertThat(event.name).isEqualTo("snapshot");
+    SnapshotPayload payload = (SnapshotPayload) event.data;
     assertThat(payload.pollId()).isEqualTo(poll.id());
-    assertThat(payload.questionId()).isEqualTo(poll.activeQuestionId());
-    assertThat(payload.optionId()).isEqualTo(optionA);
-    assertThat(payload.count()).isEqualTo(7L);
-    assertThat(payload.emittedAt()).isEqualTo(at);
+    assertThat(payload.activeQuestion()).isNotNull();
+    assertThat(payload.activeQuestion().id()).isEqualTo(activeQ);
+    Map<UUID, Long> byOption = new HashMap<>();
+    payload.tally().forEach(t -> byOption.put(t.optionId(), t.count()));
+    assertThat(byOption).containsEntry(optionA, 7L).containsEntry(optionB, 2L);
   }
 
-  // A VoteRetractedEvent fans out as a "tally" SSE event carrying the post-decrement absolute count
-  // for the option that was un-voted. Same payload shape as a VoteCastEvent — the client treats it
-  // as an authoritative new count, not a delta.
+  // A VoteRetractedEvent fans out as a fresh "snapshot" SSE event reflecting the post-retraction
+  // tally. Same payload shape as the cast path — the client is fully snapshot-driven.
   @Test
-  void vote_retracted_event_broadcasts_tally_with_new_count() throws Exception {
+  void vote_retracted_event_broadcasts_fresh_snapshot() throws Exception {
     Poll poll = seedPollWithActiveQuestion("retract-talk");
+    UUID activeQ = poll.activeQuestionId();
     UUID optionA = poll.questions().get(0).options().get(0).id();
+    votes.seedTally(activeQ, Map.of(optionA, 3L));
     CapturingEmitter emitter = new CapturingEmitter();
     hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:05:00Z");
-    broadcaster.onVoteRetracted(new VoteRetractedEvent(poll.id(), poll.activeQuestionId(), at));
+    broadcaster.onVoteRetracted(new VoteRetractedEvent(poll.id(), activeQ, at));
 
     assertThat(emitter.events).hasSize(1);
     CapturingEmitter.Captured event = emitter.events.get(0);
-    assertThat(event.name).isEqualTo("tally");
-    TallyPayload payload = (TallyPayload) event.data;
-    assertThat(payload.pollId()).isEqualTo(poll.id());
-    assertThat(payload.questionId()).isEqualTo(poll.activeQuestionId());
-    assertThat(payload.optionId()).isEqualTo(optionA);
-    assertThat(payload.count()).isEqualTo(3L);
-    assertThat(payload.emittedAt()).isEqualTo(at);
+    assertThat(event.name).isEqualTo("snapshot");
+    SnapshotPayload payload = (SnapshotPayload) event.data;
+    assertThat(payload.activeQuestion().id()).isEqualTo(activeQ);
+    Map<UUID, Long> byOption = new HashMap<>();
+    payload.tally().forEach(t -> byOption.put(t.optionId(), t.count()));
+    assertThat(byOption.get(optionA)).isEqualTo(3L);
   }
 
   // @TS-031 — ActiveQuestionChangedEvent triggers a fresh snapshot whose activeQuestion.id matches
@@ -135,28 +139,6 @@ class TallyBroadcastTest {
     assertThat(payload.tally()).allMatch(t -> t.count() == 0L);
   }
 
-  // @TS-032 — the broadcaster always stamps the event with the questionId from the VoteCastEvent,
-  // so the client can detect a stale tally and ignore it. Server-side assertion: a tally event
-  // carries the exact questionId the event said it did, never an out-of-band value.
-  @Test
-  void tally_payload_carries_the_votecast_question_id_for_client_filtering() throws Exception {
-    Poll poll = seedPollWithActiveQuestion("filter-talk");
-    UUID optionA = poll.questions().get(0).options().get(0).id();
-    UUID someOtherQuestion = UUID.randomUUID();
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
-
-    // Fire an event whose questionId intentionally does not match the current active. The
-    // broadcaster still forwards it verbatim — the client is the one that filters stray tallies
-    // by cross-referencing its latest snapshot's activeQuestion.id.
-    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), someOtherQuestion, Instant.now()));
-
-    TallyPayload payload = (TallyPayload) emitter.events.get(0).data;
-    assertThat(payload.questionId())
-        .as("payload carries the exact questionId — client filters stray tallies via it")
-        .isEqualTo(someOtherQuestion);
-  }
-
   // A question-closed event (presenter closed without activating a successor) broadcasts the
   // "question-closed" SSE event verbatim; a later activation will fire its own snapshot.
   @Test
@@ -181,7 +163,6 @@ class TallyBroadcastTest {
   @Test
   void broadcast_with_no_subscribers_is_a_noop() throws Exception {
     Poll poll = seedPollWithActiveQuestion("silent-talk");
-    UUID optionA = poll.questions().get(0).options().get(0).id();
     // No emitters registered.
     broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), Instant.now()));
     // Nothing to assert besides "did not throw"; reaching here is the assertion.
@@ -398,6 +379,12 @@ class TallyBroadcastTest {
   }
 
   private static final class InMemoryVoteRepository implements VoteRepository {
+    private final Map<UUID, Map<UUID, Long>> tallies = new HashMap<>();
+
+    void seedTally(UUID questionId, Map<UUID, Long> counts) {
+      tallies.put(questionId, new HashMap<>(counts));
+    }
+
     @Override
     public site.asm0dey.slidev.polls.core.domain.Vote insert(
         site.asm0dey.slidev.polls.core.domain.Vote vote) {
@@ -411,7 +398,7 @@ class TallyBroadcastTest {
 
     @Override
     public Map<UUID, Long> tally(UUID questionId) {
-      return Map.of();
+      return tallies.getOrDefault(questionId, Map.of());
     }
 
     @Override
