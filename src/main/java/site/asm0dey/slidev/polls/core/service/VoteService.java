@@ -1,8 +1,12 @@
 package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -53,7 +57,12 @@ public class VoteService {
    *     {@code (question_id, voter_token)} refuses a second row ({@code @TS-023}, {@code @TS-024})
    */
   @Transactional
-  public Vote recordVote(String slug, UUID optionId, String voterToken) {
+  public Vote recordVote(String slug, List<UUID> optionIds, String voterToken) {
+    Objects.requireNonNull(optionIds, "optionIds");
+    if (optionIds.size() != Set.copyOf(optionIds).size()) {
+      throw new IllegalArgumentException("duplicate option in ballot");
+    }
+
     Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
     UUID activeQuestionId = getActiveQuestionId(slug, poll);
     Question activeQuestion =
@@ -64,21 +73,36 @@ public class VoteService {
                 () ->
                     new NotFoundException(
                         "active question " + activeQuestionId + " not in poll " + poll.id()));
-    boolean optionBelongs =
-        activeQuestion.options().stream().map(Option::id).anyMatch(id -> id.equals(optionId));
-    if (!optionBelongs) {
-      throw new NotFoundException(
-          "option " + optionId + " does not belong to active question " + activeQuestionId);
+
+    if (optionIds.size() < activeQuestion.minSelections()
+        || optionIds.size() > activeQuestion.maxSelections()) {
+      throw new IllegalArgumentException(
+          "ballot size must be between "
+              + activeQuestion.minSelections()
+              + " and "
+              + activeQuestion.maxSelections());
+    }
+
+    Set<UUID> known =
+        activeQuestion.options().stream().map(Option::id).collect(Collectors.toUnmodifiableSet());
+    for (UUID oid : optionIds) {
+      if (!known.contains(oid)) {
+        throw new NotFoundException(
+            "option " + oid + " does not belong to active question " + activeQuestionId);
+      }
     }
 
     Vote pending =
         new Vote(
-            UUID.randomUUID(), poll.id(), activeQuestionId, optionId, voterToken, Instant.now());
+            UUID.randomUUID(),
+            poll.id(),
+            activeQuestionId,
+            List.copyOf(optionIds),
+            voterToken,
+            Instant.now());
     Vote stored = voteRepository.insert(pending);
 
-    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
-    events.publishEvent(
-        new VoteCastEvent(poll.id(), activeQuestionId, optionId, newCount, stored.createdAt()));
+    events.publishEvent(new VoteCastEvent(poll.id(), activeQuestionId, stored.createdAt()));
     return stored;
   }
 
@@ -97,16 +121,13 @@ public class VoteService {
   public void retractVote(String slug, String voterToken) {
     Poll poll = pollRepository.findBySlug(slug).orElseThrow(() -> new NotFoundException(slug));
     UUID activeQuestionId = getActiveQuestionId(slug, poll);
-    Optional<UUID> deletedOption =
+    Optional<List<UUID>> deletedOption =
         voteRepository.deleteByQuestionAndVoter(activeQuestionId, voterToken);
     if (deletedOption.isEmpty()) {
       // Idempotent no-op — voter had no row on the active question. No event.
       return;
     }
-    UUID optionId = deletedOption.get();
-    long newCount = voteRepository.tally(activeQuestionId).getOrDefault(optionId, 0L);
-    events.publishEvent(
-        new VoteRetractedEvent(poll.id(), activeQuestionId, optionId, newCount, Instant.now()));
+    events.publishEvent(new VoteRetractedEvent(poll.id(), activeQuestionId, Instant.now()));
   }
 
   private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {

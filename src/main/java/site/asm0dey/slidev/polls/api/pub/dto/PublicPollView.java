@@ -40,7 +40,9 @@ public record PublicPollView(
               .orElse(null);
     }
     State state = active == null ? State.WAITING : State.ACTIVE;
-    QuestionDto activeDto = active == null ? null : QuestionDto.from(active);
+    // Voter-facing view doesn't surface vote counts; default to 0 so the shared QuestionDto shape
+    // still serialises.
+    QuestionDto activeDto = active == null ? null : QuestionDto.from(active, 0);
     return new PublicPollView(poll.id(), poll.slug(), poll.title(), state, activeDto, alreadyVoted);
   }
 }

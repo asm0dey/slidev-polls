@@ -9,8 +9,7 @@ import {
   openPollStream,
   ResultsPanel,
   type QuestionClosedEvent,
-  type SnapshotEvent,
-  type TallyDeltaEvent
+  type SnapshotEvent
 } from "@slidev-polls/shared";
 import { useDeckAuth } from "../composables/useDeckAuth";
 import { findSlideRoot, useSlidevTheme } from "../composables/useSlidevTheme";
@@ -105,10 +104,15 @@ const panelQuestion = computed(() => {
   if (!s?.activeQuestion) return null;
   return {
     prompt: s.activeQuestion.prompt,
+    // Pass arity through so ResultsPanel can decide whether to render the
+    // "{voters} voters · {selections} selections" footer (multi-choice only).
+    minSelections: s.activeQuestion.minSelections,
+    maxSelections: s.activeQuestion.maxSelections,
     options: s.activeQuestion.options.map((o) => ({ id: o.id, label: o.label })),
     tally: s.tally
   };
 });
+const panelVoterCount = computed(() => snapshot.value?.voterCount ?? 0);
 
 function isElementVisible(el: HTMLElement): boolean {
   const r = el.getBoundingClientRect();
@@ -297,13 +301,6 @@ onMounted(async () => {
       closedNotice.value = null;
       setPollResults(resultsKey.value, ev);
     },
-    onTally: (ev: TallyDeltaEvent) => {
-      if (!snapshot.value || snapshot.value.activeQuestion?.id !== ev.questionId) return;
-      const entry = snapshot.value.tally.find((t) => t.optionId === ev.optionId);
-      if (entry) entry.count = ev.count;
-      else snapshot.value.tally.push({ optionId: ev.optionId, count: ev.count });
-      setPollResults(resultsKey.value, snapshot.value);
-    },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
       if (snapshot.value && snapshot.value.activeQuestion?.id === ev.questionId) {
         // Keep the panel rendering the final results. The deck embeds these
@@ -347,6 +344,7 @@ onUnmounted(() => {
     <ResultsPanel
       v-if="panelQuestion"
       :question="panelQuestion"
+      :voter-count="panelVoterCount"
       :mode="theme.scrim === 'none' ? 'flat' : theme.scrim"
     />
     <p v-else-if="closedNotice" class="sp-pollpanel__waiting" data-testid="poll-waiting">

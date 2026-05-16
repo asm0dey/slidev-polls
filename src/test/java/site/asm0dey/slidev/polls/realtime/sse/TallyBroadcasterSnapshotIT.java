@@ -1,4 +1,4 @@
-package site.asm0dey.slidev.polls.api.pub;
+package site.asm0dey.slidev.polls.realtime.sse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -31,25 +31,26 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestTemplate;
+import site.asm0dey.slidev.polls.api.PollApiApplication;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
 import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * End-to-end test for {@code GET /api/polls/{slug}/stream}. Anchors {@code @TS-030}: a vote landing
- * against the active question produces a fresh {@code snapshot} SSE event delivered to connected
- * subscribers in well under the 2-second budget.
+ * Pins the snapshot-only SSE contract after the {@code tally} delta event was retired: every
+ * accepted vote (and every retraction) re-broadcasts a fresh {@link SnapshotPayload}. No {@code
+ * tally} or {@code tally-delta} event should ever appear on the wire.
  *
- * <p>Unlike the pure-unit coverage in {@code TallyBroadcastTest}, this IT boots the full stack
- * (Flyway-migrated Postgres via Testcontainers, Spring Security, the controller layer) so the SSE
- * connection is established over a real HTTP socket and the vote flows through the actual REST
- * pipeline. A small HTTP SSE reader thread collects events off the wire; Awaitility polls it until
- * the expected event lands.
+ * <p>Boots the full Spring stack the same way {@code StreamIT} does — the public REST surface still
+ * exposes the legacy single-{@code optionId} shape until Task 12 lands; the snapshot-driven SSE
+ * behaviour is independent of that and is what this IT verifies.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    classes = PollApiApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
-class StreamIT {
+class TallyBroadcasterSnapshotIT {
 
   @LocalServerPort int port;
   @Autowired ObjectMapper objectMapper;
@@ -59,14 +60,14 @@ class StreamIT {
   private RestTemplate rest;
   private ExecutorService readerPool;
   private AtomicBoolean reading;
+  private String voterCookie;
 
   @BeforeEach
   void setUp() {
     rest = new RestTemplate();
     readerPool = Executors.newSingleThreadExecutor();
     reading = new AtomicBoolean(true);
-    // V6 dropped the seed migration; ensure alice exists. Idempotent because polls from earlier
-    // tests reference admin_user via FK.
+    voterCookie = null;
     AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
   }
 
@@ -76,60 +77,101 @@ class StreamIT {
     readerPool.shutdownNow();
   }
 
-  // @TS-030 — end-to-end latency: a connected subscriber receives a fresh "snapshot" event within
-  // 2 seconds of the vote being accepted by the REST layer. Every ballot change re-broadcasts the
-  // full snapshot — the legacy "tally" delta event has been removed.
   @Test
-  void subscriber_receives_snapshot_within_two_seconds_of_a_vote() throws Exception {
-    PollFixture poll = createPollWithActiveQuestion("stream-talk");
+  void castFiresOneSnapshotFrameAndNoTallyFrame() throws Exception {
+    String slug = "snap-cast";
+    PollFixture poll = createPollWithActiveQuestion(slug);
     ConcurrentLinkedQueue<SseEvent> received = new ConcurrentLinkedQueue<>();
+    readerPool.submit(() -> readStream("/api/polls/" + slug + "/stream", received));
 
-    // Open the stream in a background reader; the server emits the initial snapshot synchronously
-    // so we can hand off to Awaitility once it has arrived.
-    readerPool.submit(() -> readStream("/api/polls/stream-talk/stream", received));
-
-    // Wait for the initial snapshot before firing the vote; this avoids a race where the vote
-    // lands before the hub has the subscriber registered.
+    // Wait for the initial connect-time snapshot so the subscriber is registered before voting.
     await()
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> received.stream().anyMatch(e -> "snapshot".equals(e.name)));
 
-    // Vote, then verify the resnapshot arrives within the 2s budget. The snapshot-driven SSE
-    // contract is independent of the ballot shape — Task 12 swapped the request body to
-    // {optionIds: [...]} but the stream still re-snapshots on every vote.
-    String voteBody = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
-    ResponseEntity<String> voteResponse =
-        rest.exchange(
-            "http://localhost:" + port + "/api/polls/stream-talk/votes",
-            HttpMethod.POST,
-            new HttpEntity<>(voteBody, jsonHeaders()),
-            String.class);
-    assertThat(voteResponse.getStatusCode().value()).isEqualTo(201);
+    cast(slug, poll.optionAId());
 
-    long before = System.nanoTime();
+    // Exactly one more snapshot frame should arrive (one cast → one resnapshot).
     await()
         .atMost(2, TimeUnit.SECONDS)
         .until(() -> received.stream().filter(e -> "snapshot".equals(e.name)).count() >= 2);
-    long elapsedMs = (System.nanoTime() - before) / 1_000_000L;
-    assertThat(elapsedMs).as("snapshot delivered within 2s budget").isLessThan(2_000L);
 
-    // The second snapshot (post-vote) carries the updated tally for optionA.
-    List<SseEvent> snapshots = received.stream().filter(e -> "snapshot".equals(e.name)).toList();
-    SseEvent latest = snapshots.get(snapshots.size() - 1);
-    JsonNode node = objectMapper.readTree(latest.data);
-    assertThat(UUID.fromString(node.get("activeQuestion").get("id").asText()))
-        .as("snapshot activeQuestion matches the open question")
-        .isEqualTo(poll.activeQuestionId());
-    long optionACount = 0L;
-    for (JsonNode entry : node.get("tally")) {
-      if (UUID.fromString(entry.get("optionId").asText()).equals(poll.optionAId())) {
-        optionACount = entry.get("count").asLong();
-      }
-    }
-    assertThat(optionACount).isEqualTo(1L);
+    assertThat(received.stream().filter(e -> "snapshot".equals(e.name)).count())
+        .as("cast triggers exactly one resnapshot beyond the connect-time snapshot")
+        .isEqualTo(2L);
+    assertThat(received.stream().filter(e -> "tally".equals(e.name)))
+        .as("legacy tally delta event must not be emitted")
+        .isEmpty();
+    assertThat(received.stream().filter(e -> "tally-delta".equals(e.name)))
+        .as("legacy tally-delta event must not be emitted")
+        .isEmpty();
   }
 
-  // ---------- SSE reader + parsing ----------------------------------------
+  @Test
+  void retractFiresAnotherSnapshotFrame() throws Exception {
+    String slug = "snap-retract";
+    PollFixture poll = createPollWithActiveQuestion(slug);
+    ConcurrentLinkedQueue<SseEvent> received = new ConcurrentLinkedQueue<>();
+    readerPool.submit(() -> readStream("/api/polls/" + slug + "/stream", received));
+
+    await()
+        .atMost(5, TimeUnit.SECONDS)
+        .until(() -> received.stream().anyMatch(e -> "snapshot".equals(e.name)));
+
+    cast(slug, poll.optionAId());
+    await()
+        .atMost(2, TimeUnit.SECONDS)
+        .until(() -> received.stream().filter(e -> "snapshot".equals(e.name)).count() >= 2);
+
+    retract(slug);
+    await()
+        .atMost(2, TimeUnit.SECONDS)
+        .until(() -> received.stream().filter(e -> "snapshot".equals(e.name)).count() >= 3);
+
+    assertThat(received.stream().filter(e -> "snapshot".equals(e.name)).count())
+        .as("connect + cast + retract = three snapshot frames")
+        .isEqualTo(3L);
+  }
+
+  // ---------- HTTP helpers -------------------------------------------------
+
+  private void cast(String slug, UUID optionId) {
+    String body = String.format("{\"optionIds\":[\"%s\"]}", optionId);
+    HttpHeaders headers = jsonHeaders();
+    if (voterCookie != null) {
+      headers.add(HttpHeaders.COOKIE, voterCookie);
+    }
+    ResponseEntity<String> response =
+        rest.exchange(
+            "http://localhost:" + port + "/api/polls/" + slug + "/votes",
+            HttpMethod.POST,
+            new HttpEntity<>(body, headers),
+            String.class);
+    assertThat(response.getStatusCode().value()).isEqualTo(201);
+    List<String> setCookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+    if (setCookies != null) {
+      for (String header : setCookies) {
+        if (header.startsWith("sp_voter=")) {
+          int semi = header.indexOf(';');
+          voterCookie = semi >= 0 ? header.substring(0, semi) : header;
+        }
+      }
+    }
+  }
+
+  private void retract(String slug) {
+    HttpHeaders headers = jsonHeaders();
+    if (voterCookie != null) {
+      headers.add(HttpHeaders.COOKIE, voterCookie);
+    }
+    ResponseEntity<String> response =
+        rest.exchange(
+            "http://localhost:" + port + "/api/polls/" + slug + "/votes",
+            HttpMethod.DELETE,
+            new HttpEntity<>(headers),
+            String.class);
+    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+  }
 
   private void readStream(String path, ConcurrentLinkedQueue<SseEvent> sink) {
     try {
@@ -161,12 +203,10 @@ class StreamIT {
           } else if (line.startsWith("data:")) {
             dataLines.add(line.substring("data:".length()).trim());
           }
-          // ":" comment lines (heartbeats) and any other field are ignored for the assertion.
         }
       }
-    } catch (Exception ex) {
-      // The reader thread is best-effort; Awaitility surfaces the failure when the expected
-      // event never lands.
+    } catch (Exception _) {
+      // Best-effort reader; failures surface through Awaitility timing out on the expected event.
     }
   }
 
@@ -178,12 +218,9 @@ class StreamIT {
 
   private record SseEvent(String name, String data) {}
 
-  // ---------- fixtures -----------------------------------------------------
+  // ---------- fixture ------------------------------------------------------
 
   private PollFixture createPollWithActiveQuestion(String slug) throws Exception {
-    // Log in as alice — the response sets JSESSIONID and XSRF-TOKEN cookies; subsequent admin
-    // POSTs need both (the XSRF token is echoed as X-XSRF-TOKEN per SecurityConfig's
-    // CookieCsrfTokenRepository setup).
     ResponseEntity<String> login =
         rest.exchange(
             "http://localhost:" + port + "/api/admin/login",
@@ -208,7 +245,7 @@ class StreamIT {
         String.format(
             """
             {
-              "title": "Stream fixture",
+              "title": "Snapshot fixture",
               "slug": "%s",
               "questions": [
                 {
@@ -240,7 +277,6 @@ class StreamIT {
     return new PollFixture(pollId, questionId, optionA, optionB);
   }
 
-  /** Pull the first Set-Cookie line whose name matches and return "name=value" (no attributes). */
   private static String extractCookie(List<String> setCookieHeaders, String name) {
     for (String header : setCookieHeaders) {
       if (header.startsWith(name + "=")) {

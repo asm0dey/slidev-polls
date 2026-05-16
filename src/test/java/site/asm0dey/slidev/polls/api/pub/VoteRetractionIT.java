@@ -67,7 +67,7 @@ class VoteRetractionIT {
     PollFixture poll = createPollWithActiveQuestion("retract-happy");
     Cookie sessionCookie = mintVoterCookie("retract-happy");
 
-    String body = String.format("{\"optionId\":\"%s\"}", poll.optionAId());
+    String body = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     mvc.perform(
             post("/api/polls/retract-happy/votes")
                 .cookie(sessionCookie)
@@ -110,7 +110,7 @@ class VoteRetractionIT {
     Cookie sessionCookie = mintVoterCookie("retract-closed");
 
     // Cast.
-    String body = String.format("{\"optionId\":\"%s\"}", poll.optionAId());
+    String body = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     mvc.perform(
             post("/api/polls/retract-closed/votes")
                 .cookie(sessionCookie)

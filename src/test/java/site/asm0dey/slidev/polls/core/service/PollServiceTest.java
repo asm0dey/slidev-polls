@@ -347,7 +347,7 @@ class PollServiceTest {
     service.activateQuestionForOwner(created.id(), "alice", qid);
 
     fakeVoteRepository.insert(
-        new Vote(UUID.randomUUID(), created.id(), qid, oid, "voter-1", Instant.now()));
+        new Vote(UUID.randomUUID(), created.id(), qid, List.of(oid), "voter-1", Instant.now()));
 
     Poll after = service.clearVotesForOwner(created.id(), "alice");
 
@@ -489,7 +489,8 @@ class PollServiceTest {
           opts.add(new Option(oid, qid, ou.label(), j));
         }
         rebuilt.add(
-            new Question(qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, opts, null, null));
+            new Question(
+                qid, pollId, qu.prompt(), i, QuestionStatus.DRAFT, 1, 1, opts, null, null));
       }
       Poll updated =
           new Poll(
@@ -527,6 +528,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.ACTIVE,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   Instant.now(),
                   null));
@@ -538,6 +541,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.CLOSED,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   q.activatedAt(),
                   Instant.now()));
@@ -574,6 +579,8 @@ class PollServiceTest {
                   q.prompt(),
                   q.ordinal(),
                   QuestionStatus.CLOSED,
+                  q.minSelections(),
+                  q.maxSelections(),
                   q.options(),
                   q.activatedAt(),
                   Instant.now()));
@@ -633,6 +640,8 @@ class PollServiceTest {
                 q.prompt(),
                 q.ordinal(),
                 QuestionStatus.DRAFT,
+                q.minSelections(),
+                q.maxSelections(),
                 q.options(),
                 null,
                 null));
@@ -659,6 +668,11 @@ class PollServiceTest {
         throw new NotFoundException(pollId.toString());
       }
       return existing;
+    }
+
+    @Override
+    public java.util.Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+      return java.util.Map.of();
     }
   }
 
@@ -695,10 +709,17 @@ class PollServiceTest {
       Map<UUID, Long> out = new HashMap<>();
       for (Vote v : rows) {
         if (v.questionId().equals(questionId)) {
-          out.merge(v.optionId(), 1L, Long::sum);
+          for (UUID oid : v.optionIds()) {
+            out.merge(oid, 1L, Long::sum);
+          }
         }
       }
       return out;
+    }
+
+    @Override
+    public long voterCount(UUID questionId) {
+      return rows.stream().filter(v -> v.questionId().equals(questionId)).count();
     }
 
     @Override
@@ -709,7 +730,8 @@ class PollServiceTest {
     }
 
     @Override
-    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    public java.util.Optional<List<UUID>> deleteByQuestionAndVoter(
+        UUID questionId, String voterToken) {
       throw new UnsupportedOperationException("not needed for PollServiceTest");
     }
   }

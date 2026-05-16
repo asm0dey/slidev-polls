@@ -55,7 +55,11 @@ public class VoteController {
     }
 
     VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
-    Vote recorded = voteService.recordVote(slug, body.optionId(), voter.token());
+    // {@code body.optionIds()} is @NotNull-validated at the binding boundary, so a legacy
+    // {"optionId": "..."} payload (which Jackson silently swallows under
+    // fail-on-unknown-properties: false) has already been rejected as 400 VALIDATION_FAILED by
+    // the time we get here. An empty list is an abstention; the service enforces arity bounds.
+    Vote recorded = voteService.recordVote(slug, body.optionIds(), voter.token());
 
     ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.CREATED);
     if (voter.setCookieHeader() != null) {

@@ -16,6 +16,9 @@ export interface Question {
   prompt: string;
   ordinal: number;
   status: QuestionStatus;
+  minSelections: number;
+  maxSelections: number;
+  voteCount: number;
   options: Option[];
 }
 
@@ -62,6 +65,8 @@ export interface CreateOptionRequest {
 /** Question payload for create/update (POST /api/admin/polls). */
 export interface CreateQuestionRequest {
   prompt: string;
+  minSelections?: number;
+  maxSelections?: number;
   options: CreateOptionRequest[];
 }
 
@@ -83,6 +88,8 @@ export interface UpdateOptionBody {
 export interface UpdateQuestionRequest {
   id?: string;
   prompt: string;
+  minSelections?: number;
+  maxSelections?: number;
   options: UpdateOptionBody[];
 }
 
@@ -101,8 +108,8 @@ export interface ActivateQuestionRequest {
 
 /** Vote submission payload (POST /api/polls/{slug}/votes). */
 export interface VoteRequest {
-  optionId: string;
-  voterToken: string;
+  optionIds: string[];
+  voterToken?: string;
 }
 
 /** Vote accepted response. */
@@ -129,7 +136,8 @@ export type ProblemCode =
   | "ORIGIN_INVALID"
   | "SETUP_LOCKED"
   | "USERNAME_TAKEN"
-  | "TRANSPORT_FAILURE";
+  | "TRANSPORT_FAILURE"
+  | "RESOURCE_HAS_VOTES";
 
 export interface Problem {
   code: ProblemCode;
@@ -154,30 +162,27 @@ export interface SnapshotActiveQuestion {
   id: string;
   prompt: string;
   ordinal: number;
+  minSelections: number;
+  maxSelections: number;
   options: Option[];
 }
 
-/** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect. */
+/** SSE "snapshot" event — full state for a poll/question, re-emitted on (re)connect.
+ *  `voterCount` is the ballots-cast figure (one row in `votes`, regardless of how many options
+ *  the ballot picked) and is distinct from the selections-summed totals in `tally`. The
+ *  multi-choice results footer renders both as "{voterCount} voters · {sum(tally)} selections". */
 export interface SnapshotEvent {
   pollId: string;
   slug: string;
   activeQuestion: SnapshotActiveQuestion | null;
   tally: TallyEntry[];
+  voterCount: number;
   emittedAt: string;
 }
 
 export interface TallyEntry {
   optionId: string;
   count: number;
-}
-
-/** SSE "tally" event — delta for a single option, fan-out on each accepted vote. */
-export interface TallyDeltaEvent {
-  pollId: string;
-  questionId: string;
-  optionId: string;
-  count: number;
-  emittedAt: string;
 }
 
 /** SSE "question-closed" event. */

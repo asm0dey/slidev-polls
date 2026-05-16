@@ -3,6 +3,7 @@ package site.asm0dey.slidev.polls.api.admin;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import site.asm0dey.slidev.polls.api.admin.dto.PollDetailDto;
 import site.asm0dey.slidev.polls.api.admin.dto.PollDto;
 import site.asm0dey.slidev.polls.api.admin.dto.UpdatePollRequest;
 import site.asm0dey.slidev.polls.core.domain.Poll;
+import site.asm0dey.slidev.polls.core.service.PollRepository;
 import site.asm0dey.slidev.polls.core.service.PollService;
 
 /**
@@ -38,15 +40,22 @@ import site.asm0dey.slidev.polls.core.service.PollService;
  * <p>{@code publicUrlBase} is assembled from the request at response time via {@link
  * PublicUrlBase#of(HttpServletRequest)} so the join link always reflects the reverse-proxy host the
  * presenter actually hit; no config property is threaded through the call.
+ *
+ * <p>Per-question {@code voteCount} is fetched out-of-band via {@link
+ * PollRepository#voteCountByQuestion(UUID)} on every detail response so the backoffice can lock
+ * structural edits once any ballot has been cast. The freshly-created path skips the query (counts
+ * are zero by construction).
  */
 @RestController
 @RequestMapping("/api/admin/polls")
 public class PollController {
 
   private final PollService pollService;
+  private final PollRepository pollRepository;
 
-  public PollController(PollService pollService) {
+  public PollController(PollService pollService, PollRepository pollRepository) {
     this.pollService = pollService;
+    this.pollRepository = pollRepository;
   }
 
   @GetMapping
@@ -62,6 +71,7 @@ public class PollController {
       Authentication authentication,
       HttpServletRequest request) {
     Poll created = pollService.create(owner(authentication), body.toCommand());
+    // Freshly-created poll: no votes yet, so skip the lookup and let PollDetailDto default to 0.
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(PollDetailDto.from(created, PublicUrlBase.of(request)));
   }
@@ -70,7 +80,7 @@ public class PollController {
   public PollDetailDto get(
       @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
     Poll poll = pollService.getForOwner(pollId, owner(authentication));
-    return PollDetailDto.from(poll, PublicUrlBase.of(request));
+    return PollDetailDto.from(poll, PublicUrlBase.of(request), counts(pollId));
   }
 
   @PatchMapping("/{pollId}")
@@ -80,13 +90,14 @@ public class PollController {
       Authentication authentication,
       HttpServletRequest request) {
     Poll updated = pollService.updateForOwner(pollId, owner(authentication), body.toCommand());
-    return PollDetailDto.from(updated, PublicUrlBase.of(request));
+    return PollDetailDto.from(updated, PublicUrlBase.of(request), counts(pollId));
   }
 
   @PostMapping("/{pollId}/clone")
   public ResponseEntity<PollDetailDto> clone(
       @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
     Poll cloned = pollService.cloneForOwner(pollId, owner(authentication));
+    // Clone produces a brand-new poll with no votes.
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(PollDetailDto.from(cloned, PublicUrlBase.of(request)));
   }
@@ -95,6 +106,7 @@ public class PollController {
   public PollDetailDto clearVotes(
       @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
     Poll after = pollService.clearVotesForOwner(pollId, owner(authentication));
+    // votes:clear empties the votes table for this poll; counts are zero by construction.
     return PollDetailDto.from(after, PublicUrlBase.of(request));
   }
 
@@ -112,14 +124,18 @@ public class PollController {
       HttpServletRequest request) {
     Poll after =
         pollService.activateQuestionForOwner(pollId, owner(authentication), body.questionId());
-    return PollDetailDto.from(after, PublicUrlBase.of(request));
+    return PollDetailDto.from(after, PublicUrlBase.of(request), counts(pollId));
   }
 
   @PostMapping("/{pollId}/close")
   public PollDetailDto close(
       @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request) {
     Poll after = pollService.closeActiveQuestionForOwner(pollId, owner(authentication));
-    return PollDetailDto.from(after, PublicUrlBase.of(request));
+    return PollDetailDto.from(after, PublicUrlBase.of(request), counts(pollId));
+  }
+
+  private Map<UUID, Long> counts(UUID pollId) {
+    return pollRepository.voteCountByQuestion(pollId);
   }
 
   private static String owner(Authentication authentication) {

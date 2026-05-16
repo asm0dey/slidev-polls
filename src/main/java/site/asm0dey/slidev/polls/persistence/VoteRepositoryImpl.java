@@ -5,6 +5,7 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,10 +30,15 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * in the same way {@link PollRepositoryImpl} handles the partial activation index ({@code @TS-023},
  * {@code @TS-024}).
  *
+ * <p>The ballot itself rides in {@code option_ids uuid[]}; an empty array is a valid "abstain"
+ * ballot and still occupies a row, so the unique index keeps refusing second submissions even from
+ * abstainers. The aggregate projection in {@link #tally} unnests the array so a single multi-select
+ * ballot contributes a count to every option it picked.
+ *
  * <p>{@link #deleteByQuestionAndVoter} is the symmetric path on the delete side: a gated {@code
  * DELETE … WHERE EXISTS (… status='ACTIVE')} translates a zero-rows-affected race against the
  * status flip into {@link QuestionNotActiveException}. The method first reads the row's {@code
- * option_id} so the caller can publish a tally event; if a concurrent transaction deletes the row
+ * option_ids} so the caller can publish a tally event; if a concurrent transaction deletes the row
  * between the preflight and the gated DELETE, we re-read the question status to disambiguate "row
  * vanished concurrently" (idempotent no-op) from "question flipped to CLOSED" (FR-010 violation).
  */
@@ -51,6 +57,7 @@ public class VoteRepositoryImpl implements VoteRepository {
         vote.createdAt() != null
             ? OffsetDateTime.ofInstant(vote.createdAt(), java.time.ZoneOffset.UTC)
             : OffsetDateTime.now();
+    UUID[] optionIdArray = vote.optionIds().toArray(new UUID[0]);
     int inserted;
     try {
       inserted =
@@ -59,7 +66,7 @@ public class VoteRepositoryImpl implements VoteRepository {
                   VOTES.ID,
                   VOTES.POLL_ID,
                   VOTES.QUESTION_ID,
-                  VOTES.OPTION_ID,
+                  VOTES.OPTION_IDS,
                   VOTES.VOTER_TOKEN,
                   VOTES.CREATED_AT)
               .select(
@@ -67,7 +74,7 @@ public class VoteRepositoryImpl implements VoteRepository {
                           DSL.val(vote.id()),
                           DSL.val(vote.pollId()),
                           DSL.val(vote.questionId()),
-                          DSL.val(vote.optionId()),
+                          DSL.val(optionIdArray, VOTES.OPTION_IDS.getDataType()),
                           DSL.val(vote.voterToken()),
                           DSL.val(createdAt))
                       .from(POLL_QUESTIONS)
@@ -87,7 +94,7 @@ public class VoteRepositoryImpl implements VoteRepository {
         vote.id(),
         vote.pollId(),
         vote.questionId(),
-        vote.optionId(),
+        List.of(optionIdArray),
         vote.voterToken(),
         createdAt.toInstant());
   }
@@ -103,14 +110,42 @@ public class VoteRepositoryImpl implements VoteRepository {
 
   @Override
   public Map<UUID, Long> tally(UUID questionId) {
+    // Fetch ballots as raw arrays and tally in-process. H2 supports UNNEST only as a constant
+    // table-valued source (no implicit lateral join to outer columns), and the cross-dialect
+    // alternatives (CROSS JOIN LATERAL, explicit unnest derived table) are not parsed by H2's
+    // SQL parser. A read-side fanout in Java sidesteps the portability gap; the row volume per
+    // question is bounded by the active voter count, which is the same upper bound the index
+    // scan would have hit anyway.
     Map<UUID, Long> out = new HashMap<>();
-    dsl.select(VOTES.OPTION_ID, DSL.count())
+    dsl.select(VOTES.OPTION_IDS)
         .from(VOTES)
         .where(VOTES.QUESTION_ID.eq(questionId))
-        .groupBy(VOTES.OPTION_ID)
         .fetch()
-        .forEach(r -> out.put(r.value1(), (long) r.value2()));
+        .forEach(
+            r -> {
+              UUID[] ids = r.value1();
+              if (ids == null) {
+                return;
+              }
+              for (UUID id : ids) {
+                out.merge(id, 1L, Long::sum);
+              }
+            });
     return out;
+  }
+
+  @Override
+  public long voterCount(UUID questionId) {
+    // One row in `votes` is exactly one ballot (the unique index on
+    // (question_id, voter_token) is what enforces this). COUNT(*) is the
+    // ballots-cast figure the multi-choice footer needs — distinct from the
+    // selections-summed total returned by tally().
+    Integer count =
+        dsl.selectCount()
+            .from(VOTES)
+            .where(VOTES.QUESTION_ID.eq(questionId))
+            .fetchOne(0, Integer.class);
+    return count == null ? 0L : count.longValue();
   }
 
   @Override
@@ -119,13 +154,13 @@ public class VoteRepositoryImpl implements VoteRepository {
   }
 
   @Override
-  public Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
-    UUID optionId =
-        dsl.select(VOTES.OPTION_ID)
+  public Optional<List<UUID>> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    UUID[] optionIds =
+        dsl.select(VOTES.OPTION_IDS)
             .from(VOTES)
             .where(VOTES.QUESTION_ID.eq(questionId).and(VOTES.VOTER_TOKEN.eq(voterToken)))
-            .fetchOne(VOTES.OPTION_ID);
-    if (optionId == null) {
+            .fetchOne(VOTES.OPTION_IDS);
+    if (optionIds == null) {
       return Optional.empty();
     }
 
@@ -163,6 +198,6 @@ public class VoteRepositoryImpl implements VoteRepository {
       // Question still ACTIVE but row gone — idempotent no-op.
       return Optional.empty();
     }
-    return Optional.of(optionId);
+    return Optional.of(List.of(optionIds));
   }
 }

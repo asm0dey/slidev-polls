@@ -17,14 +17,46 @@ public record CreatePollCommand(
     allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
   }
 
-  public record QuestionDraft(String prompt, List<OptionDraft> options) {}
+  public record QuestionDraft(
+      String prompt, int minSelections, int maxSelections, List<OptionDraft> options) {
+
+    public QuestionDraft {
+      if (maxSelections < 1) throw new IllegalArgumentException("maxSelections must be ≥ 1");
+      if (minSelections < 0) throw new IllegalArgumentException("minSelections must be ≥ 0");
+      if (minSelections > maxSelections) {
+        throw new IllegalArgumentException(
+            "minSelections > maxSelections: " + minSelections + " > " + maxSelections);
+      }
+    }
+
+    /** Convenience for tests + back-compat with callers that pre-date the per-question arity. */
+    public QuestionDraft(String prompt, List<OptionDraft> options) {
+      this(prompt, 1, 1, options);
+    }
+  }
 
   public record OptionDraft(String label) {}
 
   /** Update-path counterpart of {@link QuestionDraft}. {@code id} is null for new questions. */
-  public record QuestionUpdate(java.util.UUID id, String prompt, List<OptionUpdate> options) {
+  public record QuestionUpdate(
+      java.util.UUID id,
+      String prompt,
+      int minSelections,
+      int maxSelections,
+      List<OptionUpdate> options) {
+
     public QuestionUpdate {
+      if (maxSelections < 1) throw new IllegalArgumentException("maxSelections must be ≥ 1");
+      if (minSelections < 0) throw new IllegalArgumentException("minSelections must be ≥ 0");
+      if (minSelections > maxSelections) {
+        throw new IllegalArgumentException("min > max");
+      }
       options = options == null ? List.of() : List.copyOf(options);
+    }
+
+    /** Convenience for tests + back-compat with callers that pre-date the per-question arity. */
+    public QuestionUpdate(java.util.UUID id, String prompt, List<OptionUpdate> options) {
+      this(id, prompt, 1, 1, options);
     }
   }
 

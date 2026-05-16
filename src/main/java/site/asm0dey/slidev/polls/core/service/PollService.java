@@ -2,7 +2,11 @@ package site.asm0dey.slidev.polls.core.service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +20,7 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
+import site.asm0dey.slidev.polls.core.error.ResourceHasVotesException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
 import site.asm0dey.slidev.polls.core.error.SlugTakenException;
@@ -110,9 +115,107 @@ public class PollService {
               pollId, OriginNormaliser.normalise(command.allowedOrigins()));
     }
     if (command.questions() != null) {
+      enforceVoteLock(existing, command.questions());
       return repository.replaceQuestions(pollId, command.questions());
     }
     return afterHeader;
+  }
+
+  /**
+   * FR-013 / RESOURCE_HAS_VOTES: once a question has recorded votes, structural edits to it are
+   * rejected. Reword-only edits (prompt text, option label text) and pure reorderings remain
+   * allowed. Structural edits are:
+   *
+   * <ul>
+   *   <li>deleting the question (its id is missing from the update payload),
+   *   <li>deleting any of its options (an existing option id is missing from the update payload),
+   *   <li>changing its selection arity ({@code minSelections} / {@code maxSelections}).
+   * </ul>
+   */
+  private void enforceVoteLock(Poll existing, List<CreatePollCommand.QuestionUpdate> incoming) {
+    Map<UUID, Long> counts = repository.voteCountByQuestion(existing.id());
+    if (counts.isEmpty()) {
+      return;
+    }
+    Set<UUID> incomingQuestionIds = collectIncomingQuestionIds(incoming);
+    lockQuestionDelete(existing, counts, incomingQuestionIds);
+    Map<UUID, Question> storedById = new HashMap<>();
+    for (Question q : existing.questions()) {
+      storedById.put(q.id(), q);
+    }
+    for (CreatePollCommand.QuestionUpdate qu : incoming) {
+      Question stored = resolveVotedStored(qu, storedById, counts);
+      if (stored == null) {
+        continue;
+      }
+      lockArityChange(stored, qu);
+      lockOptionDelete(stored, qu);
+    }
+  }
+
+  private static Set<UUID> collectIncomingQuestionIds(
+      List<CreatePollCommand.QuestionUpdate> incoming) {
+    Set<UUID> ids = new HashSet<>();
+    for (CreatePollCommand.QuestionUpdate qu : incoming) {
+      if (qu.id() != null) {
+        ids.add(qu.id());
+      }
+    }
+    return ids;
+  }
+
+  /** Question-delete: any stored question with voteCount>0 missing from the payload. */
+  private static void lockQuestionDelete(
+      Poll existing, Map<UUID, Long> counts, Set<UUID> incomingQuestionIds) {
+    for (Question stored : existing.questions()) {
+      long voteCount = counts.getOrDefault(stored.id(), 0L);
+      if (voteCount > 0 && !incomingQuestionIds.contains(stored.id())) {
+        throw new ResourceHasVotesException("QUESTION", stored.id());
+      }
+    }
+  }
+
+  /**
+   * Returns the stored counterpart of {@code qu} if it carries votes and is structurally relevant
+   * (known id, voteCount>0); {@code null} when the update should be ignored by the lock checks.
+   */
+  private static Question resolveVotedStored(
+      CreatePollCommand.QuestionUpdate qu, Map<UUID, Question> storedById, Map<UUID, Long> counts) {
+    if (qu.id() == null) {
+      return null; // a brand-new question can't carry votes
+    }
+    Question stored = storedById.get(qu.id());
+    if (stored == null) {
+      return null; // unknown id — replaceQuestions will treat it as a new question
+    }
+    long voteCount = counts.getOrDefault(stored.id(), 0L);
+    if (voteCount == 0) {
+      return null;
+    }
+    return stored;
+  }
+
+  /** Arity change on a voted question is a structural mutation. */
+  private static void lockArityChange(Question stored, CreatePollCommand.QuestionUpdate qu) {
+    if (qu.minSelections() != stored.minSelections()
+        || qu.maxSelections() != stored.maxSelections()) {
+      throw new ResourceHasVotesException("QUESTION", stored.id());
+    }
+  }
+
+  /** Option-delete: any stored option id not present in the incoming option list. */
+  private static void lockOptionDelete(Question stored, CreatePollCommand.QuestionUpdate qu) {
+    Set<UUID> incomingOptionIds = new HashSet<>();
+    for (CreatePollCommand.OptionUpdate ou : qu.options()) {
+      if (ou.id() != null) {
+        incomingOptionIds.add(ou.id());
+      }
+    }
+    for (Option storedOpt : stored.options()) {
+      if (!incomingOptionIds.contains(storedOpt.id())) {
+        throw new ResourceHasVotesException("OPTION", storedOpt.id());
+      }
+    }
   }
 
   @Transactional
@@ -271,7 +374,17 @@ public class PollService {
         options.add(new Option(UUID.randomUUID(), qid, draft.options().get(j).label(), j));
       }
       out.add(
-          new Question(qid, pollId, draft.prompt(), i, QuestionStatus.DRAFT, options, null, null));
+          new Question(
+              qid,
+              pollId,
+              draft.prompt(),
+              i,
+              QuestionStatus.DRAFT,
+              draft.minSelections(),
+              draft.maxSelections(),
+              options,
+              null,
+              null));
     }
     return out;
   }

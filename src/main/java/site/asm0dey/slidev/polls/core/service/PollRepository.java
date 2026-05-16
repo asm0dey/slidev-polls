@@ -1,6 +1,7 @@
 package site.asm0dey.slidev.polls.core.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -72,4 +73,12 @@ public interface PollRepository {
    * polls.status = DRAFT}. Idempotent.
    */
   Poll resetQuestionsToDraft(UUID pollId);
+
+  /**
+   * Distinct-voter ballot counts per question on {@code pollId}. Missing questions (no votes yet)
+   * are simply absent from the returned map — callers default to {@code 0}. Used by the admin DTO
+   * assembler to surface {@code voteCount} on every question and by the structural-edit lock to
+   * decide whether a question is still safe to mutate (FR-013, RESOURCE_HAS_VOTES).
+   */
+  Map<UUID, Long> voteCountByQuestion(UUID pollId);
 }

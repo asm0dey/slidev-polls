@@ -169,7 +169,7 @@ test.describe.serial("admin creates poll, voter sees activation live", () => {
     await expect(
       voterPage.getByRole("heading", { level: 2, name: new RegExp(seed.questionPrompt, "i") })
     ).toBeVisible();
-    const firstOption = voterPage.getByRole("button", { name: seed.firstOptionLabel });
+    const firstOption = voterPage.getByRole("radio", { name: seed.firstOptionLabel });
     await expect(firstOption).toBeVisible();
 
     // ─── 3d. voter casts a vote via the two-step UX (option select → submit) ─

@@ -1,6 +1,7 @@
 package site.asm0dey.slidev.polls.realtime.sse;
 
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
@@ -11,16 +12,17 @@ import site.asm0dey.slidev.polls.core.event.VoteRetractedEvent;
 import site.asm0dey.slidev.polls.realtime.SseHub;
 
 /**
- * Fans poll state changes out to SSE subscribers. Listens for three {@code poll-core} events:
+ * Fans poll state changes out to SSE subscribers. Every ballot change re-broadcasts the canonical
+ * {@code snapshot} payload — there is no longer a delta event on the wire. Listens for these {@code
+ * poll-core} events:
  *
  * <ul>
- *   <li>{@link VoteCastEvent} → {@code tally} SSE event with the new absolute count
- *       ({@code @TS-030})
- *   <li>{@link VoteRetractedEvent} → {@code tally} SSE event with the new absolute count
- *       (post-decrement)
+ *   <li>{@link VoteCastEvent} → fresh {@code snapshot} with the new tally for the voted question
+ *   <li>{@link VoteRetractedEvent} → fresh {@code snapshot} with the post-retraction tally
  *   <li>{@link PollActiveQuestionChangedEvent} → fresh {@code snapshot} with the new active
  *       question and a zeroed tally ({@code @TS-031})
  *   <li>{@link PollQuestionClosedEvent} → {@code question-closed} SSE event
+ *   <li>{@link PollVotesClearedEvent} → fresh {@code snapshot} reflecting the cleared state
  * </ul>
  *
  * <p>Event routing uses the shared {@link SseHub}; per-emitter send failures are isolated there, so
@@ -28,6 +30,8 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  */
 @Component
 public class TallyBroadcaster {
+
+  private static final String SNAPSHOT_EVENT = "snapshot";
 
   private final SseHub hub;
   private final SnapshotBuilder snapshots;
@@ -39,35 +43,19 @@ public class TallyBroadcaster {
 
   @EventListener
   public void onVoteCast(VoteCastEvent event) {
-    hub.broadcast(
-        event.pollId(),
-        "tally",
-        new TallyPayload(
-            event.pollId(),
-            event.questionId(),
-            event.optionId(),
-            event.newOptionCount(),
-            event.occurredAt()));
+    resnapshotForQuestion(event.pollId(), event.questionId());
   }
 
   @EventListener
   public void onVoteRetracted(VoteRetractedEvent event) {
-    hub.broadcast(
-        event.pollId(),
-        "tally",
-        new TallyPayload(
-            event.pollId(),
-            event.questionId(),
-            event.optionId(),
-            event.newOptionCount(),
-            event.occurredAt()));
+    resnapshotForQuestion(event.pollId(), event.questionId());
   }
 
   @EventListener
   public void onActiveQuestionChanged(PollActiveQuestionChangedEvent event) {
     snapshots
         .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), "snapshot", payload));
+        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
   }
 
   @EventListener
@@ -82,6 +70,14 @@ public class TallyBroadcaster {
   public void onVotesCleared(PollVotesClearedEvent event) {
     snapshots
         .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), "snapshot", payload));
+        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
+  }
+
+  private void resnapshotForQuestion(UUID pollId, UUID questionId) {
+    // SnapshotBuilder produces the canonical wire payload used on (re)connect — re-emitting it
+    // after every ballot change keeps the client purely snapshot-driven (no delta application).
+    snapshots
+        .buildForQuestion(pollId, questionId)
+        .ifPresent(payload -> hub.broadcast(pollId, SNAPSHOT_EVENT, payload));
   }
 }

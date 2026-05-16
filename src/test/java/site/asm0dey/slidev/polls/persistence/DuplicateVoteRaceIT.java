@@ -81,7 +81,7 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
                         UUID.randomUUID(),
                         seeded.id(),
                         questionId,
-                        optionA,
+                        java.util.List.of(optionA),
                         "v-123",
                         Instant.now()));
               } catch (RuntimeException e) {
@@ -132,7 +132,8 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
               PollStatus.DRAFT,
               null,
               List.of(
-                  new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null)),
+                  new Question(
+                      q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
               List.of(), // allowedOrigins
               null,
               null);

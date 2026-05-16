@@ -61,14 +61,14 @@ public class SnapshotBuilder {
   public SnapshotPayload build(Poll poll, Instant emittedAt) {
     UUID activeId = poll.activeQuestionId();
     if (activeId == null) {
-      return new SnapshotPayload(poll.id(), poll.slug(), null, List.of(), emittedAt);
+      return new SnapshotPayload(poll.id(), poll.slug(), null, List.of(), 0L, emittedAt);
     }
     Question active =
         poll.questions().stream().filter(q -> q.id().equals(activeId)).findFirst().orElse(null);
     if (active == null) {
       // Defensive: should not happen, but if the pointer desynced we degrade to waiting state
       // rather than crash the fan-out (Principle IV).
-      return new SnapshotPayload(poll.id(), poll.slug(), null, List.of(), emittedAt);
+      return new SnapshotPayload(poll.id(), poll.slug(), null, List.of(), 0L, emittedAt);
     }
     return buildFor(poll, active, emittedAt);
   }
@@ -85,7 +85,13 @@ public class SnapshotBuilder {
     }
     SnapshotPayload.ActiveQuestion dto =
         new SnapshotPayload.ActiveQuestion(
-            question.id(), question.prompt(), question.ordinal(), options);
-    return new SnapshotPayload(poll.id(), poll.slug(), dto, tallyEntries, emittedAt);
+            question.id(),
+            question.prompt(),
+            question.ordinal(),
+            question.minSelections(),
+            question.maxSelections(),
+            options);
+    long voterCount = votes.voterCount(question.id());
+    return new SnapshotPayload(poll.id(), poll.slug(), dto, tallyEntries, voterCount, emittedAt);
   }
 }

@@ -27,6 +27,7 @@ import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
+import site.asm0dey.slidev.polls.core.error.ResourceHasVotesException;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.SlugInvalidException;
 import site.asm0dey.slidev.polls.core.error.SlugReservedException;
@@ -80,6 +81,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ActivationRejectedException.class)
   ResponseEntity<Problem> handleActivationRejected(ActivationRejectedException ex) {
     return respond(HttpStatus.CONFLICT, ProblemCode.ACTIVATION_REJECTED, safe(ex));
+  }
+
+  @ExceptionHandler(ResourceHasVotesException.class)
+  ResponseEntity<Problem> handleResourceHasVotes(ResourceHasVotesException ex) {
+    String key = ex.kind() + "." + ex.resourceId();
+    return respond(
+        HttpStatus.CONFLICT,
+        ProblemCode.RESOURCE_HAS_VOTES,
+        safe(ex),
+        Map.of(key, List.of(safe(ex))));
   }
 
   @ExceptionHandler(SlugTakenException.class)
@@ -148,6 +159,17 @@ public class GlobalExceptionHandler {
   ResponseEntity<Problem> handleUnreadableBody() {
     return respond(
         HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, "request body is invalid");
+  }
+
+  // Service-layer rejections of malformed inputs (e.g. a multi-option ballot on a single-choice
+  // question, or a duplicate option in a ballot) surface here. They are semantic 400s — the
+  // request body parsed and bind-validated cleanly, but the values violate a domain rule that the
+  // service is closer to than the DTO. The message is authored in our own code, so {@link #safe}
+  // is safe; we do not key the entry to a specific field because the violations span the whole
+  // {@code optionIds} array.
+  @ExceptionHandler(IllegalArgumentException.class)
+  ResponseEntity<Problem> handleIllegalArgument(IllegalArgumentException ex) {
+    return respond(HttpStatus.BAD_REQUEST, ProblemCode.VALIDATION_FAILED, safe(ex));
   }
 
   // A missing static resource (e.g. /admin/assets/foo.js when no such file was packaged) is a

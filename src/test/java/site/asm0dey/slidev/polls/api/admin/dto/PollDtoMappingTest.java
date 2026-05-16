@@ -60,7 +60,8 @@ class PollDtoMappingTest {
     List<Option> opts =
         List.of(
             new Option(UUID.randomUUID(), qid, "A", 0), new Option(UUID.randomUUID(), qid, "B", 1));
-    Question q = new Question(qid, pollId, "prompt?", 0, QuestionStatus.DRAFT, opts, null, null);
+    Question q =
+        new Question(qid, pollId, "prompt?", 0, QuestionStatus.DRAFT, 1, 1, opts, null, null);
     return new Poll(
         pollId,
         "alice",

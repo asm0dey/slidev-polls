@@ -6,7 +6,6 @@ import {
   openPollStream,
   type PublicPollView,
   type SnapshotEvent,
-  type TallyDeltaEvent,
   Button,
   IconCheck,
   LiveDot,
@@ -32,7 +31,10 @@ const poll = ref<PublicPollView | null>(null);
 const submitting = ref(false);
 const retracting = ref(false);
 const errorMessage = ref<string | null>(null);
-const selectedOptionId = ref<string | null>(null);
+const selectedOptionIds = ref<Set<string>>(new Set());
+// Snapshot-driven tally for the post-vote ResultsPanel. The tally-delta path was
+// removed in Task 14, so the page now re-renders results entirely off the SSE
+// snapshot envelope.
 const liveTally = ref<{ optionId: string; count: number }[]>([]);
 let stopStream: (() => void) | null = null;
 
@@ -76,6 +78,7 @@ function ensureStream() {
   stopStream = openPollStream(props.serverBase, props.slug, {
     onSnapshot: (ev: SnapshotEvent) => {
       liveTally.value = ev.tally.slice();
+      liveVoterCount.value = ev.voterCount;
       // The presenter can rotate the active question (Q1 → Q2, then back to
       // Q1 after re-OPEN). Each snapshot carries the current activeQuestion;
       // when its id changes we have to swap PollView's local model in place
@@ -95,11 +98,14 @@ function ensureStream() {
             prompt: next.prompt,
             ordinal: next.ordinal,
             status: "ACTIVE",
+            minSelections: next.minSelections,
+            maxSelections: next.maxSelections,
+            voteCount: 0,
             options: next.options.map((o) => ({ id: o.id, label: o.label, position: o.position }))
           },
           alreadyVoted: undefined
         };
-        selectedOptionId.value = null;
+        selectedOptionIds.value = new Set();
         // Per-question alreadyVoted check: the voter may have answered this
         // question on a previous open; the cookie + cached flag both fire.
         if (hasAlreadyVoted(props.slug, next.id)) {
@@ -109,14 +115,9 @@ function ensureStream() {
         }
       } else {
         poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
-        selectedOptionId.value = null;
+        selectedOptionIds.value = new Set();
         status.value = "waiting";
       }
-    },
-    onTally: (ev: TallyDeltaEvent) => {
-      const entry = liveTally.value.find((t) => t.optionId === ev.optionId);
-      if (entry) entry.count = ev.count;
-      else liveTally.value.push({ optionId: ev.optionId, count: ev.count });
     },
     onQuestionClosed: () => {
       // Server emits `question-closed` standalone (no follow-up snapshot) when
@@ -127,7 +128,7 @@ function ensureStream() {
       const current = poll.value;
       if (!current) return;
       poll.value = { ...current, state: "WAITING", activeQuestion: undefined };
-      selectedOptionId.value = null;
+      selectedOptionIds.value = new Set();
       liveTally.value = [];
       // Preserve the per-(slug, questionId) localStorage flags: the presenter can re-OPEN the
       // same question (or an earlier one) and the snapshot path below relies on the flag to
@@ -148,7 +149,7 @@ async function retract() {
   try {
     await client.retractVote(props.slug);
     clearAlreadyVoted(props.slug, qid);
-    selectedOptionId.value = null;
+    selectedOptionIds.value = new Set();
     status.value = "active";
   } catch (err) {
     if (err instanceof ApiError && err.code === "QUESTION_NOT_ACTIVE") {
@@ -163,17 +164,67 @@ async function retract() {
   }
 }
 
+const isSingle = computed(() => {
+  const q = poll.value?.activeQuestion;
+  return q ? q.minSelections === 1 && q.maxSelections === 1 : true;
+});
+const atCap = computed(() => {
+  const q = poll.value?.activeQuestion;
+  return q ? selectedOptionIds.value.size >= q.maxSelections : false;
+});
+const minMet = computed(() => {
+  const q = poll.value?.activeQuestion;
+  return q ? selectedOptionIds.value.size >= q.minSelections : true;
+});
+const submitLabel = computed(() => {
+  if (submitting.value) return "Submitting…";
+  return selectedOptionIds.value.size === 0 ? "Skip" : "Submit answer";
+});
+const hintText = computed(() => {
+  const q = poll.value?.activeQuestion;
+  if (!q) return "";
+  if (isSingle.value) return "Pick one";
+  if (q.minSelections === 0) return `Optional — pick up to ${q.maxSelections}`;
+  if (q.minSelections === q.maxSelections) return `Pick exactly ${q.minSelections}`;
+  return `Pick ${q.minSelections} to ${q.maxSelections}`;
+});
+
+function toggle(optionId: string) {
+  if (submitting.value) return;
+  const max = poll.value?.activeQuestion?.maxSelections ?? 1;
+  const next = new Set(selectedOptionIds.value);
+  if (next.has(optionId)) {
+    next.delete(optionId);
+  } else {
+    if (isSingle.value) {
+      next.clear();
+    } else if (next.size >= max) {
+      // Cap reached — ignore the click. Disabled state on the button is the
+      // primary signal; this guards against keyboard / programmatic clicks.
+      return;
+    }
+    next.add(optionId);
+  }
+  selectedOptionIds.value = next;
+}
+
+function isDisabled(optionId: string) {
+  if (submitting.value) return true;
+  if (selectedOptionIds.value.has(optionId)) return false;
+  // Single-choice (radio semantics): never disable an unchecked option,
+  // because picking it auto-deselects the prior choice.
+  if (isSingle.value) return false;
+  return atCap.value;
+}
+
 async function submit() {
-  if (!selectedOptionId.value || submitting.value) return;
+  if (!minMet.value || submitting.value) return;
   const qid = poll.value?.activeQuestion?.id;
   if (!qid) return;
   submitting.value = true;
   errorMessage.value = null;
   try {
-    await client.submitVote(props.slug, {
-      optionId: selectedOptionId.value,
-      voterToken: ""
-    });
+    await client.submitVote(props.slug, { optionIds: [...selectedOptionIds.value] });
     markAlreadyVoted(props.slug, qid);
     status.value = "voted";
     ensureStream();
@@ -217,18 +268,27 @@ function describeSubmitError(err: unknown): string {
 
 const resultsForPanel = computed(() => {
   const q = poll.value?.activeQuestion;
-  if (!q) return { prompt: "", options: [], tally: [] };
+  if (!q) return { prompt: "", minSelections: 1, maxSelections: 1, options: [], tally: [] };
   return {
     prompt: q.prompt,
+    // Thread arity into the panel so the multi-choice footer ({voters} voters · {selections}
+    // selections) renders when the active question is multi-choice. Single-choice questions
+    // keep the legacy bare-bars look — the footer would just duplicate the row counts.
+    minSelections: q.minSelections,
+    maxSelections: q.maxSelections,
     options: q.options.map((o) => ({ id: o.id, label: o.label })),
     tally: liveTally.value
   };
 });
+// Ballots-cast figure for the post-vote ResultsPanel footer. Sourced from the SSE snapshot —
+// the same envelope drives `liveTally`, so the two stay consistent without a separate fetch.
+const liveVoterCount = ref(0);
 
-const votedOptionLabel = computed(() => {
-  const id = selectedOptionId.value;
-  if (!id) return null;
-  return poll.value?.activeQuestion?.options.find((o) => o.id === id)?.label ?? null;
+const votedOptionLabels = computed(() => {
+  const q = poll.value?.activeQuestion;
+  if (!q) return [];
+  const ids = selectedOptionIds.value;
+  return q.options.filter((o) => ids.has(o.id)).map((o) => o.label);
 });
 
 onMounted(load);
@@ -264,7 +324,7 @@ onUnmounted(() => stopStream?.());
       </div>
 
       <div v-else-if="status === 'active' && poll?.activeQuestion" data-testid="poll-active">
-        <div class="pv__eyebrow">Pick one</div>
+        <div class="pv__eyebrow">{{ hintText }}</div>
         <h2 class="pv__prompt">{{ poll.activeQuestion.prompt }}</h2>
         <div class="pv__options">
           <button
@@ -273,21 +333,23 @@ onUnmounted(() => stopStream?.());
             type="button"
             class="pv__opt"
             :data-testid="`option-${opt.id}`"
-            :data-selected="selectedOptionId === opt.id ? '' : undefined"
-            :disabled="submitting"
-            @click="selectedOptionId = opt.id"
+            :data-selected="selectedOptionIds.has(opt.id) ? '' : undefined"
+            :role="isSingle ? 'radio' : 'checkbox'"
+            :aria-checked="selectedOptionIds.has(opt.id)"
+            :disabled="isDisabled(opt.id)"
+            @click="toggle(opt.id)"
           >
             <span>{{ opt.label }}</span>
-            <IconCheck v-if="selectedOptionId === opt.id" />
+            <IconCheck v-if="selectedOptionIds.has(opt.id)" />
           </button>
         </div>
         <Button
           class="pv__submit"
-          :disabled="!selectedOptionId || submitting"
+          :disabled="!minMet || submitting"
           data-testid="poll-submit"
           @click="submit"
         >
-          {{ submitting ? "Submitting…" : "Submit answer" }}
+          {{ submitLabel }}
         </Button>
         <p v-if="errorMessage" role="alert" class="pv__error" data-testid="poll-submit-error">
           {{ errorMessage }}
@@ -298,11 +360,13 @@ onUnmounted(() => stopStream?.());
         <div class="pv__confirm">
           <IconCheck />
           <span
-            >Answer recorded<span v-if="votedOptionLabel"> · {{ votedOptionLabel }}</span></span
+            >Answer recorded<span v-if="votedOptionLabels.length">
+              · {{ votedOptionLabels.join(", ") }}</span
+            ></span
           >
         </div>
         <h2 class="pv__prompt pv__prompt--small">{{ poll.activeQuestion.prompt }}</h2>
-        <ResultsPanel :question="resultsForPanel" mode="flat" />
+        <ResultsPanel :question="resultsForPanel" :voter-count="liveVoterCount" mode="flat" />
         <Button
           class="pv__retract"
           :disabled="retracting"
@@ -398,6 +462,10 @@ onUnmounted(() => stopStream?.());
   border-color: var(--sp-fg);
   color: var(--sp-bg);
   font-weight: 500;
+}
+.pv__opt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .pv__opt:focus-visible {
   outline: 2px solid var(--sp-accent-ring);

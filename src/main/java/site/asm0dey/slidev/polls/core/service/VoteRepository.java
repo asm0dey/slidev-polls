@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import site.asm0dey.slidev.polls.core.domain.Vote;
@@ -33,6 +34,13 @@ public interface VoteRepository {
    */
   Map<UUID, Long> tally(UUID questionId);
 
+  /**
+   * Distinct voter count (ballots-cast, not selections-summed) for {@code questionId} — backs the
+   * "{voters} voters · {selections} selections" footer of the multi-choice results panel. One row
+   * in {@code votes} == one ballot regardless of how many options the ballot picked.
+   */
+  long voterCount(UUID questionId);
+
   /** Delete every row in {@code votes} bound to {@code pollId}. Returns the rows deleted. */
   int deleteForPoll(UUID pollId);
 
@@ -43,12 +51,12 @@ public interface VoteRepository {
    * which the caller translates into {@link
    * site.asm0dey.slidev.polls.core.error.QuestionNotActiveException}.
    *
-   * @return the {@code option_id} of the deleted row when a row was deleted; {@link
+   * @return the {@code option_ids} ballot of the deleted row when a row was deleted; {@link
    *     java.util.Optional#empty()} when the voter had no vote on this question (idempotent no-op)
    *     — the caller distinguishes this from the not-ACTIVE case by checking the question status
    *     before attempting the delete
    * @throws site.asm0dey.slidev.polls.core.error.QuestionNotActiveException when the question is
    *     not {@code ACTIVE} at delete time
    */
-  java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken);
+  java.util.Optional<List<UUID>> deleteByQuestionAndVoter(UUID questionId, String voterToken);
 }

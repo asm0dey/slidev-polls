@@ -1,8 +1,7 @@
-import type { QuestionClosedEvent, SnapshotEvent, TallyDeltaEvent } from "./types";
+import type { QuestionClosedEvent, SnapshotEvent } from "./types";
 
 export interface StreamHandlers {
   onSnapshot: (ev: SnapshotEvent) => void;
-  onTally: (ev: TallyDeltaEvent) => void;
   onQuestionClosed?: (ev: QuestionClosedEvent) => void;
   onConnectionStateChange?: (state: "open" | "paused") => void;
 }
@@ -93,9 +92,6 @@ export function openPollStream(
 
     es.addEventListener("snapshot", (e) => {
       handlers.onSnapshot(JSON.parse((e as MessageEvent).data) as SnapshotEvent);
-    });
-    es.addEventListener("tally", (e) => {
-      handlers.onTally(JSON.parse((e as MessageEvent).data) as TallyDeltaEvent);
     });
     es.addEventListener("question-closed", (e) => {
       handlers.onQuestionClosed?.(JSON.parse((e as MessageEvent).data) as QuestionClosedEvent);

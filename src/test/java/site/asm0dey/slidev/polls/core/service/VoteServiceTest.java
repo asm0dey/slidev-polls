@@ -54,9 +54,9 @@ class VoteServiceTest {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
 
-    Vote stored = service.recordVote(seeded.slug(), optionA, "v-123");
+    Vote stored = service.recordVote(seeded.slug(), List.of(optionA), "v-123");
 
-    assertThat(stored.optionId()).isEqualTo(optionA);
+    assertThat(stored.optionIds()).containsExactly(optionA);
     assertThat(stored.voterToken()).isEqualTo("v-123");
     assertThat(stored.questionId()).isEqualTo(seeded.activeQuestionId());
     assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
@@ -67,9 +67,7 @@ class VoteServiceTest {
               assertThat(e).isInstanceOf(VoteCastEvent.class);
               VoteCastEvent ev = (VoteCastEvent) e;
               assertThat(ev.pollId()).isEqualTo(seeded.id());
-              assertThat(ev.optionId()).isEqualTo(optionA);
-              // Post-write tally for optionA is exactly one (the vote we just recorded).
-              assertThat(ev.newOptionCount()).isEqualTo(1L);
+              assertThat(ev.questionId()).isEqualTo(seeded.activeQuestionId());
             });
   }
 
@@ -81,7 +79,7 @@ class VoteServiceTest {
     Poll seeded = seedPollWithoutActiveQuestion();
     UUID anyOption = seeded.questions().get(0).options().get(0).id();
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), anyOption, "v-999"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(anyOption), "v-999"))
         .isInstanceOf(QuestionNotActiveException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -103,7 +101,7 @@ class VoteServiceTest {
   void retract_deletes_row_and_publishes_event_with_decremented_tally() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-1");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-1");
 
     service.retractVote(seeded.slug(), "v-1");
 
@@ -114,8 +112,6 @@ class VoteServiceTest {
     var retracted = (site.asm0dey.slidev.polls.core.event.VoteRetractedEvent) second;
     assertThat(retracted.pollId()).isEqualTo(seeded.id());
     assertThat(retracted.questionId()).isEqualTo(seeded.activeQuestionId());
-    assertThat(retracted.optionId()).isEqualTo(optionA);
-    assertThat(retracted.newOptionCount()).isEqualTo(0L);
   }
 
   @Test
@@ -132,7 +128,7 @@ class VoteServiceTest {
   void retract_propagates_question_not_active_when_question_closes_mid_flight() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-1");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-1");
     votes.simulateConcurrentClose(seeded.activeQuestionId());
 
     assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1"))
@@ -153,7 +149,7 @@ class VoteServiceTest {
     // Options of the non-active question are not valid submissions.
     UUID otherQuestionOption = seeded.questions().get(1).options().get(0).id();
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), otherQuestionOption, "v-1"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(otherQuestionOption), "v-1"))
         .isInstanceOf(NotFoundException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -166,9 +162,9 @@ class VoteServiceTest {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
 
-    service.recordVote(seeded.slug(), optionA, "v-dup");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-dup");
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), optionA, "v-dup"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(optionA), "v-dup"))
         .isInstanceOf(AlreadyVotedException.class);
     // Only the first insert landed; the second never reached storage.
     assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
@@ -186,7 +182,7 @@ class VoteServiceTest {
     // real VoteRepositoryImpl sees this via the INSERT ... SELECT returning zero rows.
     votes.simulateConcurrentClose(seeded.activeQuestionId());
 
-    assertThatThrownBy(() -> service.recordVote(seeded.slug(), optionA, "v-late"))
+    assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(optionA), "v-late"))
         .isInstanceOf(QuestionNotActiveException.class);
     assertThat(votes.allRows()).isEmpty();
     assertThat(events.published()).isEmpty();
@@ -198,7 +194,7 @@ class VoteServiceTest {
   void already_voted_reports_cookie_state() {
     Poll seeded = seedPollWithActiveQuestion();
     UUID optionA = seeded.questions().get(0).options().get(0).id();
-    service.recordVote(seeded.slug(), optionA, "v-seen");
+    service.recordVote(seeded.slug(), List.of(optionA), "v-seen");
 
     assertThat(service.alreadyVoted(seeded.activeQuestionId(), "v-seen")).isTrue();
     assertThat(service.alreadyVoted(seeded.activeQuestionId(), "v-new")).isFalse();
@@ -229,8 +225,18 @@ class VoteServiceTest {
             q1,
             List.of(
                 new Question(
-                    q1, pollId, "Q1", 0, QuestionStatus.ACTIVE, q1Options, Instant.now(), null),
-                new Question(q2, pollId, "Q2", 1, QuestionStatus.DRAFT, q2Options, null, null)),
+                    q1,
+                    pollId,
+                    "Q1",
+                    0,
+                    QuestionStatus.ACTIVE,
+                    1,
+                    1,
+                    q1Options,
+                    Instant.now(),
+                    null),
+                new Question(
+                    q2, pollId, "Q2", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null)),
             List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
@@ -252,7 +258,9 @@ class VoteServiceTest {
             "waiting-poll",
             PollStatus.DRAFT,
             null,
-            List.of(new Question(q1, pollId, "Q1", 0, QuestionStatus.DRAFT, q1Options, null, null)),
+            List.of(
+                new Question(
+                    q1, pollId, "Q1", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
             List.of(), // allowedOrigins
             Instant.now(),
             Instant.now());
@@ -330,6 +338,11 @@ class VoteServiceTest {
     public Poll resetQuestionsToDraft(UUID pollId) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }
+
+    @Override
+    public java.util.Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+      return java.util.Map.of();
+    }
   }
 
   /**
@@ -370,10 +383,17 @@ class VoteServiceTest {
       Map<UUID, Long> out = new HashMap<>();
       for (Vote v : rows) {
         if (v.questionId().equals(questionId)) {
-          out.merge(v.optionId(), 1L, Long::sum);
+          for (UUID oid : v.optionIds()) {
+            out.merge(oid, 1L, Long::sum);
+          }
         }
       }
       return out;
+    }
+
+    @Override
+    public long voterCount(UUID questionId) {
+      return rows.stream().filter(v -> v.questionId().equals(questionId)).count();
     }
 
     List<Vote> rowsFor(UUID questionId) {
@@ -394,7 +414,8 @@ class VoteServiceTest {
     }
 
     @Override
-    public java.util.Optional<UUID> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+    public java.util.Optional<List<UUID>> deleteByQuestionAndVoter(
+        UUID questionId, String voterToken) {
       if (closedQuestions.contains(questionId)) {
         throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
       }
@@ -403,7 +424,7 @@ class VoteServiceTest {
               .filter(r -> r.questionId().equals(questionId) && r.voterToken().equals(voterToken))
               .findFirst();
       match.ifPresent(rows::remove);
-      return match.map(Vote::optionId);
+      return match.map(Vote::optionIds);
     }
   }
 

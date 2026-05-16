@@ -8,15 +8,19 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -146,6 +150,8 @@ public class PollRepositoryImpl implements PollRepository {
         dsl.update(POLL_QUESTIONS)
             .set(POLL_QUESTIONS.PROMPT, q.prompt())
             .set(POLL_QUESTIONS.ORDINAL, i)
+            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
             .where(POLL_QUESTIONS.ID.eq(qid))
             .execute();
         syncOptions(qid, q.options());
@@ -155,6 +161,8 @@ public class PollRepositoryImpl implements PollRepository {
             .set(POLL_QUESTIONS.ID, newQid)
             .set(POLL_QUESTIONS.POLL_ID, pollId)
             .set(POLL_QUESTIONS.PROMPT, q.prompt())
+            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
             .set(POLL_QUESTIONS.ORDINAL, i)
             .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
             .execute();
@@ -340,6 +348,8 @@ public class PollRepositoryImpl implements PollRepository {
           .set(POLL_QUESTIONS.ID, qid)
           .set(POLL_QUESTIONS.POLL_ID, pollId)
           .set(POLL_QUESTIONS.PROMPT, q.prompt())
+          .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+          .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
           .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
           .set(POLL_QUESTIONS.STATUS, q.status().name())
           .execute();
@@ -363,7 +373,16 @@ public class PollRepositoryImpl implements PollRepository {
       }
       ordered.add(
           new Question(
-              qid, pollId, q.prompt(), q.ordinal(), q.status(), insertedOptions, null, null));
+              qid,
+              pollId,
+              q.prompt(),
+              q.ordinal(),
+              q.status(),
+              q.minSelections(),
+              q.maxSelections(),
+              insertedOptions,
+              null,
+              null));
     }
     return ordered;
   }
@@ -399,6 +418,8 @@ public class PollRepositoryImpl implements PollRepository {
                       POLL_QUESTIONS.PROMPT,
                       POLL_QUESTIONS.ORDINAL,
                       POLL_QUESTIONS.STATUS,
+                      POLL_QUESTIONS.MIN_SELECTIONS,
+                      POLL_QUESTIONS.MAX_SELECTIONS,
                       POLL_QUESTIONS.ACTIVATED_AT,
                       POLL_QUESTIONS.CLOSED_AT,
                       OPTIONS_FIELD)
@@ -415,6 +436,8 @@ public class PollRepositoryImpl implements PollRepository {
                               q.get(POLL_QUESTIONS.PROMPT),
                               q.get(POLL_QUESTIONS.ORDINAL),
                               QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
+                              q.get(POLL_QUESTIONS.MIN_SELECTIONS),
+                              q.get(POLL_QUESTIONS.MAX_SELECTIONS),
                               q.get(OPTIONS_FIELD),
                               q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
                                   ? null
@@ -454,5 +477,17 @@ public class PollRepositoryImpl implements PollRepository {
         row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
+  }
+
+  @Override
+  public Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+    Map<UUID, Long> out = new HashMap<>();
+    dsl.select(VOTES.QUESTION_ID, DSL.count())
+        .from(VOTES)
+        .where(VOTES.POLL_ID.eq(pollId))
+        .groupBy(VOTES.QUESTION_ID)
+        .fetch()
+        .forEach(r -> out.put(r.value1(), (long) r.value2()));
+    return out;
   }
 }

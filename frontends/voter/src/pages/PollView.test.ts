@@ -28,6 +28,9 @@ function makeActiveView(): PublicPollView {
       prompt: "Which JVM?",
       ordinal: 0,
       status: "ACTIVE",
+      minSelections: 1,
+      maxSelections: 1,
+      voteCount: 0,
       options: [
         { id: "opt-a", label: "OpenJDK", position: 0 },
         { id: "opt-b", label: "GraalVM", position: 1 }
@@ -118,10 +121,7 @@ describe("PollView", () => {
     await wrapper.find('[data-testid="poll-submit"]').trigger("click");
     await flushPromises();
 
-    expect(submitVote).toHaveBeenCalledWith(
-      "my-talk",
-      expect.objectContaining({ optionId: "opt-a" })
-    );
+    expect(submitVote).toHaveBeenCalledWith("my-talk", { optionIds: ["opt-a"] });
     expect(wrapper.find('[data-testid="poll-voted"]').exists()).toBe(true);
     // The alreadyVoted cache is now populated so a reload would skip the active UI.
     expect(window.localStorage.getItem("slidev-polls:already-voted:my-talk:q1")).toBe("1");
@@ -281,11 +281,13 @@ describe("PollView", () => {
     // and emits a fresh snapshot.
     captured!.onSnapshot?.({
       pollId: "poll-uuid",
+      slug: "my-talk",
       activeQuestion: {
         id: "q1",
         prompt: "Which JVM?",
         ordinal: 0,
-        status: "ACTIVE",
+        minSelections: 1,
+        maxSelections: 1,
         options: [
           { id: "opt-a", label: "OpenJDK", position: 0 },
           { id: "opt-b", label: "GraalVM", position: 1 }

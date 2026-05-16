@@ -63,11 +63,13 @@ class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
       UUID questionId = seeded.activeQuestionId();
       UUID optionA = seeded.questions().getFirst().options().getFirst().id();
       voteRepository.insert(
-          new Vote(UUID.randomUUID(), seeded.id(), questionId, optionA, "v-1", Instant.now()));
+          new Vote(
+              UUID.randomUUID(), seeded.id(), questionId, List.of(optionA), "v-1", Instant.now()));
 
-      Optional<UUID> deletedOption = voteRepository.deleteByQuestionAndVoter(questionId, "v-1");
+      Optional<List<UUID>> deletedOption =
+          voteRepository.deleteByQuestionAndVoter(questionId, "v-1");
 
-      assertThat(deletedOption).contains(optionA);
+      assertThat(deletedOption).contains(List.of(optionA));
       assertThat(voteRepository.alreadyVoted(questionId, "v-1")).isFalse();
     }
 
@@ -77,9 +79,11 @@ class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
       UUID questionId = seeded.activeQuestionId();
       UUID optionA = seeded.questions().getFirst().options().getFirst().id();
       voteRepository.insert(
-          new Vote(UUID.randomUUID(), seeded.id(), questionId, optionA, "v-1", Instant.now()));
+          new Vote(
+              UUID.randomUUID(), seeded.id(), questionId, List.of(optionA), "v-1", Instant.now()));
 
-      Optional<UUID> deletedOption = voteRepository.deleteByQuestionAndVoter(questionId, "v-other");
+      Optional<List<UUID>> deletedOption =
+          voteRepository.deleteByQuestionAndVoter(questionId, "v-other");
 
       assertThat(deletedOption).isEmpty();
       // Original row untouched.
@@ -92,7 +96,8 @@ class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
       UUID questionId = seeded.activeQuestionId();
       UUID optionA = seeded.questions().getFirst().options().getFirst().id();
       voteRepository.insert(
-          new Vote(UUID.randomUUID(), seeded.id(), questionId, optionA, "v-1", Instant.now()));
+          new Vote(
+              UUID.randomUUID(), seeded.id(), questionId, List.of(optionA), "v-1", Instant.now()));
 
       // Flip the question to CLOSED out of band; emulates the presenter closing while a retract
       // is in flight. The poll_questions_active_timestamp_ck constraint requires
@@ -128,7 +133,8 @@ class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
               PollStatus.DRAFT,
               null,
               List.of(
-                  new Question(q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, q1Options, null, null)),
+                  new Question(
+                      q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null)),
               List.of(),
               null,
               null);
