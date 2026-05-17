@@ -71,7 +71,47 @@ const theme = useSlidevTheme(root);
 const snapshot = ref<SnapshotEvent | null>(null);
 const paused = ref(false);
 const closedNotice = ref<string | null>(null);
+// When SSE stays paused and we can confirm the backend is up but rejects the
+// browser's origin via CORS, surface an actionable hint pointing at the
+// backoffice's Allowed origins control. corsHint holds the visible message;
+// reconnectAttempts gates the probe so a single pause doesn't fire it.
+const corsHint = ref<string | null>(null);
+const reconnectAttempts = ref(0);
+// Module-local guard so concurrent paused-state callbacks don't stack overlapping
+// probes (each issues a fetch + opens DevTools network noise).
+let corsProbing = false;
 let stop: (() => void) | null = null;
+
+async function probeCors(base: string) {
+  // Skip if we already know it's CORS, or if there's nothing question-scoped
+  // to probe. The historical-snapshot endpoint is the same one the panel
+  // already hits on mount, so a CORS reject here matches what the SSE client
+  // would have hit.
+  if (corsHint.value) return;
+  if (corsProbing) return;
+  if (!props.questionId || !props.pollId) return;
+  const probeUrl = `${base.replace(/\/$/, "")}/api/polls/${encodeURIComponent(props.slug)}/questions/${encodeURIComponent(props.questionId)}/snapshot`;
+  corsProbing = true;
+  try {
+    await fetch(probeUrl);
+    // Cross-origin fetch resolved — backend is reachable and CORS isn't the issue.
+    // (Even a 5xx resolves; only a CORS reject / network error throws TypeError.)
+    return;
+  } catch (err) {
+    if (!(err instanceof TypeError)) return;
+    // Cross-origin fetch threw. Confirm we're actually online by probing
+    // same-origin — if that also fails, the user is offline and a CORS hint
+    // would be misleading.
+    try {
+      await fetch(window.location.href, { method: "HEAD" });
+      corsHint.value = `Live updates blocked — backend rejected this origin. Add ${window.location.origin} to the poll's Allowed origins in the backoffice.`;
+    } catch {
+      /* both failed → offline, not a CORS problem */
+    }
+  } finally {
+    corsProbing = false;
+  }
+}
 
 // Tracks the most recent intent we successfully posted. The server is idempotent already,
 // but this skips the wasted round-trip when a slide jitter fires the same edge twice.
@@ -299,6 +339,11 @@ onMounted(async () => {
       snapshot.value = ev;
       paused.value = false;
       closedNotice.value = null;
+      // A live snapshot proves the SSE channel is healthy — drop any CORS
+      // hint that was raised during an earlier paused streak, and reset the
+      // pause counter so a future single pause doesn't immediately re-probe.
+      corsHint.value = null;
+      reconnectAttempts.value = 0;
       setPollResults(resultsKey.value, ev);
     },
     onQuestionClosed: (ev: QuestionClosedEvent) => {
@@ -316,6 +361,15 @@ onMounted(async () => {
     },
     onConnectionStateChange: (state) => {
       paused.value = state === "paused";
+      if (state === "paused") {
+        reconnectAttempts.value += 1;
+        // First pause might just be a transient blip; only probe once we've
+        // seen the reconnect-loop fire at least once. Past that, the SSE
+        // client is in retry-territory and a CORS reject is a plausible cause.
+        if (reconnectAttempts.value >= 2) {
+          void probeCors(base);
+        }
+      }
     }
   });
 });
@@ -340,6 +394,9 @@ onUnmounted(() => {
     <PollQrButton v-if="auth.status.value === 'signed-in'" :voter-url="voterUrl" />
     <div v-if="paused" class="sp-pollpanel__paused" data-testid="poll-paused">
       live updates paused
+    </div>
+    <div v-if="corsHint" class="sp-pollpanel__cors-hint" role="alert" data-testid="poll-cors-hint">
+      {{ corsHint }}
     </div>
     <ResultsPanel
       v-if="panelQuestion"
@@ -374,6 +431,15 @@ onUnmounted(() => {
   border-radius: var(--sp-radius-sm);
   padding: 6px 10px;
   font-size: 12px;
+  margin-bottom: 8px;
+}
+.sp-pollpanel__cors-hint {
+  background: var(--sp-danger-bg);
+  color: var(--sp-danger-fg);
+  border: 1px solid var(--sp-danger);
+  border-radius: var(--sp-radius-sm);
+  padding: 8px 12px;
+  font-size: 13px;
   margin-bottom: 8px;
 }
 .sp-pollpanel__waiting {

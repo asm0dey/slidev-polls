@@ -450,4 +450,247 @@ describe("PollPanel", () => {
   });
 
   it.todo("POSTs /close when the slide scrolls below the hysteresis threshold (intersect-leave)");
+
+  describe("CORS hint", () => {
+    // Replace the default openPollStream mock with one that captures handlers
+    // so each test can drive paused / snapshot edges manually.
+    type Handlers = {
+      onSnapshot: (e: unknown) => void;
+      onQuestionClosed: (e: unknown) => void;
+      onConnectionStateChange: (s: string) => void;
+    };
+
+    async function installStreamCapture() {
+      const sharedMod = await import("@slidev-polls/shared");
+      const original = sharedMod.openPollStream;
+      const captured: { handlers: Handlers | null } = { handlers: null };
+      (sharedMod as { openPollStream: unknown }).openPollStream = (
+        _b: string,
+        _s: string,
+        handlers: Handlers
+      ) => {
+        captured.handlers = handlers;
+        return () => {};
+      };
+      return {
+        captured,
+        restore: () => {
+          (sharedMod as { openPollStream: unknown }).openPollStream = original;
+        }
+      };
+    }
+
+    function makeSnapshot(slug: string, qid: string) {
+      return {
+        pollId: "p1",
+        slug,
+        emittedAt: "now",
+        activeQuestion: {
+          id: qid,
+          prompt: "Pick",
+          ordinal: 1,
+          minSelections: 1,
+          maxSelections: 1,
+          options: [{ id: "a", label: "A", position: 0 }]
+        },
+        tally: [{ optionId: "a", count: 1 }],
+        voterCount: 1
+      };
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("shows CORS hint when paused twice and cross-origin fetch rejects with TypeError", async () => {
+      authState.value = "anonymous";
+      const { captured, restore } = await installStreamCapture();
+
+      // mount-time historical snapshot resolves; subsequent probe rejects
+      // with TypeError; same-origin HEAD resolves.
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+        const url = String(input);
+        const method = (init as RequestInit | undefined)?.method ?? "GET";
+        if (method === "HEAD") return Promise.resolve(new Response(null, { status: 200 }));
+        // Same-origin (jsdom) requests resolve; cross-origin probe rejects.
+        if (url.startsWith("https://api.test/")) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        return Promise.resolve(new Response(null, { status: 200 }));
+      });
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "cors-slug",
+          pollId: "poll-cors",
+          questionId: "q-cors",
+          server: "https://api.test"
+        }
+      });
+      await flushPromises();
+
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      // Probe + same-origin HEAD are both promises; flush a second microtask
+      // tick to let the .then chains settle before asserting on the DOM.
+      await flushPromises();
+
+      const hint = w.find('[data-testid="poll-cors-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain(window.location.origin);
+      expect(hint.text()).toContain("Allowed origins");
+      expect(hint.attributes("role")).toBe("alert");
+
+      fetchSpy.mockRestore();
+      restore();
+      w.unmount();
+    });
+
+    it("does NOT show CORS hint when backend reachable but returns 5xx", async () => {
+      authState.value = "anonymous";
+      const { captured, restore } = await installStreamCapture();
+
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(() => Promise.resolve(new Response(null, { status: 503 })));
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "cors-503",
+          pollId: "poll-503",
+          questionId: "q-503",
+          server: "https://api.test"
+        }
+      });
+      await flushPromises();
+
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      await flushPromises();
+
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(false);
+
+      fetchSpy.mockRestore();
+      restore();
+      w.unmount();
+    });
+
+    it("does NOT show CORS hint when both probes fail (offline)", async () => {
+      authState.value = "anonymous";
+      const { captured, restore } = await installStreamCapture();
+
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(() => Promise.reject(new TypeError("offline")));
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "cors-offline",
+          pollId: "poll-offline",
+          questionId: "q-offline",
+          server: "https://api.test"
+        }
+      });
+      await flushPromises();
+
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      await flushPromises();
+
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(false);
+
+      fetchSpy.mockRestore();
+      restore();
+      w.unmount();
+    });
+
+    it("clears CORS hint when a snapshot arrives after recovery", async () => {
+      authState.value = "anonymous";
+      const { captured, restore } = await installStreamCapture();
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+        const url = String(input);
+        const method = (init as RequestInit | undefined)?.method ?? "GET";
+        if (method === "HEAD") return Promise.resolve(new Response(null, { status: 200 }));
+        if (url.startsWith("https://api.test/")) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        return Promise.resolve(new Response(null, { status: 200 }));
+      });
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "cors-recover",
+          pollId: "poll-recover",
+          questionId: "q-recover",
+          server: "https://api.test"
+        }
+      });
+      await flushPromises();
+
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      await flushPromises();
+
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(true);
+
+      captured.handlers!.onSnapshot(makeSnapshot("cors-recover", "q-recover"));
+      await flushPromises();
+
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(false);
+
+      fetchSpy.mockRestore();
+      restore();
+      w.unmount();
+    });
+
+    it("only shows CORS hint after at least one reconnect attempt", async () => {
+      authState.value = "anonymous";
+      const { captured, restore } = await installStreamCapture();
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+        const url = String(input);
+        const method = (init as RequestInit | undefined)?.method ?? "GET";
+        if (method === "HEAD") return Promise.resolve(new Response(null, { status: 200 }));
+        if (url.startsWith("https://api.test/")) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        return Promise.resolve(new Response(null, { status: 200 }));
+      });
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "cors-once",
+          pollId: "poll-once",
+          questionId: "q-once",
+          server: "https://api.test"
+        }
+      });
+      await flushPromises();
+
+      // First pause — single transient blip, no probe yet.
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      await flushPromises();
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(false);
+
+      // Second pause — now we probe and surface the hint.
+      captured.handlers!.onConnectionStateChange("paused");
+      await flushPromises();
+      await flushPromises();
+      expect(w.find('[data-testid="poll-cors-hint"]').exists()).toBe(true);
+
+      fetchSpy.mockRestore();
+      restore();
+      w.unmount();
+    });
+  });
 });
