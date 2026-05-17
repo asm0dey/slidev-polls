@@ -207,15 +207,20 @@ public class PollRepositoryImpl implements PollRepository {
   }
 
   private void insertNewOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> options) {
-    for (int i = 0; i < options.size(); i++) {
-      CreatePollCommand.OptionUpdate o = options.get(i);
-      dsl.insertInto(POLL_OPTIONS)
-          .set(POLL_OPTIONS.ID, UUID.randomUUID())
-          .set(POLL_OPTIONS.QUESTION_ID, questionId)
-          .set(POLL_OPTIONS.LABEL, o.label())
-          .set(POLL_OPTIONS.POSITION, i)
-          .execute();
+    if (options == null || options.isEmpty()) {
+      return;
     }
+    var insert =
+        dsl.insertInto(
+            POLL_OPTIONS,
+            POLL_OPTIONS.ID,
+            POLL_OPTIONS.QUESTION_ID,
+            POLL_OPTIONS.LABEL,
+            POLL_OPTIONS.POSITION);
+    for (int i = 0; i < options.size(); i++) {
+      insert = insert.values(UUID.randomUUID(), questionId, options.get(i).label(), i);
+    }
+    insert.execute();
   }
 
   @Override
@@ -340,30 +345,56 @@ public class PollRepositoryImpl implements PollRepository {
     if (questions == null || questions.isEmpty()) {
       return;
     }
+    // Resolve UUIDs up front so the options INSERT below can reference the parent
+    // question ids without a second pass through the input list.
+    List<UUID> qids = new java.util.ArrayList<>(questions.size());
     for (Question q : questions) {
-      UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
-      dsl.insertInto(POLL_QUESTIONS)
-          .set(POLL_QUESTIONS.ID, qid)
-          .set(POLL_QUESTIONS.POLL_ID, pollId)
-          .set(POLL_QUESTIONS.PROMPT, q.prompt())
-          .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
-          .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
-          .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
-          .set(POLL_QUESTIONS.STATUS, q.status().name())
-          .execute();
-      if (!q.options().isEmpty()) {
-        dsl.batch(
-                q.options().stream()
-                    .map(
-                        o ->
-                            dsl.insertInto(POLL_OPTIONS)
-                                .set(POLL_OPTIONS.ID, o.id() != null ? o.id() : UUID.randomUUID())
-                                .set(POLL_OPTIONS.QUESTION_ID, qid)
-                                .set(POLL_OPTIONS.LABEL, o.label())
-                                .set(POLL_OPTIONS.POSITION, o.position()))
-                    .toList())
-            .execute();
+      qids.add(q.id() != null ? q.id() : UUID.randomUUID());
+    }
+
+    var questionsInsert =
+        dsl.insertInto(
+            POLL_QUESTIONS,
+            POLL_QUESTIONS.ID,
+            POLL_QUESTIONS.POLL_ID,
+            POLL_QUESTIONS.PROMPT,
+            POLL_QUESTIONS.MIN_SELECTIONS,
+            POLL_QUESTIONS.MAX_SELECTIONS,
+            POLL_QUESTIONS.ORDINAL,
+            POLL_QUESTIONS.STATUS);
+    for (int i = 0; i < questions.size(); i++) {
+      Question q = questions.get(i);
+      questionsInsert =
+          questionsInsert.values(
+              qids.get(i),
+              pollId,
+              q.prompt(),
+              q.minSelections(),
+              q.maxSelections(),
+              q.ordinal(),
+              q.status().name());
+    }
+    questionsInsert.execute();
+
+    var optionsInsert =
+        dsl.insertInto(
+            POLL_OPTIONS,
+            POLL_OPTIONS.ID,
+            POLL_OPTIONS.QUESTION_ID,
+            POLL_OPTIONS.LABEL,
+            POLL_OPTIONS.POSITION);
+    int optionRows = 0;
+    for (int i = 0; i < questions.size(); i++) {
+      UUID qid = qids.get(i);
+      for (Option o : questions.get(i).options()) {
+        optionsInsert =
+            optionsInsert.values(
+                o.id() != null ? o.id() : UUID.randomUUID(), qid, o.label(), o.position());
+        optionRows++;
       }
+    }
+    if (optionRows > 0) {
+      optionsInsert.execute();
     }
   }
 
