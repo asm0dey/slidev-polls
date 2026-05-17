@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.persistence;
 
+import static org.jooq.impl.DSL.exists;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
@@ -123,11 +124,7 @@ public class VoteRepositoryImpl implements VoteRepository {
         .fetch()
         .forEach(
             r -> {
-              UUID[] ids = r.get(VOTES.OPTION_IDS);
-              if (ids == null) {
-                return;
-              }
-              for (UUID id : ids) {
+              for (UUID id : r.get(VOTES.OPTION_IDS)) {
                 out.merge(id, 1L, Long::sum);
               }
             });
@@ -172,7 +169,7 @@ public class VoteRepositoryImpl implements VoteRepository {
                     .eq(questionId)
                     .and(VOTES.VOTER_TOKEN.eq(voterToken))
                     .and(
-                        DSL.exists(
+                        exists(
                             dsl.selectOne()
                                 .from(POLL_QUESTIONS)
                                 .where(
@@ -192,7 +189,7 @@ public class VoteRepositoryImpl implements VoteRepository {
               .from(POLL_QUESTIONS)
               .where(POLL_QUESTIONS.ID.eq(questionId))
               .fetchOne(POLL_QUESTIONS.STATUS);
-      if (status == null || !QuestionStatus.ACTIVE.name().equals(status)) {
+      if (!QuestionStatus.ACTIVE.name().equals(status)) {
         throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
       }
       // Question still ACTIVE but row gone — idempotent no-op.
