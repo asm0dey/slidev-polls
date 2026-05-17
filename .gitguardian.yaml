@@ -1,5 +1,12 @@
+version: 2
+
 secret:
   ignored_matches:
-  - match: 7ab1ecf027c66e39d8b5875f3e3ac0e626e64f99d6823167fb2f55098d346cb5
-    name: Username Password - frontends/slidev-component/e2e/slidev-question-switch.spec.ts
-version: 2
+    # xkcd-936 throwaway used across test fixtures + Playwright specs.
+    # Never real auth material; suppress so GitGuardian stops flagging it.
+    - match: correct-horse
+      name: test-fixture-password-correct-horse
+    - match: correct-horse-battery
+      name: test-fixture-password-correct-horse-battery
+    - match: 7ab1ecf027c66e39d8b5875f3e3ac0e626e64f99d6823167fb2f55098d346cb5
+      name: Username Password - frontends/slidev-component/e2e/slidev-question-switch.spec.ts
