@@ -402,7 +402,15 @@ public class PollRepositoryImpl implements PollRepository {
                   .from(POLL_OPTIONS)
                   .where(POLL_OPTIONS.QUESTION_ID.eq(POLL_QUESTIONS.ID))
                   .orderBy(POLL_OPTIONS.POSITION.asc()))
-          .convertFrom(r -> r.map(o -> new Option(o.value1(), o.value2(), o.value3(), o.value4())));
+          .convertFrom(
+              r ->
+                  r.map(
+                      o ->
+                          new Option(
+                              o.get(POLL_OPTIONS.ID),
+                              o.get(POLL_OPTIONS.QUESTION_ID),
+                              o.get(POLL_OPTIONS.LABEL),
+                              o.get(POLL_OPTIONS.POSITION))));
 
   /**
    * Outer multiset that materialises every {@link Question} (with its nested options) for the poll
@@ -452,7 +460,7 @@ public class PollRepositoryImpl implements PollRepository {
                   .from(POLL_ALLOWED_ORIGINS)
                   .where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(POLLS.ID))
                   .orderBy(POLL_ALLOWED_ORIGINS.POSITION.asc()))
-          .convertFrom(r -> r.map(o -> o.value1()));
+          .convertFrom(r -> r.map(o -> o.get(POLL_ALLOWED_ORIGINS.ORIGIN)));
 
   private Poll toPoll(Record row) {
     List<Question> questions = row.get(QUESTIONS_FIELD);
@@ -481,13 +489,14 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+    Field<Integer> voteCount = DSL.count();
     Map<UUID, Long> out = new HashMap<>();
-    dsl.select(VOTES.QUESTION_ID, DSL.count())
+    dsl.select(VOTES.QUESTION_ID, voteCount)
         .from(VOTES)
         .where(VOTES.POLL_ID.eq(pollId))
         .groupBy(VOTES.QUESTION_ID)
         .fetch()
-        .forEach(r -> out.put(r.value1(), (long) r.value2()));
+        .forEach(r -> out.put(r.get(VOTES.QUESTION_ID), (long) r.get(voteCount)));
     return out;
   }
 }

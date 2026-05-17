@@ -123,7 +123,7 @@ public class VoteRepositoryImpl implements VoteRepository {
         .fetch()
         .forEach(
             r -> {
-              UUID[] ids = r.value1();
+              UUID[] ids = r.get(VOTES.OPTION_IDS);
               if (ids == null) {
                 return;
               }
