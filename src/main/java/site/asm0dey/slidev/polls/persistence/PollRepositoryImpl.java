@@ -11,7 +11,6 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -337,11 +336,10 @@ public class PollRepositoryImpl implements PollRepository {
     dsl.batch(rows).execute();
   }
 
-  private List<Question> insertQuestions(UUID pollId, List<Question> questions) {
+  private void insertQuestions(UUID pollId, List<Question> questions) {
     if (questions == null || questions.isEmpty()) {
-      return List.of();
+      return;
     }
-    List<Question> ordered = new ArrayList<>(questions.size());
     for (Question q : questions) {
       UUID qid = q.id() != null ? q.id() : UUID.randomUUID();
       dsl.insertInto(POLL_QUESTIONS)
@@ -353,38 +351,20 @@ public class PollRepositoryImpl implements PollRepository {
           .set(POLL_QUESTIONS.ORDINAL, q.ordinal())
           .set(POLL_QUESTIONS.STATUS, q.status().name())
           .execute();
-      List<Option> insertedOptions = new ArrayList<>(q.options().size());
       if (!q.options().isEmpty()) {
-        var batch =
-            dsl.batch(
+        dsl.batch(
                 q.options().stream()
                     .map(
-                        o -> {
-                          UUID oid = o.id() != null ? o.id() : UUID.randomUUID();
-                          insertedOptions.add(new Option(oid, qid, o.label(), o.position()));
-                          return dsl.insertInto(POLL_OPTIONS)
-                              .set(POLL_OPTIONS.ID, oid)
-                              .set(POLL_OPTIONS.QUESTION_ID, qid)
-                              .set(POLL_OPTIONS.LABEL, o.label())
-                              .set(POLL_OPTIONS.POSITION, o.position());
-                        })
-                    .toList());
-        batch.execute();
+                        o ->
+                            dsl.insertInto(POLL_OPTIONS)
+                                .set(POLL_OPTIONS.ID, o.id() != null ? o.id() : UUID.randomUUID())
+                                .set(POLL_OPTIONS.QUESTION_ID, qid)
+                                .set(POLL_OPTIONS.LABEL, o.label())
+                                .set(POLL_OPTIONS.POSITION, o.position()))
+                    .toList())
+            .execute();
       }
-      ordered.add(
-          new Question(
-              qid,
-              pollId,
-              q.prompt(),
-              q.ordinal(),
-              q.status(),
-              q.minSelections(),
-              q.maxSelections(),
-              insertedOptions,
-              null,
-              null));
     }
-    return ordered;
   }
 
   /**
