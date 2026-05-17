@@ -1,52 +1,34 @@
 package site.asm0dey.slidev.polls.persistence.h2;
 
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
+
 import java.sql.Connection;
-import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import org.h2.api.Trigger;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import org.h2.tools.TriggerAdapter;
+import org.jooq.impl.DSL;
 
 /**
  * Keeps {@code polls.updated_at} fresh when any {@code poll_questions} row on the poll changes. H2
- * has no SQL-level trigger bodies, so the action is implemented in Java; the matching PG trigger
- * lives in V10.
+ * triggers must be implemented in Java (no SQL trigger body); we render the actual UPDATE through
+ * jOOQ against the generated {@link site.asm0dey.slidev.polls.persistence.jooq.Tables#POLLS} table
+ * so the trigger stays in sync with schema renames the same way every other writer does. The
+ * matching Postgres trigger lives in V10.
  */
-public final class TouchPollUpdatedAtTrigger implements Trigger {
-
-  private int pollIdColumnIndex = -1;
+public final class TouchPollUpdatedAtTrigger extends TriggerAdapter {
 
   @Override
-  public void init(
-      Connection conn,
-      String schemaName,
-      String triggerName,
-      String tableName,
-      boolean before,
-      int type)
-      throws SQLException {
-    try (var rs = conn.getMetaData().getColumns(null, schemaName, tableName, "poll_id")) {
-      if (rs.next()) {
-        pollIdColumnIndex = rs.getInt("ORDINAL_POSITION") - 1;
-      }
-    }
-    if (pollIdColumnIndex < 0) {
-      throw new SQLException("poll_id column not found on " + schemaName + "." + tableName);
-    }
-  }
-
-  @Override
-  public void fire(Connection conn, Object[] oldRow, Object[] newRow) throws SQLException {
-    Object pollId = (newRow != null) ? newRow[pollIdColumnIndex] : oldRow[pollIdColumnIndex];
+  public void fire(Connection conn, ResultSet oldRow, ResultSet newRow) throws SQLException {
+    ResultSet src = newRow != null ? newRow : oldRow;
+    UUID pollId = src.getObject("poll_id", UUID.class);
     if (pollId == null) return;
-    try (PreparedStatement ps =
-        conn.prepareStatement("UPDATE polls SET updated_at = CURRENT_TIMESTAMP WHERE id = ?")) {
-      ps.setObject(1, pollId);
-      ps.executeUpdate();
-    }
+    DSL.using(conn)
+        .update(POLLS)
+        .set(POLLS.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+        .where(POLLS.ID.eq(pollId))
+        .execute();
   }
-
-  @Override
-  public void close() {}
-
-  @Override
-  public void remove() {}
 }
