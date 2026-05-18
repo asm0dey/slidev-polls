@@ -69,7 +69,11 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Optional<Poll> findById(UUID pollId) {
-    return dsl.select(POLLS.fields())
+    return findById(dsl, pollId);
+  }
+
+  private Optional<Poll> findById(DSLContext ctx, UUID pollId) {
+    return ctx.select(POLLS.fields())
         .select(QUESTIONS_FIELD)
         .select(ORIGINS_FIELD)
         .from(POLLS)
@@ -239,62 +243,91 @@ public class PollRepositoryImpl implements PollRepository {
     //   - any currently-ACTIVE row that is not the target becomes CLOSED
     //     (activated_at = NULL, closed_at = now),
     //   - every other row keeps its existing status / timestamps.
-    // The partial unique index poll_questions_one_active_uq serialises concurrent activations
-    // on the same poll (FR-004) — both engines lock the index slot for the duration of the
-    // statement. polls.updated_at is maintained by a trigger that fires on poll_questions
-    // changes (V10 / H2 V2).
-    int matches =
-        dsl.fetchCount(
-            POLL_QUESTIONS,
-            POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
-    if (matches == 0) {
-      throw new NotFoundException("question " + questionId + " not in poll " + pollId);
-    }
+    // polls.updated_at is maintained by a trigger that fires on poll_questions changes
+    // (V10 / H2 V2).
+    //
+    // SERIALIZATION: the CASE-driven UPDATE scans every poll_questions row of the poll and
+    // takes per-tuple row locks in heap/MVCC order. Two concurrent activates on the same
+    // poll can acquire those locks in different orders and deadlock on `poll_questions`
+    // (observed in practice when the Slidev addon's slide-switch flow fires close+activate
+    // POSTs from several mounted PollPanels at once). A `SELECT polls FOR UPDATE` on the
+    // owning poll row up front serialises every activation on the same pollId behind a
+    // single row lock — and PATCH /api/admin/polls/{id} naturally takes the same row lock
+    // via its `UPDATE polls` so the two paths can no longer interleave their per-question
+    // locks. The lookup also enforces the poll's existence, replacing what findById did at
+    // the end of the method.
+    // The lock + state-flipping UPDATE must share a single connection / transaction; otherwise
+    // the FOR UPDATE row lock taken by lockPollRow is released the moment its statement returns
+    // (autocommit), and the serialisation guarantee evaporates. In production the call already
+    // sits inside PollService's @Transactional boundary; the explicit dsl.transactionResult here
+    // is a defensive wrap that also makes the lock effective when the repository is invoked
+    // directly (e.g. from tests).
+    return dsl.transactionResult(
+        cfg -> {
+          DSLContext tx = cfg.dsl();
+          lockPollRow(tx, pollId);
+          int matches =
+              tx.fetchCount(
+                  POLL_QUESTIONS,
+                  POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
+          if (matches == 0) {
+            throw new NotFoundException("question " + questionId + " not in poll " + pollId);
+          }
 
-    OffsetDateTime now = OffsetDateTime.now();
-    // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT NULL).
-    // The CASE expressions keep that invariant by setting activated_at=now only when status
-    // transitions to ACTIVE and clearing it when an ACTIVE row is closed in the same statement.
-    dsl.update(POLL_QUESTIONS)
-        .set(
-            POLL_QUESTIONS.STATUS,
-            when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
-                .when(
-                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                    val(QuestionStatus.CLOSED.name()))
-                .otherwise(POLL_QUESTIONS.STATUS))
-        .set(
-            POLL_QUESTIONS.ACTIVATED_AT,
-            when(POLL_QUESTIONS.ID.eq(questionId), val(now))
-                .when(
-                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                    val((OffsetDateTime) null))
-                .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
-        .set(
-            POLL_QUESTIONS.CLOSED_AT,
-            when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
-                .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
-                .otherwise(POLL_QUESTIONS.CLOSED_AT))
-        .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-        .execute();
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+          OffsetDateTime now = OffsetDateTime.now();
+          // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT
+          // NULL). The CASE expressions keep that invariant by setting activated_at=now only
+          // when status transitions to ACTIVE and clearing it when an ACTIVE row is closed in
+          // the same statement.
+          tx.update(POLL_QUESTIONS)
+              .set(
+                  POLL_QUESTIONS.STATUS,
+                  when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
+                      .when(
+                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                          val(QuestionStatus.CLOSED.name()))
+                      .otherwise(POLL_QUESTIONS.STATUS))
+              .set(
+                  POLL_QUESTIONS.ACTIVATED_AT,
+                  when(POLL_QUESTIONS.ID.eq(questionId), val(now))
+                      .when(
+                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                          val((OffsetDateTime) null))
+                      .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
+              .set(
+                  POLL_QUESTIONS.CLOSED_AT,
+                  when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
+                      .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
+                      .otherwise(POLL_QUESTIONS.CLOSED_AT))
+              .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
+              .execute();
+          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+        });
   }
 
   @Override
   public Poll closeActiveQuestion(UUID pollId) {
-    OffsetDateTime now = OffsetDateTime.now();
-    // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not ACTIVE.
-    dsl.update(POLL_QUESTIONS)
-        .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
-        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-        .set(POLL_QUESTIONS.CLOSED_AT, now)
-        .where(
-            POLL_QUESTIONS
-                .POLL_ID
-                .eq(pollId)
-                .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
-        .execute();
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    // Same serialisation reason as activateQuestion — keeps concurrent close + activate on
+    // the same poll from interleaving their per-row locks on poll_questions.
+    return dsl.transactionResult(
+        cfg -> {
+          DSLContext tx = cfg.dsl();
+          lockPollRow(tx, pollId);
+          OffsetDateTime now = OffsetDateTime.now();
+          // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not
+          // ACTIVE.
+          tx.update(POLL_QUESTIONS)
+              .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+              .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+              .set(POLL_QUESTIONS.CLOSED_AT, now)
+              .where(
+                  POLL_QUESTIONS
+                      .POLL_ID
+                      .eq(pollId)
+                      .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
+              .execute();
+          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+        });
   }
 
   @Override
@@ -496,6 +529,15 @@ public class PollRepositoryImpl implements PollRepository {
         row.get(ORIGINS_FIELD),
         row.get(POLLS.CREATED_AT).toInstant(),
         row.get(POLLS.UPDATED_AT).toInstant());
+  }
+
+  private static void lockPollRow(DSLContext tx, UUID pollId) {
+    tx.select(POLLS.ID)
+        .from(POLLS)
+        .where(POLLS.ID.eq(pollId))
+        .forUpdate()
+        .fetchOptional()
+        .orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
   @Override
