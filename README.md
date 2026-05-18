@@ -1,5 +1,10 @@
 # Slidev Polls
 
+[![npm](https://img.shields.io/npm/v/@slidev-polls/component?label=%40slidev-polls%2Fcomponent&logo=npm)](https://www.npmjs.com/package/@slidev-polls/component)
+[![GitHub release](https://img.shields.io/github/v/release/asm0dey/slidev-polls?logo=github)](https://github.com/asm0dey/slidev-polls/releases)
+[![GHCR image](https://ghcr-badge.egpl.dev/asm0dey/slidev-polls-backend/latest_tag?label=ghcr&trim=major)](https://github.com/asm0dey/slidev-polls/pkgs/container/slidev-polls-backend)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
 Live audience polling for [Slidev](https://sli.dev) presentations. One service
 runs the API, the database, the voter page (`/`), and the admin UI (`/admin/`).
 A companion Slidev addon renders the results on a slide while the audience is
