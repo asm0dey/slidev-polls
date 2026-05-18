@@ -112,6 +112,42 @@ describe("ResultsPanel", () => {
     expect(w.find('[data-testid="results-footer"]').exists()).toBe(false);
   });
 
+  it("multi-choice percentages divide by voterCount, not total selections", () => {
+    const w = mount(ResultsPanel, {
+      props: {
+        mode: "flat",
+        voterCount: 2,
+        question: {
+          prompt: "pick 1-3",
+          minSelections: 1,
+          maxSelections: 3,
+          options: [
+            { id: "a", label: "Azul" },
+            { id: "b", label: "OpenJDK" },
+            { id: "c", label: "GraalJDK" },
+            { id: "d", label: "Liberica" },
+            { id: "e", label: "Coretto" },
+            { id: "f", label: "SAP Machine" }
+          ],
+          // 2 voters, 6 total selections. SAP Machine picked by both → 2/2 = 100%
+          // (not 2/6 = 33%). Each singleton picked by one voter → 1/2 = 50%.
+          tally: [
+            { optionId: "a", count: 1 },
+            { optionId: "b", count: 1 },
+            { optionId: "c", count: 1 },
+            { optionId: "d", count: 1 },
+            { optionId: "e", count: 0 },
+            { optionId: "f", count: 2 }
+          ]
+        }
+      }
+    });
+    const rows = w.findAll("[data-testid='rp-row']");
+    expect(rows[5].text()).toContain("100%");
+    expect(rows[0].text()).toContain("50%");
+    expect(rows[4].text()).toContain("0%");
+  });
+
   it("uses singular labels for single voter / single selection", () => {
     const w = mount(ResultsPanel, {
       props: {

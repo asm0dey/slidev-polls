@@ -63,9 +63,20 @@ function countOf(id: string): number {
   return props.question.tally.find((t) => t.optionId === id)?.count ?? 0;
 }
 
+// Multi-choice questions report "share of voters who picked this option" — each voter contributes
+// at most 1 to a given option's count, so count/voterCount answers the natural "what fraction of
+// the room picked X?". Using total selections (the legacy denominator) made each row's % depend
+// on how many *other* options were also picked, which read as "33% of 2 voters" nonsense in the
+// presenter view. Single-choice keeps the historical count/total denominator (identical when
+// voterCount === total).
+const denominator = computed(() =>
+  isMulti.value && props.voterCount > 0 ? props.voterCount : total.value
+);
+
 function pctOf(id: string): number {
-  if (total.value === 0) return 0;
-  return Math.round((countOf(id) / total.value) * 100);
+  const d = denominator.value;
+  if (d === 0) return 0;
+  return Math.round((countOf(id) / d) * 100);
 }
 </script>
 
@@ -204,13 +215,20 @@ function pctOf(id: string): number {
 .sp-rp__row[data-leader] .sp-rp__fill {
   background: var(--sp-accent);
 }
-.sp-rp__row[data-leader] {
+/* Leader text colour is applied per-element, not row-wide. The bar fill only
+   covers `pct%` of the row width, so a row-level color override painted the
+   percentage label (right-anchored, outside the bar) in the on-accent fg —
+   e.g. near-black "33%" sitting on the dark row background in dark theme,
+   which read as illegible. Label sits at the left edge (always inside the
+   bar when pct > 0) so it gets the on-accent fg; the pct stays in theme fg
+   so it remains readable against `--sp-bg-subtle` outside the bar. */
+.sp-rp__row[data-leader] .sp-rp__label {
   color: var(--sp-accent-fg);
 }
-.sp-rp[data-mode="scrim-dark"] .sp-rp__row[data-leader] {
+.sp-rp[data-mode="scrim-dark"] .sp-rp__row[data-leader] .sp-rp__label {
   color: #fff;
 }
-.sp-rp[data-mode="scrim-light"] .sp-rp__row[data-leader] {
+.sp-rp[data-mode="scrim-light"] .sp-rp__row[data-leader] .sp-rp__label {
   color: #fff;
 }
 .sp-rp__row[data-leader] .sp-rp__label,
