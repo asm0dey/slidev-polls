@@ -256,78 +256,72 @@ public class PollRepositoryImpl implements PollRepository {
     // via its `UPDATE polls` so the two paths can no longer interleave their per-question
     // locks. The lookup also enforces the poll's existence, replacing what findById did at
     // the end of the method.
-    // The lock + state-flipping UPDATE must share a single connection / transaction; otherwise
-    // the FOR UPDATE row lock taken by lockPollRow is released the moment its statement returns
-    // (autocommit), and the serialisation guarantee evaporates. In production the call already
-    // sits inside PollService's @Transactional boundary; the explicit dsl.transactionResult here
-    // is a defensive wrap that also makes the lock effective when the repository is invoked
-    // directly (e.g. from tests).
-    return dsl.transactionResult(
-        cfg -> {
-          DSLContext tx = cfg.dsl();
-          lockPollRow(tx, pollId);
-          int matches =
-              tx.fetchCount(
-                  POLL_QUESTIONS,
-                  POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
-          if (matches == 0) {
-            throw new NotFoundException("question " + questionId + " not in poll " + pollId);
-          }
+    // R1 fallback (Quarkus/Narayana): the connection jOOQ uses is already enlisted in the ambient
+    // JTA transaction opened by PollService's @Transactional boundary, so an explicit nested
+    // dsl.transactionResult(...) here fails with "Attempting to commit while taking part in a
+    // transaction". We therefore run directly on the active dsl and rely on the @Transactional
+    // boundary for atomicity. lockPollRow still issues a SELECT ... FOR UPDATE that serialises
+    // concurrent activations within the same JTA transaction; even without a lock the single
+    // CASE-driven UPDATE is per-statement atomic, so the one-ACTIVE-per-poll invariant holds.
+    lockPollRow(dsl, pollId);
+    int matches =
+        dsl.fetchCount(
+            POLL_QUESTIONS,
+            POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
+    if (matches == 0) {
+      throw new NotFoundException("question " + questionId + " not in poll " + pollId);
+    }
 
-          OffsetDateTime now = OffsetDateTime.now();
-          // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT
-          // NULL). The CASE expressions keep that invariant by setting activated_at=now only
-          // when status transitions to ACTIVE and clearing it when an ACTIVE row is closed in
-          // the same statement.
-          tx.update(POLL_QUESTIONS)
-              .set(
-                  POLL_QUESTIONS.STATUS,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
-                      .when(
-                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                          val(QuestionStatus.CLOSED.name()))
-                      .otherwise(POLL_QUESTIONS.STATUS))
-              .set(
-                  POLL_QUESTIONS.ACTIVATED_AT,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val(now))
-                      .when(
-                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                          val((OffsetDateTime) null))
-                      .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
-              .set(
-                  POLL_QUESTIONS.CLOSED_AT,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
-                      .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
-                      .otherwise(POLL_QUESTIONS.CLOSED_AT))
-              .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-              .execute();
-          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-        });
+    OffsetDateTime now = OffsetDateTime.now();
+    // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT
+    // NULL). The CASE expressions keep that invariant by setting activated_at=now only
+    // when status transitions to ACTIVE and clearing it when an ACTIVE row is closed in
+    // the same statement.
+    dsl.update(POLL_QUESTIONS)
+        .set(
+            POLL_QUESTIONS.STATUS,
+            when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
+                .when(
+                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                    val(QuestionStatus.CLOSED.name()))
+                .otherwise(POLL_QUESTIONS.STATUS))
+        .set(
+            POLL_QUESTIONS.ACTIVATED_AT,
+            when(POLL_QUESTIONS.ID.eq(questionId), val(now))
+                .when(
+                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                    val((OffsetDateTime) null))
+                .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
+        .set(
+            POLL_QUESTIONS.CLOSED_AT,
+            when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
+                .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
+                .otherwise(POLL_QUESTIONS.CLOSED_AT))
+        .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
+        .execute();
+    return findById(dsl, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
   @Override
   public Poll closeActiveQuestion(UUID pollId) {
-    // Same serialisation reason as activateQuestion — keeps concurrent close + activate on
-    // the same poll from interleaving their per-row locks on poll_questions.
-    return dsl.transactionResult(
-        cfg -> {
-          DSLContext tx = cfg.dsl();
-          lockPollRow(tx, pollId);
-          OffsetDateTime now = OffsetDateTime.now();
-          // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not
-          // ACTIVE.
-          tx.update(POLL_QUESTIONS)
-              .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
-              .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-              .set(POLL_QUESTIONS.CLOSED_AT, now)
-              .where(
-                  POLL_QUESTIONS
-                      .POLL_ID
-                      .eq(pollId)
-                      .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
-              .execute();
-          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-        });
+    // R1 fallback: run on the active dsl inside PollService's @Transactional boundary rather than
+    // an explicit nested jOOQ transaction (which fails under Narayana — see activateQuestion).
+    // Same serialisation reason as activateQuestion — lockPollRow keeps concurrent close + activate
+    // on the same poll from interleaving their per-row locks on poll_questions.
+    lockPollRow(dsl, pollId);
+    OffsetDateTime now = OffsetDateTime.now();
+    // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not ACTIVE.
+    dsl.update(POLL_QUESTIONS)
+        .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+        .set(POLL_QUESTIONS.CLOSED_AT, now)
+        .where(
+            POLL_QUESTIONS
+                .POLL_ID
+                .eq(pollId)
+                .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
+        .execute();
+    return findById(dsl, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
   }
 
   @Override

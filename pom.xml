@@ -166,14 +166,14 @@
             <artifactId>quarkus-elytron-security</artifactId>
         </dependency>
         <!--
-          quarkus-csrf-reactive was relocated to quarkus-rest-csrf (Quarkus
-          Migration Guide 3.9); use the current artifactId. CSRF wiring for the
-          JSON admin flow is configured in Phase 4 (design risk R2).
+          NOTE: the quarkus-rest-csrf extension was removed. Its global
+          CsrfRequestResponseReactiveFilter rejects EVERY state-changing request
+          that lacks its own form/cookie token — including all application/json
+          POST/PUT/PATCH/DELETE — with a bare 400, and `verify-token=false` does
+          not suppress that filter in 3.15. CSRF for the backoffice JSON SPA is
+          enforced by the custom AdminCsrfFilter (double-submit, scoped to
+          /api/admin/**), which does not need the extension.
         -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-csrf</artifactId>
-        </dependency>
 
         <!-- Scheduling -->
         <dependency>
@@ -229,6 +229,17 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit5-mockito</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -279,11 +290,40 @@
             </plugin>
 
             <!--
-              Failsafe runs `*IT.java` at integration-test / verify.
+              Surefire runs `*Test.java` at test. DOCKER_API_VERSION is pinned so the
+              Testcontainers client bundled by Quarkus Dev Services (docker-java negotiates
+              API 1.32 by default) talks to a modern daemon that requires API >= 1.40.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <DOCKER_API_VERSION>1.43</DOCKER_API_VERSION>
+                    </environmentVariables>
+                    <systemPropertyVariables>
+                        <api.version>1.43</api.version>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!--
+              Failsafe runs `*IT.java` at integration-test / verify. Same DOCKER_API_VERSION
+              pin as surefire for Quarkus Dev Services.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <DOCKER_API_VERSION>1.43</DOCKER_API_VERSION>
+                    </environmentVariables>
+                    <systemPropertyVariables>
+                        <api.version>1.43</api.version>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                    </systemPropertyVariables>
+                </configuration>
                 <executions>
                     <execution>
                         <id>default-it</id>
