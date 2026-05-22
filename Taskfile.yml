@@ -86,7 +86,7 @@ tasks:
   # ---------- Build surfaces ----------------------------------------------
 
   frontends:
-    desc: Build the voter + backoffice SPAs into src/main/resources/static
+    desc: Build the voter + backoffice SPAs into src/main/resources/META-INF/resources
     cmds:
       - bash scripts/build-frontends.sh
 
@@ -236,4 +236,4 @@ tasks:
     cmds:
       - ./mvnw clean
       - rm -rf frontends/*/dist
-      - rm -rf src/main/resources/static
+      - rm -rf src/main/resources/META-INF/resources

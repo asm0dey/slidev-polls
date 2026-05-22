@@ -11,8 +11,8 @@ frontends/*/dist/
 
 # Built SPA bundles copied into backend (pre-unification path kept for Task 6 cleanup)
 backend/poll-api/src/main/resources/static/
-# Built SPA bundles in unified app layout
-src/main/resources/static/
+# Built SPA bundles in unified app layout (Quarkus static root)
+src/main/resources/META-INF/resources/
 
 # IDE
 .idea/

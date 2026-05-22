@@ -5,7 +5,7 @@ set -euo pipefail
 # application's static resources so the single-JAR deployment serves them.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STATIC="$ROOT/src/main/resources/static"
+STATIC="$ROOT/src/main/resources/META-INF/resources"
 
 cd "$ROOT/frontends"
 bun install
