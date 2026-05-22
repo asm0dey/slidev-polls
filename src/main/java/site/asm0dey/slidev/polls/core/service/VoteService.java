@@ -1,5 +1,8 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
+import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -8,9 +11,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.Question;
@@ -30,17 +30,15 @@ import site.asm0dey.slidev.polls.core.event.VoteRetractedEvent;
  * newOptionCount} already includes the row just written; the listener side of this (T111's {@code
  * TallyBroadcaster}) fans the delta out over SSE.
  */
-@Service
+@ApplicationScoped
 public class VoteService {
 
   private final PollRepository pollRepository;
   private final VoteRepository voteRepository;
-  private final ApplicationEventPublisher events;
+  private final Event<Object> events;
 
   public VoteService(
-      PollRepository pollRepository,
-      VoteRepository voteRepository,
-      ApplicationEventPublisher events) {
+      PollRepository pollRepository, VoteRepository voteRepository, Event<Object> events) {
     this.pollRepository = pollRepository;
     this.voteRepository = voteRepository;
     this.events = events;
@@ -102,7 +100,7 @@ public class VoteService {
             Instant.now());
     Vote stored = voteRepository.insert(pending);
 
-    events.publishEvent(new VoteCastEvent(poll.id(), activeQuestionId, stored.createdAt()));
+    events.fire(new VoteCastEvent(poll.id(), activeQuestionId, stored.createdAt()));
     return stored;
   }
 
@@ -127,7 +125,7 @@ public class VoteService {
       // Idempotent no-op — voter had no row on the active question. No event.
       return;
     }
-    events.publishEvent(new VoteRetractedEvent(poll.id(), activeQuestionId, Instant.now()));
+    events.fire(new VoteRetractedEvent(poll.id(), activeQuestionId, Instant.now()));
   }
 
   private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {

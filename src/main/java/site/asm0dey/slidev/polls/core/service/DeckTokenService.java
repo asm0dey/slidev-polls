@@ -1,5 +1,7 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -9,8 +11,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.DeckToken;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 
@@ -24,7 +24,7 @@ import site.asm0dey.slidev.polls.core.error.NotFoundException;
  * (see {@link #resolveLive(String)}) bypasses ownership by design — it is authorised by the bearer
  * itself.
  */
-@Service
+@ApplicationScoped
 public class DeckTokenService {
 
   private static final SecureRandom RNG = new SecureRandom();

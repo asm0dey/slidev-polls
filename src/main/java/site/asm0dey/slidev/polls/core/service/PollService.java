@@ -1,5 +1,9 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
+import jakarta.enterprise.inject.Instance;
+import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,10 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -39,23 +39,22 @@ import site.asm0dey.slidev.polls.core.slug.SlugValidator;
  * DeckTokenAuthenticationFilter} has already validated the token/poll binding by the time we get
  * here.
  */
-@Service
+@ApplicationScoped
 public class PollService {
 
   private final PollRepository repository;
-  private final ApplicationEventPublisher events;
-  // Spring 6 rejects circular references by default and Spring AOT cannot generate code
-  // for an `@Lazy` self-injected setter (the AOT-emitted CGLIB proxy clashes with
-  // SerializableNoOp at setCallbacks). ObjectProvider resolves on demand from the bean
-  // factory, which returns the proxy that `@Transactional` advice is bound to, so
-  // self-invocations still cross a transactional boundary.
-  private final ObjectProvider<PollService> self;
+  private final Event<Object> events;
+  // Self-injection so intra-class calls go through the CDI client proxy and therefore
+  // cross a @Transactional interceptor boundary (a direct `this.method()` call would
+  // bypass the interceptor). CDI's Instance is the analog of Spring's ObjectProvider:
+  // it resolves the contextual proxy on demand via `get()`.
+  private final Instance<PollService> self;
   private final VoteRepository voteRepository;
 
   public PollService(
       PollRepository repository,
-      ApplicationEventPublisher events,
-      ObjectProvider<PollService> self,
+      Event<Object> events,
+      Instance<PollService> self,
       VoteRepository voteRepository) {
     this.repository = repository;
     this.events = events;
@@ -102,7 +101,7 @@ public class PollService {
 
   @Transactional
   public Poll updateForOwner(UUID pollId, String ownerUsername, UpdatePollCommand command) {
-    Poll existing = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll existing = self.get().getForOwner(pollId, ownerUsername);
     String title = command.title() != null ? command.title() : existing.title();
     String slug = existing.slug();
     if (command.slug() != null && !command.slug().equals(existing.slug())) {
@@ -220,16 +219,16 @@ public class PollService {
 
   @Transactional
   public void deleteForOwner(UUID pollId, String ownerUsername) {
-    self.getObject().getForOwner(pollId, ownerUsername);
+    self.get().getForOwner(pollId, ownerUsername);
     repository.delete(pollId);
   }
 
   @Transactional
   public Poll clearVotesForOwner(UUID pollId, String ownerUsername) {
-    self.getObject().getForOwner(pollId, ownerUsername);
+    self.get().getForOwner(pollId, ownerUsername);
     voteRepository.deleteForPoll(pollId);
     Poll after = repository.resetQuestionsToDraft(pollId);
-    events.publishEvent(new PollVotesClearedEvent(pollId, Instant.now()));
+    events.fire(new PollVotesClearedEvent(pollId, Instant.now()));
     return after;
   }
 
@@ -242,7 +241,7 @@ public class PollService {
    */
   @Transactional
   public Poll cloneForOwner(UUID pollId, String ownerUsername) {
-    Poll src = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll src = self.get().getForOwner(pollId, ownerUsername);
     List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>(src.questions().size());
     for (Question q : src.questions()) {
       List<CreatePollCommand.OptionDraft> opts = new ArrayList<>(q.options().size());
@@ -251,7 +250,7 @@ public class PollService {
       }
       drafts.add(new CreatePollCommand.QuestionDraft(q.prompt(), opts));
     }
-    return self.getObject()
+    return self.get()
         .create(
             ownerUsername,
             new CreatePollCommand("Copy of " + src.title(), null, drafts, src.allowedOrigins()));
@@ -259,17 +258,17 @@ public class PollService {
 
   @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
-    self.getObject().getForOwner(pollId, ownerUsername);
-    return self.getObject().activateQuestion(pollId, questionId);
+    self.get().getForOwner(pollId, ownerUsername);
+    return self.get().activateQuestion(pollId, questionId);
   }
 
   @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    Poll before = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll before = self.get().getForOwner(pollId, ownerUsername);
     UUID wasActive = before.activeQuestionId();
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {
-      events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
+      events.fire(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
     }
     return after;
   }
@@ -300,7 +299,7 @@ public class PollService {
     }
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {
-      events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
+      events.fire(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
     }
     return after;
   }
@@ -331,7 +330,7 @@ public class PollService {
       return poll;
     }
     Poll after = repository.activateQuestion(pollId, questionId);
-    events.publishEvent(new PollActiveQuestionChangedEvent(pollId, questionId, Instant.now()));
+    events.fire(new PollActiveQuestionChangedEvent(pollId, questionId, Instant.now()));
     return after;
   }
 

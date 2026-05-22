@@ -1,15 +1,12 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+import jakarta.transaction.UserTransaction;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.PessimisticLockingFailureException;
+import org.jooq.exception.DataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
@@ -19,21 +16,20 @@ import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
  * gated on an empty table; subsequent accounts go through {@link #createAdmin} which only requires
  * the caller to be authenticated (the controller enforces that, not this class).
  */
-@Service
+@ApplicationScoped
 public class AdminUserService {
 
   private final AdminUserRepository repository;
   private final PasswordEncoder passwordEncoder;
-  private final TransactionTemplate serializableTx;
+  private final UserTransaction userTransaction;
 
   public AdminUserService(
       AdminUserRepository repository,
       PasswordEncoder passwordEncoder,
-      PlatformTransactionManager transactionManager) {
+      UserTransaction userTransaction) {
     this.repository = repository;
     this.passwordEncoder = passwordEncoder;
-    this.serializableTx = new TransactionTemplate(transactionManager);
-    this.serializableTx.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+    this.userTransaction = userTransaction;
   }
 
   public boolean isSetupRequired() {
@@ -41,36 +37,66 @@ public class AdminUserService {
   }
 
   /**
-   * Inserts the bootstrap presenter inside a SERIALIZABLE transaction. We use a programmatic
-   * TransactionTemplate (not @Transactional) so the catch sits OUTSIDE the transaction boundary —
-   * Postgres reports the serialization conflict at COMMIT time, which a try/catch inside
-   * an @Transactional method body cannot observe. Two concurrent setup attempts therefore resolve
-   * as:
+   * Inserts the bootstrap presenter inside a programmatic JTA transaction (a {@link
+   * UserTransaction}, not {@code @Transactional}) so the catch sits OUTSIDE the transaction
+   * boundary — Postgres reports the serialization conflict at COMMIT time, which a try/catch inside
+   * an {@code @Transactional} method body cannot observe. Two concurrent setup attempts therefore
+   * resolve as:
    *
    * <ul>
    *   <li>both pass the in-tx {@code count()} check at their MVCC snapshot,
    *   <li>both insert,
-   *   <li>one commit succeeds, the other fails with {@link PessimisticLockingFailureException} (or
-   *       {@link DataIntegrityViolationException} if usernames collide on the PK).
+   *   <li>one commit succeeds, the other fails (a {@link DataAccessException} on the username PK,
+   *       or a serialization conflict surfaced as a JTA rollback at {@code commit()}).
    * </ul>
    *
    * The catch translates either failure into {@link SetupLockedException} so the controller surface
    * is consistently {@code 409 Problem(SETUP_LOCKED)} (FR-017 / Principle VI: actionable failure
    * categories, no leaking of database-level error wording).
+   *
+   * <p>NOTE: SERIALIZABLE isolation can no longer be requested per-transaction the way Spring's
+   * {@code TransactionTemplate} did — JTA {@link UserTransaction} has no isolation knob. The
+   * isolation level must be set at the datasource/connection level (see the Quarkus datasource
+   * config). If the datasource default is READ COMMITTED, the username PK is still the backstop,
+   * but the "both insert, one loses at COMMIT on serialization conflict" path degrades to a
+   * PK-collision path only.
    */
   public AdminUser createInitialAdmin(CreateAdminCommand command) {
     try {
-      return serializableTx.execute(
-          _ -> {
-            if (repository.count() != 0L) {
-              throw new SetupLockedException("setup already complete");
-            }
-            String hash = passwordEncoder.encode(command.password());
-            repository.insert(command.username(), hash);
-            return new AdminUser(command.username(), Instant.now());
-          });
-    } catch (PessimisticLockingFailureException | DataIntegrityViolationException _) {
+      userTransaction.begin();
+    } catch (Exception ex) {
+      throw new IllegalStateException("could not begin setup transaction", ex);
+    }
+    try {
+      if (repository.count() != 0L) {
+        throw new SetupLockedException("setup already complete");
+      }
+      String hash = passwordEncoder.encode(command.password());
+      repository.insert(command.username(), hash);
+      AdminUser created = new AdminUser(command.username(), Instant.now());
+      userTransaction.commit();
+      return created;
+    } catch (SetupLockedException ex) {
+      rollbackQuietly();
+      throw ex;
+    } catch (DataAccessException ex) {
+      // Lost the insert race: a concurrent setup committed first and the username PK (or the
+      // serialization conflict surfaced at COMMIT) rejected this attempt. Translate to the
+      // controller-facing 409 SETUP_LOCKED rather than leaking the database error wording.
+      rollbackQuietly();
       throw new SetupLockedException("setup already complete");
+    } catch (Exception ex) {
+      // COMMIT-time serialization failure also lands here as a generic JTA RollbackException.
+      rollbackQuietly();
+      throw new SetupLockedException("setup already complete");
+    }
+  }
+
+  private void rollbackQuietly() {
+    try {
+      userTransaction.rollback();
+    } catch (Exception ignored) {
+      // Best-effort rollback: the transaction may already be rolled back by the manager.
     }
   }
 
@@ -90,7 +116,7 @@ public class AdminUserService {
     String hash = passwordEncoder.encode(command.password());
     try {
       repository.insert(command.username(), hash);
-    } catch (DataIntegrityViolationException _) {
+    } catch (DataAccessException _) {
       throw new UsernameTakenException(command.username());
     }
     return new AdminUser(command.username(), Instant.now());

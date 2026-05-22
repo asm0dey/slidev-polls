@@ -1,9 +1,9 @@
 package site.asm0dey.slidev.polls.realtime.sse;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 import site.asm0dey.slidev.polls.core.event.PollActiveQuestionChangedEvent;
 import site.asm0dey.slidev.polls.core.event.PollQuestionClosedEvent;
 import site.asm0dey.slidev.polls.core.event.PollVotesClearedEvent;
@@ -28,7 +28,7 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  * <p>Event routing uses the shared {@link SseHub}; per-emitter send failures are isolated there, so
  * a dead browser on one pollId cannot starve siblings or crash the broadcast (Principle IV).
  */
-@Component
+@ApplicationScoped
 public class TallyBroadcaster {
 
   private static final String SNAPSHOT_EVENT = "snapshot";
@@ -41,33 +41,28 @@ public class TallyBroadcaster {
     this.snapshots = snapshots;
   }
 
-  @EventListener
-  public void onVoteCast(VoteCastEvent event) {
+  public void onVoteCast(@Observes VoteCastEvent event) {
     resnapshotForQuestion(event.pollId(), event.questionId());
   }
 
-  @EventListener
-  public void onVoteRetracted(VoteRetractedEvent event) {
+  public void onVoteRetracted(@Observes VoteRetractedEvent event) {
     resnapshotForQuestion(event.pollId(), event.questionId());
   }
 
-  @EventListener
-  public void onActiveQuestionChanged(PollActiveQuestionChangedEvent event) {
+  public void onActiveQuestionChanged(@Observes PollActiveQuestionChangedEvent event) {
     snapshots
         .build(event.pollId())
         .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
   }
 
-  @EventListener
-  public void onQuestionClosed(PollQuestionClosedEvent event) {
+  public void onQuestionClosed(@Observes PollQuestionClosedEvent event) {
     hub.broadcast(
         event.pollId(),
         "question-closed",
         new QuestionClosedPayload(event.pollId(), event.questionId(), Instant.now()));
   }
 
-  @EventListener
-  public void onVotesCleared(PollVotesClearedEvent event) {
+  public void onVotesCleared(@Observes PollVotesClearedEvent event) {
     snapshots
         .build(event.pollId())
         .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
