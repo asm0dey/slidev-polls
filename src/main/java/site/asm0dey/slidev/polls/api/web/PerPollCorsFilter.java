@@ -32,6 +32,13 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
  * router. On a preflight {@code OPTIONS} for an allowed origin it writes the headers, responds 204
  * and ends the response; on any other request it writes the allow-origin/credentials headers (when
  * the origin is allowed) and continues the chain via {@link RoutingContext#next()}.
+ *
+ * <p>The origin resolution hits the database via blocking jOOQ ({@code findBySlug}/{@code
+ * findById}/{@code isOriginAllowedByAnyPoll}). A {@link RouteFilter} runs on the Vert.x event loop,
+ * so the lookup is pushed onto a worker thread with {@link io.vertx.core.Vertx#executeBlocking};
+ * the response is written / the chain resumed back on the event loop in the result handler. This
+ * mirrors {@code DeckTokenMechanism}, which offloads its blocking lookup to a worker pool for the
+ * same reason.
  */
 @ApplicationScoped
 public class PerPollCorsFilter {
@@ -57,7 +64,18 @@ public class PerPollCorsFilter {
     String uri = rc.normalizedPath();
     String origin = rc.request().getHeader("Origin");
 
-    List<String> allowedOrigins = resolveAllowedOrigins(uri, origin);
+    // resolveAllowedOrigins performs blocking jOOQ; never run it on the event loop. Offload to a
+    // worker thread, then apply headers / resume the chain back on the event loop in the handler.
+    rc.vertx()
+        .executeBlocking(() -> resolveAllowedOrigins(uri, origin), false)
+        .onComplete(
+            ar -> {
+              List<String> allowedOrigins = ar.succeeded() ? ar.result() : null;
+              applyCorsAndContinue(rc, origin, allowedOrigins);
+            });
+  }
+
+  private void applyCorsAndContinue(RoutingContext rc, String origin, List<String> allowedOrigins) {
     boolean originAllowed =
         origin != null
             && !origin.isBlank()
