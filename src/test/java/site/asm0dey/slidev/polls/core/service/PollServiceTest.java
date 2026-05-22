@@ -12,8 +12,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -46,16 +44,8 @@ class PollServiceTest {
   void setUp() {
     repository = new FakePollRepository();
     fakeVoteRepository = new FakeVoteRepository();
-    org.springframework.beans.factory.ObjectProvider<PollService> selfProvider =
-        new org.springframework.beans.factory.ObjectProvider<>() {
-          @Override
-          public PollService getObject() {
-            return service;
-          }
-        };
-    service =
-        new PollService(
-            repository, new RecordingEventPublisher(), selfProvider, fakeVoteRepository);
+    SelfInstance<PollService> selfProvider = new SelfInstance<>(() -> service);
+    service = new PollService(repository, new RecordingEvent(), selfProvider, fakeVoteRepository);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title
@@ -734,15 +724,5 @@ class PollServiceTest {
         UUID questionId, String voterToken) {
       throw new UnsupportedOperationException("not needed for PollServiceTest");
     }
-  }
-
-  /** No-op event sink — individual tests that care about events can subclass and inspect. */
-  static final class RecordingEventPublisher implements ApplicationEventPublisher {
-
-    @Override
-    public void publishEvent(Object event) {}
-
-    @Override
-    public void publishEvent(ApplicationEvent event) {}
   }
 }

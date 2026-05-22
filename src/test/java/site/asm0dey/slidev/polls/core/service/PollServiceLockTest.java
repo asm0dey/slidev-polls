@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -63,14 +62,8 @@ class PollServiceLockTest {
     FakeRepo repo = new FakeRepo();
     FakeVotes votes = new FakeVotes();
     PollService[] holder = new PollService[1];
-    ObjectProvider<PollService> provider =
-        new ObjectProvider<>() {
-          @Override
-          public PollService getObject() {
-            return holder[0];
-          }
-        };
-    PollService service = new PollService(repo, ev -> {}, provider, votes);
+    SelfInstance<PollService> provider = new SelfInstance<>(() -> holder[0]);
+    PollService service = new PollService(repo, new RecordingEvent(), provider, votes);
     holder[0] = service;
 
     Poll created =

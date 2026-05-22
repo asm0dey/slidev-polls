@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.enterprise.event.Event;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -46,7 +46,7 @@ class VoteServiceArityTest {
     Fixture f = fixture(0, 3, 3);
     when(f.repo.insert(any())).thenAnswer(inv -> inv.getArgument(0));
     f.service.recordVote("p", List.of(f.options.get(0), f.options.get(2)), "v");
-    verify(f.events).publishEvent((Object) any());
+    verify(f.events).fire(any());
   }
 
   @Test
@@ -60,7 +60,7 @@ class VoteServiceArityTest {
     ArgumentCaptor<Vote> inserted = ArgumentCaptor.forClass(Vote.class);
     verify(f.repo).insert(inserted.capture());
     assertThat(inserted.getValue().optionIds()).isEmpty();
-    verify(f.events).publishEvent((Object) any());
+    verify(f.events).fire(any());
   }
 
   @Test
@@ -139,15 +139,13 @@ class VoteServiceArityTest {
     VoteRepository voteRepo = mock(VoteRepository.class);
     when(voteRepo.tally(any())).thenReturn(Map.of());
 
-    ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    @SuppressWarnings("unchecked")
+    Event<Object> events = mock(Event.class);
 
     VoteService service = new VoteService(pollRepo, voteRepo, events);
     return new Fixture(service, voteRepo, events, optionIds);
   }
 
   private record Fixture(
-      VoteService service,
-      VoteRepository repo,
-      ApplicationEventPublisher events,
-      List<UUID> options) {}
+      VoteService service, VoteRepository repo, Event<Object> events, List<UUID> options) {}
 }

@@ -1,9 +1,18 @@
 package site.asm0dey.slidev.polls.realtime.sse;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import io.quarkus.test.common.http.TestHTTPResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
+import io.restassured.config.EncoderConfig;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
+import jakarta.inject.Inject;
 import java.net.URI;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,53 +27,47 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.client.RestTemplate;
-import site.asm0dey.slidev.polls.api.PollApiApplication;
-import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.security.Argon2PasswordHasher;
 import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the snapshot-only SSE contract after the {@code tally} delta event was retired: every
  * accepted vote (and every retraction) re-broadcasts a fresh {@link SnapshotPayload}. No {@code
  * tally} or {@code tally-delta} event should ever appear on the wire.
  *
- * <p>Boots the full Spring stack the same way {@code StreamIT} does — the public REST surface still
- * exposes the legacy single-{@code optionId} shape until Task 12 lands; the snapshot-driven SSE
- * behaviour is independent of that and is what this IT verifies.
+ * <p>Ported to {@code @QuarkusTest} + RestAssured (fixtures via the real admin login → create →
+ * open flow, same as {@code VoteSubmissionIT}). The SSE stream is read off a raw {@link HttpClient}
+ * against the {@code @TestHTTPResource} base URL because RestAssured does not stream {@code
+ * text/event-stream}. The voter identity is the {@code sp_voter} cookie minted on the first vote;
+ * it is replayed on the retract so the same row is removed.
  */
-@SpringBootTest(
-    classes = PollApiApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(TestcontainersConfiguration.class)
+@QuarkusTest
 class TallyBroadcasterSnapshotIT {
 
-  @LocalServerPort int port;
-  @Autowired ObjectMapper objectMapper;
-  @Autowired DSLContext dsl;
-  @Autowired PasswordEncoder encoder;
+  @TestHTTPResource("/")
+  URL baseUrl;
 
-  private RestTemplate rest;
+  @Inject DSLContext dsl;
+  @Inject Argon2PasswordHasher encoder;
+
   private ExecutorService readerPool;
   private AtomicBoolean reading;
   private String voterCookie;
 
+  @BeforeAll
+  static void noCharsetOnJson() {
+    RestAssured.config =
+        RestAssured.config()
+            .encoderConfig(
+                EncoderConfig.encoderConfig()
+                    .appendDefaultContentCharsetToContentTypeIfUndefined(false));
+  }
+
   @BeforeEach
   void setUp() {
-    rest = new RestTemplate();
     readerPool = Executors.newSingleThreadExecutor();
     reading = new AtomicBoolean(true);
     voterCookie = null;
@@ -78,7 +81,7 @@ class TallyBroadcasterSnapshotIT {
   }
 
   @Test
-  void castFiresOneSnapshotFrameAndNoTallyFrame() throws Exception {
+  void castFiresOneSnapshotFrameAndNoTallyFrame() {
     String slug = "snap-cast";
     PollFixture poll = createPollWithActiveQuestion(slug);
     ConcurrentLinkedQueue<SseEvent> received = new ConcurrentLinkedQueue<>();
@@ -108,7 +111,7 @@ class TallyBroadcasterSnapshotIT {
   }
 
   @Test
-  void retractFiresAnotherSnapshotFrame() throws Exception {
+  void retractFiresAnotherSnapshotFrame() {
     String slug = "snap-retract";
     PollFixture poll = createPollWithActiveQuestion(slug);
     ConcurrentLinkedQueue<SseEvent> received = new ConcurrentLinkedQueue<>();
@@ -136,41 +139,32 @@ class TallyBroadcasterSnapshotIT {
   // ---------- HTTP helpers -------------------------------------------------
 
   private void cast(String slug, UUID optionId) {
-    String body = String.format("{\"optionIds\":[\"%s\"]}", optionId);
-    HttpHeaders headers = jsonHeaders();
+    var req =
+        given()
+            .contentType(ContentType.JSON)
+            .body(String.format("{\"optionIds\":[\"%s\"]}", optionId));
     if (voterCookie != null) {
-      headers.add(HttpHeaders.COOKIE, voterCookie);
+      req = req.cookie("sp_voter", voterCookie);
     }
-    ResponseEntity<String> response =
-        rest.exchange(
-            "http://localhost:" + port + "/api/polls/" + slug + "/votes",
-            HttpMethod.POST,
-            new HttpEntity<>(body, headers),
-            String.class);
-    assertThat(response.getStatusCode().value()).isEqualTo(201);
-    List<String> setCookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
-    if (setCookies != null) {
-      for (String header : setCookies) {
-        if (header.startsWith("sp_voter=")) {
-          int semi = header.indexOf(';');
-          voterCookie = semi >= 0 ? header.substring(0, semi) : header;
-        }
-      }
+    Response response =
+        req.when()
+            .post("/api/polls/" + slug + "/votes")
+            .then()
+            .statusCode(201)
+            .extract()
+            .response();
+    String minted = response.getCookie("sp_voter");
+    if (minted != null) {
+      voterCookie = minted;
     }
   }
 
   private void retract(String slug) {
-    HttpHeaders headers = jsonHeaders();
+    var req = given();
     if (voterCookie != null) {
-      headers.add(HttpHeaders.COOKIE, voterCookie);
+      req = req.cookie("sp_voter", voterCookie);
     }
-    ResponseEntity<String> response =
-        rest.exchange(
-            "http://localhost:" + port + "/api/polls/" + slug + "/votes",
-            HttpMethod.DELETE,
-            new HttpEntity<>(headers),
-            String.class);
-    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+    req.when().delete("/api/polls/" + slug + "/votes").then().statusCode(204);
   }
 
   private void readStream(String path, ConcurrentLinkedQueue<SseEvent> sink) {
@@ -178,7 +172,7 @@ class TallyBroadcasterSnapshotIT {
       HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
       HttpRequest request =
           HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + port + path))
+              .uri(URI.create(baseUrl.toString().replaceAll("/+$", "") + path))
               .header("Accept", "text/event-stream")
               .GET()
               .build();
@@ -205,42 +199,17 @@ class TallyBroadcasterSnapshotIT {
           }
         }
       }
-    } catch (Exception _) {
+    } catch (Exception ignored) {
       // Best-effort reader; failures surface through Awaitility timing out on the expected event.
     }
-  }
-
-  private HttpHeaders jsonHeaders() {
-    HttpHeaders h = new HttpHeaders();
-    h.setContentType(MediaType.APPLICATION_JSON);
-    return h;
   }
 
   private record SseEvent(String name, String data) {}
 
   // ---------- fixture ------------------------------------------------------
 
-  private PollFixture createPollWithActiveQuestion(String slug) throws Exception {
-    ResponseEntity<String> login =
-        rest.exchange(
-            "http://localhost:" + port + "/api/admin/login",
-            HttpMethod.POST,
-            new HttpEntity<>(
-                "{\"username\":\"alice\",\"password\":\"correct-horse\"}", jsonHeaders()),
-            String.class);
-    List<String> setCookies = login.getHeaders().get(HttpHeaders.SET_COOKIE);
-    assertThat(setCookies).as("login established a session").isNotNull();
-    String sessionCookie = extractCookie(setCookies, "SP_SESSION");
-    String xsrfCookie = extractCookie(setCookies, "XSRF-TOKEN");
-    assertThat(sessionCookie).isNotBlank();
-    assertThat(xsrfCookie).isNotBlank();
-    String xsrfToken = xsrfCookie.substring(xsrfCookie.indexOf('=') + 1);
-
-    HttpHeaders authed = jsonHeaders();
-    authed.add(HttpHeaders.COOKIE, sessionCookie);
-    authed.add(HttpHeaders.COOKIE, xsrfCookie);
-    authed.add("X-XSRF-TOKEN", xsrfToken);
-
+  private PollFixture createPollWithActiveQuestion(String slug) {
+    Session admin = loginAsAlice();
     String createBody =
         String.format(
             """
@@ -248,43 +217,65 @@ class TallyBroadcasterSnapshotIT {
               "title": "Snapshot fixture",
               "slug": "%s",
               "questions": [
-                {
-                  "prompt": "Which JVM?",
-                  "options": [{"label":"OpenJDK"},{"label":"GraalVM"}]
-                }
+                { "prompt": "Which JVM?", "options": [ { "label": "OpenJDK" }, { "label": "GraalVM" } ] }
               ]
             }
             """,
             slug);
-    ResponseEntity<String> createdResponse =
-        rest.exchange(
-            "http://localhost:" + port + "/api/admin/polls",
-            HttpMethod.POST,
-            new HttpEntity<>(createBody, authed),
-            String.class);
-    JsonNode created = objectMapper.readTree(createdResponse.getBody());
-    UUID pollId = UUID.fromString(created.get("id").asText());
-    JsonNode question = created.get("questions").get(0);
-    UUID questionId = UUID.fromString(question.get("id").asText());
-    UUID optionA = UUID.fromString(question.get("options").get(0).get("id").asText());
-    UUID optionB = UUID.fromString(question.get("options").get(1).get("id").asText());
+    Response created =
+        admin
+            .requestWithCsrf()
+            .contentType(ContentType.JSON)
+            .body(createBody)
+            .when()
+            .post("/api/admin/polls")
+            .then()
+            .statusCode(201)
+            .extract()
+            .response();
 
-    rest.exchange(
-        "http://localhost:" + port + "/api/admin/polls/" + pollId + "/open",
-        HttpMethod.POST,
-        new HttpEntity<>("{\"questionId\":\"" + questionId + "\"}", authed),
-        String.class);
+    UUID pollId = UUID.fromString(created.path("id"));
+    UUID questionId = UUID.fromString(created.path("questions[0].id"));
+    UUID optionA = UUID.fromString(created.path("questions[0].options[0].id"));
+    UUID optionB = UUID.fromString(created.path("questions[0].options[1].id"));
+
+    admin
+        .requestWithCsrf()
+        .contentType(ContentType.JSON)
+        .body("{\"questionId\":\"" + questionId + "\"}")
+        .when()
+        .post("/api/admin/polls/" + pollId + "/open")
+        .then()
+        .statusCode(200);
+
     return new PollFixture(pollId, questionId, optionA, optionB);
   }
 
-  private static String extractCookie(List<String> setCookieHeaders, String name) {
-    for (String header : setCookieHeaders) {
-      if (header.startsWith(name + "=")) {
-        int semi = header.indexOf(';');
-        return semi >= 0 ? header.substring(0, semi) : header;
-      }
+  private Session loginAsAlice() {
+    Response login =
+        given()
+            .contentType(ContentType.JSON)
+            .body("{\"username\":\"alice\",\"password\":\"correct-horse\"}")
+            .when()
+            .post("/api/admin/login")
+            .then()
+            .statusCode(204)
+            .extract()
+            .response();
+    String session = login.getCookie("SP_SESSION");
+    String xsrf = login.getCookie("XSRF-TOKEN");
+    assertThat(session).as("login mints SP_SESSION").isNotBlank();
+    assertThat(xsrf).as("login mints XSRF-TOKEN").isNotBlank();
+    return new Session(session, xsrf);
+  }
+
+  private record Session(String sessionCookie, String xsrfCookie) {
+    io.restassured.specification.RequestSpecification requestWithCsrf() {
+      return given()
+          .cookie("SP_SESSION", sessionCookie)
+          .cookie("XSRF-TOKEN", xsrfCookie)
+          .header("X-XSRF-TOKEN", xsrfCookie);
     }
-    return "";
   }
 
   private record PollFixture(UUID pollId, UUID activeQuestionId, UUID optionAId, UUID optionBId) {}

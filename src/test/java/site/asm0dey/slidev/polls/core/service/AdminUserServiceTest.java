@@ -2,7 +2,6 @@ package site.asm0dey.slidev.polls.core.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -11,38 +10,49 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.transaction.RollbackException;
+import jakarta.transaction.UserTransaction;
 import java.time.Instant;
 import java.util.List;
+import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.CannotSerializeTransactionException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.SimpleTransactionStatus;
+import site.asm0dey.slidev.polls.api.security.Argon2PasswordHasher;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 
+/**
+ * Pure-Java (Mockito) unit coverage for {@link AdminUserService}, ported off Spring.
+ *
+ * <p>C3 — the setup-race contract no longer rides on SERIALIZABLE isolation. Under JTA there is no
+ * per-transaction isolation knob ({@link UserTransaction} has none), so the race is resolved by the
+ * {@code admin_user.username} unique constraint: when a concurrent setup commits first, the loser's
+ * {@code insert} surfaces a jOOQ {@link DataAccessException}, which the service translates into the
+ * same {@link SetupLockedException} ({@code 409 SETUP_LOCKED}) the in-tx {@code count()} pre-check
+ * would have produced. A failure observed at {@code commit()} time (a JTA {@link
+ * RollbackException}, e.g. a serialization conflict surfaced if the datasource is configured
+ * SERIALIZABLE) lands in the service's generic catch and translates to the same {@code
+ * SETUP_LOCKED}.
+ *
+ * <p>The {@link UserTransaction} is a pass-through mock: {@code begin}/{@code commit}/{@code
+ * rollback} are no-ops so the lambda body runs as if inside a transaction, and individual tests
+ * make {@code commit()} or {@code insert} throw to drive the loser path.
+ */
 class AdminUserServiceTest {
 
   AdminUserRepository repo;
-  PasswordEncoder encoder;
-  PlatformTransactionManager txManager;
+  Argon2PasswordHasher encoder;
+  UserTransaction userTransaction;
   AdminUserService service;
 
   @BeforeEach
   void setUp() {
     repo = mock(AdminUserRepository.class);
-    encoder = mock(PasswordEncoder.class);
-    txManager = mock(PlatformTransactionManager.class);
-    // Pass-through transaction: TransactionTemplate.execute calls getTransaction first;
-    // returning a plain status lets the lambda run as if inside a real transaction. The mock
-    // ignores commit/rollback so the test never fails on missing JDBC resources.
-    when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+    encoder = mock(Argon2PasswordHasher.class);
+    userTransaction = mock(UserTransaction.class);
     when(encoder.encode("password-twelve")).thenReturn("$argon2id$encoded");
-    service = new AdminUserService(repo, encoder, txManager);
+    service = new AdminUserService(repo, encoder, userTransaction);
   }
 
   @Test
@@ -133,25 +143,27 @@ class AdminUserServiceTest {
     verify(repo).insert("alice", "$argon2id$encoded");
   }
 
+  // C3 — a failure surfaced at COMMIT time (a JTA RollbackException, the JTA analogue of the old
+  // SERIALIZABLE-conflict-at-commit Spring path) lands in the service's generic catch and is
+  // translated to SETUP_LOCKED. Under JTA the isolation level is set on the datasource, not
+  // per-transaction, so the test pins the commit-time-failure → SETUP_LOCKED contract directly.
   @Test
-  void createInitialAdminTranslatesSerializationFailureToSetupLocked() {
+  void createInitialAdminTranslatesCommitFailureToSetupLocked() throws Exception {
     when(repo.count()).thenReturn(0L);
-    // Postgres reports SERIALIZABLE conflicts at COMMIT, not during the insert; the service's
-    // try/catch wraps the whole TransactionTemplate so the translation still fires.
-    doThrow(new CannotSerializeTransactionException("could not serialize access"))
-        .when(txManager)
-        .commit(any(TransactionStatus.class));
+    doThrow(new RollbackException("could not serialize access")).when(userTransaction).commit();
 
     assertThatThrownBy(
             () -> service.createInitialAdmin(new CreateAdminCommand("alice", "password-twelve")))
         .isInstanceOf(SetupLockedException.class);
   }
 
+  // C3 — two setups racing with the SAME username: the loser's insert hits the username unique
+  // constraint before commit. jOOQ surfaces that as a DataAccessException, which the service
+  // translates to SETUP_LOCKED (the unique-constraint backstop replacing the SERIALIZABLE path).
   @Test
-  void createInitialAdminTranslatesPkCollisionToSetupLocked() {
+  void createInitialAdminTranslatesUniqueViolationToSetupLocked() {
     when(repo.count()).thenReturn(0L);
-    // Two setups racing with the SAME username — the loser's insert hits the PK before commit.
-    doThrow(new DataIntegrityViolationException("admin_user_pkey"))
+    doThrow(new DataAccessException("duplicate key value violates unique constraint"))
         .when(repo)
         .insert(anyString(), anyString());
 
@@ -160,13 +172,13 @@ class AdminUserServiceTest {
         .isInstanceOf(SetupLockedException.class);
   }
 
+  // The check passes (existsByUsername returns false), but a concurrent insert races us to the
+  // username unique constraint. The service must translate the late-detected jOOQ
+  // DataAccessException into the same 409 UsernameTakenException the pre-check would have produced.
   @Test
-  void createAdminTranslatesPkCollisionToUsernameTaken() {
-    // The check passes (existsByUsername returns false), but a concurrent insert races us to
-    // the PK. The service must translate the late-detected violation into the same 409
-    // UsernameTakenException the pre-check would have produced.
+  void createAdminTranslatesUniqueViolationToUsernameTaken() {
     when(repo.existsByUsername("bob")).thenReturn(false);
-    doThrow(new DataIntegrityViolationException("admin_user_pkey"))
+    doThrow(new DataAccessException("duplicate key value violates unique constraint"))
         .when(repo)
         .insert(anyString(), anyString());
 

@@ -12,8 +12,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -36,14 +34,14 @@ class VoteServiceTest {
 
   private FakePollRepository polls;
   private FakeVoteRepository votes;
-  private RecordingEventPublisher events;
+  private RecordingEvent events;
   private VoteService service;
 
   @BeforeEach
   void setUp() {
     polls = new FakePollRepository();
     votes = new FakeVoteRepository();
-    events = new RecordingEventPublisher();
+    events = new RecordingEvent();
     service = new VoteService(polls, votes, events);
   }
 
@@ -425,24 +423,6 @@ class VoteServiceTest {
               .findFirst();
       match.ifPresent(rows::remove);
       return match.map(Vote::optionIds);
-    }
-  }
-
-  static final class RecordingEventPublisher implements ApplicationEventPublisher {
-    private final List<Object> received = new ArrayList<>();
-
-    @Override
-    public void publishEvent(Object event) {
-      received.add(event);
-    }
-
-    @Override
-    public void publishEvent(ApplicationEvent event) {
-      received.add(event);
-    }
-
-    List<Object> published() {
-      return List.copyOf(received);
     }
   }
 }

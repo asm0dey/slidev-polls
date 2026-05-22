@@ -1,20 +1,19 @@
 package site.asm0dey.slidev.polls.realtime.sse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.mockito.ArgumentCaptor;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -39,9 +38,11 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  * </ul>
  *
  * <p>Every ballot change re-broadcasts a full {@link SnapshotPayload}; the legacy delta-shaped
- * {@code tally} event has been removed. Pure-Java fakes; no Spring. The {@link SseHub} is a real
- * instance (its concurrency is pinned by {@code SseHubConcurrencyTest}); everything else is
- * in-memory.
+ * {@code tally} event has been removed. Pure-Java fakes; no Quarkus runtime. The {@link SseHub} is
+ * a Mockito mock — the JAX-RS {@code Sse}/{@code SseBroadcaster} fan-out it wraps needs a CDI
+ * runtime, so this slice verifies only the broadcaster→hub contract: the event name and the {@link
+ * SnapshotBuilder}-built payload handed to {@link SseHub#broadcast}. The hub's own fan-out and
+ * concurrency are pinned by the SseHub IT/concurrency tests.
  */
 class TallyBroadcastTest {
 
@@ -55,10 +56,21 @@ class TallyBroadcastTest {
   void setUp() {
     polls = new InMemoryPollRepository();
     votes = new InMemoryVoteRepository();
-    hub = new SseHub();
+    hub = mock(SseHub.class);
     builder = new SnapshotBuilder(polls, votes);
     broadcaster = new TallyBroadcaster(hub, builder);
   }
+
+  /** Captures the single {@code broadcast(pollId, name, payload)} the broadcaster fires. */
+  private Broadcast captureBroadcast(UUID pollId) {
+    ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+    org.mockito.Mockito.verify(hub)
+        .broadcast(org.mockito.ArgumentMatchers.eq(pollId), name.capture(), payload.capture());
+    return new Broadcast(name.getValue(), payload.getValue());
+  }
+
+  private record Broadcast(String name, Object data) {}
 
   // @TS-030 — a VoteCastEvent fans out as a fresh "snapshot" SSE event whose tally reflects the
   // VoteRepository's current absolute counts for the voted question.
@@ -69,16 +81,13 @@ class TallyBroadcastTest {
     UUID optionA = poll.questions().get(0).options().get(0).id();
     UUID optionB = poll.questions().get(0).options().get(1).id();
     votes.seedTally(activeQ, Map.of(optionA, 7L, optionB, 2L));
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:00:00Z");
     broadcaster.onVoteCast(new VoteCastEvent(poll.id(), activeQ, at));
 
-    assertThat(emitter.events).hasSize(1);
-    CapturingEmitter.Captured event = emitter.events.get(0);
-    assertThat(event.name).isEqualTo("snapshot");
-    SnapshotPayload payload = (SnapshotPayload) event.data;
+    Broadcast event = captureBroadcast(poll.id());
+    assertThat(event.name()).isEqualTo("snapshot");
+    SnapshotPayload payload = (SnapshotPayload) event.data();
     assertThat(payload.pollId()).isEqualTo(poll.id());
     assertThat(payload.activeQuestion()).isNotNull();
     assertThat(payload.activeQuestion().id()).isEqualTo(activeQ);
@@ -95,16 +104,13 @@ class TallyBroadcastTest {
     UUID activeQ = poll.activeQuestionId();
     UUID optionA = poll.questions().get(0).options().get(0).id();
     votes.seedTally(activeQ, Map.of(optionA, 3L));
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
 
     Instant at = Instant.parse("2026-04-19T10:05:00Z");
     broadcaster.onVoteRetracted(new VoteRetractedEvent(poll.id(), activeQ, at));
 
-    assertThat(emitter.events).hasSize(1);
-    CapturingEmitter.Captured event = emitter.events.get(0);
-    assertThat(event.name).isEqualTo("snapshot");
-    SnapshotPayload payload = (SnapshotPayload) event.data;
+    Broadcast event = captureBroadcast(poll.id());
+    assertThat(event.name()).isEqualTo("snapshot");
+    SnapshotPayload payload = (SnapshotPayload) event.data();
     assertThat(payload.activeQuestion().id()).isEqualTo(activeQ);
     Map<UUID, Long> byOption = new HashMap<>();
     payload.tally().forEach(t -> byOption.put(t.optionId(), t.count()));
@@ -120,16 +126,13 @@ class TallyBroadcastTest {
     // Activate Q2 and check the snapshot covers Q2's options with zeroed tallies.
     UUID q2 = poll.questions().get(1).id();
     polls.activateQuestion(poll.id(), q2);
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
 
     broadcaster.onActiveQuestionChanged(
         new PollActiveQuestionChangedEvent(poll.id(), q2, Instant.now()));
 
-    assertThat(emitter.events).hasSize(1);
-    CapturingEmitter.Captured ev = emitter.events.get(0);
-    assertThat(ev.name).isEqualTo("snapshot");
-    SnapshotPayload payload = (SnapshotPayload) ev.data;
+    Broadcast ev = captureBroadcast(poll.id());
+    assertThat(ev.name()).isEqualTo("snapshot");
+    SnapshotPayload payload = (SnapshotPayload) ev.data();
     assertThat(payload.pollId()).isEqualTo(poll.id());
     assertThat(payload.slug()).isEqualTo("snapshot-talk");
     assertThat(payload.activeQuestion()).isNotNull();
@@ -145,28 +148,24 @@ class TallyBroadcastTest {
   void question_closed_event_is_broadcast_as_question_closed() throws Exception {
     Poll poll = seedPollWithActiveQuestion("close-talk");
     UUID activeId = poll.activeQuestionId();
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
 
     broadcaster.onQuestionClosed(new PollQuestionClosedEvent(poll.id(), activeId, Instant.now()));
 
-    CapturingEmitter.Captured ev = emitter.events.get(0);
-    assertThat(ev.name).isEqualTo("question-closed");
-    QuestionClosedPayload payload = (QuestionClosedPayload) ev.data;
+    Broadcast ev = captureBroadcast(poll.id());
+    assertThat(ev.name()).isEqualTo("question-closed");
+    QuestionClosedPayload payload = (QuestionClosedPayload) ev.data();
     assertThat(payload.pollId()).isEqualTo(poll.id());
     assertThat(payload.questionId()).isEqualTo(activeId);
   }
 
-  // Sanity check: an event for a pollId with no subscribers is a no-op (no exception, no
-  // interaction). Maps to the real-world case of the first vote arriving before any deck has
-  // connected.
+  // Sanity check: an event for a pollId the SnapshotBuilder cannot resolve (poll absent) never
+  // reaches the hub — the broadcaster only fans out a payload it could build. (Whether a built
+  // payload reaches zero subscribers is the hub's own no-op, covered by the SseHub tests.)
   @Test
-  void broadcast_with_no_subscribers_is_a_noop() throws Exception {
-    Poll poll = seedPollWithActiveQuestion("silent-talk");
-    // No emitters registered.
-    broadcaster.onVoteCast(new VoteCastEvent(poll.id(), poll.activeQuestionId(), Instant.now()));
-    // Nothing to assert besides "did not throw"; reaching here is the assertion.
-    assertThat(hub.subscriberCount(poll.id())).isZero();
+  void event_for_unknown_poll_never_touches_the_hub() {
+    UUID unknownPoll = UUID.randomUUID();
+    broadcaster.onVoteCast(new VoteCastEvent(unknownPoll, UUID.randomUUID(), Instant.now()));
+    verifyNoInteractions(hub);
   }
 
   // SnapshotBuilder directly: when the poll has no active question (WAITING state, FR-008), the
@@ -192,12 +191,10 @@ class TallyBroadcastTest {
     // Selections sum to 7, but the fake's voterCount is max-per-option (4) — see
     // InMemoryVoteRepository#voterCount javadoc for why that's good enough here.
     votes.seedTally(activeQ, Map.of(optionA, 4L, optionB, 3L));
-    CapturingEmitter emitter = new CapturingEmitter();
-    hub.register(poll.id(), emitter);
 
     broadcaster.onVoteCast(new VoteCastEvent(poll.id(), activeQ, Instant.now()));
 
-    SnapshotPayload payload = (SnapshotPayload) emitter.events.get(0).data;
+    SnapshotPayload payload = (SnapshotPayload) captureBroadcast(poll.id()).data();
     long selections = payload.tally().stream().mapToLong(SnapshotPayload.TallyEntry::count).sum();
     assertThat(selections).isEqualTo(7L);
     assertThat(payload.voterCount()).isEqualTo(4L);
@@ -243,45 +240,6 @@ class TallyBroadcastTest {
             Instant.now());
     polls.insert(poll);
     return poll;
-  }
-
-  /**
-   * Captures every event the hub sends. Overrides {@link SseEmitter#send(SseEventBuilder)} and
-   * parses the builder's {@code build()} output: Spring's real builder accumulates the {@code
-   * event:<name>\ndata:\n} metadata as a {@code text/plain} {@code DataWithMediaType}, with the
-   * caller's payload as a separate entry carrying its own media type (null for {@code data(Object)}
-   * calls). The name is recovered from the metadata string.
-   */
-  private static final class CapturingEmitter extends SseEmitter {
-    final List<Captured> events = new ArrayList<>();
-
-    @Override
-    public void send(SseEventBuilder builder) throws IOException {
-      // Spring's builder emits a text fragment carrying "event:<name>\ndata:\n…\n" alongside the
-      // caller's payload object. The fragment may arrive with TEXT_PLAIN or no media type at all
-      // depending on the Spring version, so we detect it by content rather than by media type.
-      Set<ResponseBodyEmitter.DataWithMediaType> parts = builder.build();
-      String name = null;
-      Object payload = null;
-      for (ResponseBodyEmitter.DataWithMediaType part : parts) {
-        Object data = part.getData();
-        if (data instanceof String s) {
-          int idx = s.indexOf("event:");
-          if (idx >= 0) {
-            int start = idx + "event:".length();
-            int end = s.indexOf('\n', start);
-            name = end >= 0 ? s.substring(start, end) : s.substring(start);
-          }
-          // Either the leading "event:<name>\ndata:" fragment or the trailing "\n\n" fragment;
-          // neither is the caller's payload.
-        } else {
-          payload = data;
-        }
-      }
-      events.add(new Captured(name, payload));
-    }
-
-    record Captured(String name, Object data) {}
   }
 
   /** In-memory {@link PollRepository} — just enough to cover the broadcaster's calls. */
