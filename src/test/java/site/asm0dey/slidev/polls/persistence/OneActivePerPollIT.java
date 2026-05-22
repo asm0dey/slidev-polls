@@ -3,6 +3,8 @@ package site.asm0dey.slidev.polls.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,8 +16,6 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -29,161 +29,173 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
  * per-statement atomicity (on both PostgreSQL and H2) makes the race race-free; both calls return a
  * Poll, and the final state has one ACTIVE row pointed at by {@code polls.active_question_id}.
  *
- * <p>Parametrised over PostgreSQL and H2 via nested {@code @Nested} engine subclasses.
+ * <p>Ported to {@code @QuarkusTest}: the Postgres branch uses the application's injected
+ * {@code @Default} {@link DSLContext} (Dev Services Postgres); the H2 branch builds a
+ * self-contained raw-H2 {@link DSLContext} via {@link AbstractH2Test}. {@code @Nested} engine
+ * subclasses were dropped because Quarkus cannot CDI-instantiate a {@code @Nested} inner class of a
+ * {@code @QuarkusTest}.
  */
-class OneActivePerPollIT extends AbstractPostgresTest {
+@QuarkusTest
+class OneActivePerPollIT {
 
-  abstract class CommonOneActive {
-    protected PollRepositoryImpl repository;
+  @Inject DSLContext pgDsl;
 
-    protected abstract DSLContext dsl();
+  // @TS-004 — Postgres.
+  @Test
+  void concurrent_activations_on_same_poll_serialise_postgres() throws Exception {
+    runConcurrentActivations(pgDsl, "pg");
+  }
 
-    @BeforeEach
-    void setUp() {
-      DSLContext dsl = dsl();
-      repository = new PollRepositoryImpl(dsl);
-      // Each test needs an admin_user row to satisfy the polls.owner_username FK added in V3.
-      dsl.insertInto(ADMIN_USER)
-          .set(ADMIN_USER.USERNAME, "concurrency-owner")
-          .set(ADMIN_USER.PASSWORD_HASH, "n/a")
-          .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
-          .onConflictDoNothing()
-          .execute();
-    }
+  // @TS-004 — H2.
+  @Test
+  void concurrent_activations_on_same_poll_serialise_h2() throws Exception {
+    DataSource ds = AbstractH2Test.freshH2();
+    runConcurrentActivations(AbstractH2Test.dsl(ds), "h2");
+  }
 
-    // @TS-004 — under concurrent activations on the same poll, the post-race state has exactly
-    // one ACTIVE question. Both calls succeed (no exception); the single CASE UPDATE in the repo
-    // makes the race race-free per-statement, so the invariant is asserted on the final state.
-    @Test
-    void concurrent_activations_on_same_poll_serialise() throws Exception {
-      Poll seeded = seedPollWithTwoQuestions();
-      UUID q1 = seeded.questions().get(0).id();
-      UUID q2 = seeded.questions().get(1).id();
+  @Test
+  void serial_activation_transitions_question_to_active_postgres() {
+    runSerialActivation(pgDsl, "pg");
+  }
 
-      try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-        Callable<Object> activateQ1 =
-            () -> {
-              try {
-                return repository.activateQuestion(seeded.id(), q1);
-              } catch (RuntimeException e) {
-                return e;
-              }
-            };
-        Callable<Object> activateQ2 =
-            () -> {
-              try {
-                return repository.activateQuestion(seeded.id(), q2);
-              } catch (RuntimeException e) {
-                return e;
-              }
-            };
+  @Test
+  void serial_activation_transitions_question_to_active_h2() {
+    DataSource ds = AbstractH2Test.freshH2();
+    runSerialActivation(AbstractH2Test.dsl(ds), "h2");
+  }
 
-        Future<Object> f1 = pool.submit(activateQ1);
-        Future<Object> f2 = pool.submit(activateQ2);
+  @Test
+  void reactivating_same_question_is_idempotent_postgres() {
+    runReactivateIdempotent(pgDsl, "pg");
+  }
 
-        Object r1 = f1.get();
-        Object r2 = f2.get();
+  @Test
+  void reactivating_same_question_is_idempotent_h2() {
+    DataSource ds = AbstractH2Test.freshH2();
+    runReactivateIdempotent(AbstractH2Test.dsl(ds), "h2");
+  }
 
-        long successes = Stream.of(r1, r2).filter(Poll.class::isInstance).count();
-        assertThat(successes).as("both atomic UPDATEs commit").isEqualTo(2);
+  // ---------- shared bodies (run against both engines) --------------------
 
-        Poll finalState = repository.findById(seeded.id()).orElseThrow();
-        long activeCount =
-            finalState.questions().stream()
-                .filter(q -> q.status() == QuestionStatus.ACTIVE)
-                .count();
-        assertThat(activeCount)
-            .as("the poll has exactly one ACTIVE question after the race")
-            .isEqualTo(1);
-        assertThat(finalState.activeQuestionId())
-            .as("polls.active_question_id matches the surviving ACTIVE row")
-            .isIn(q1, q2);
-      }
-    }
+  private void runConcurrentActivations(DSLContext dsl, String tag) throws Exception {
+    PollRepositoryImpl repository = newRepo(dsl, tag);
+    Poll seeded = seedPollWithTwoQuestions(repository, tag);
+    UUID q1 = seeded.questions().get(0).id();
+    UUID q2 = seeded.questions().get(1).id();
 
-    // Positive-path companion: a clean serial activation succeeds end-to-end, giving the
-    // concurrent test a meaningful contrast — proves the repository's atomic update isn't broken
-    // in the happy path either.
-    @Test
-    void serial_activation_transitions_question_to_active() {
-      Poll seeded = seedPollWithTwoQuestions();
-      UUID q1 = seeded.questions().getFirst().id();
+    try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+      Callable<Object> activateQ1 =
+          () -> {
+            try {
+              return repository.activateQuestion(seeded.id(), q1);
+            } catch (RuntimeException e) {
+              return e;
+            }
+          };
+      Callable<Object> activateQ2 =
+          () -> {
+            try {
+              return repository.activateQuestion(seeded.id(), q2);
+            } catch (RuntimeException e) {
+              return e;
+            }
+          };
 
-      Poll after = repository.activateQuestion(seeded.id(), q1);
+      Future<Object> f1 = pool.submit(activateQ1);
+      Future<Object> f2 = pool.submit(activateQ2);
+      Object r1 = f1.get();
+      Object r2 = f2.get();
 
-      Question activated =
-          after.questions().stream().filter(q -> q.id().equals(q1)).findFirst().orElseThrow();
-      assertThat(activated.status()).isEqualTo(QuestionStatus.ACTIVE);
-      assertThat(after.activeQuestionId()).isEqualTo(q1);
-      assertThat(after.status()).isEqualTo(PollStatus.OPEN);
-    }
+      long successes = Stream.of(r1, r2).filter(Poll.class::isInstance).count();
+      assertThat(successes).as("both atomic UPDATEs commit").isEqualTo(2);
 
-    // Guard: activating an already-ACTIVE question is a no-op (@TS-052). The partial unique index
-    // would otherwise refuse the second UPDATE on the same row.
-    @Test
-    void reactivating_same_question_is_idempotent() {
-      Poll seeded = seedPollWithTwoQuestions();
-      UUID q1 = seeded.questions().getFirst().id();
-
-      repository.activateQuestion(seeded.id(), q1);
-      Poll after = repository.activateQuestion(seeded.id(), q1);
-
+      Poll finalState = repository.findById(seeded.id()).orElseThrow();
       long activeCount =
-          after.questions().stream().filter(q -> q.status() == QuestionStatus.ACTIVE).count();
-      assertThat(activeCount).isEqualTo(1);
-      assertThat(after.activeQuestionId()).isEqualTo(q1);
-    }
-
-    private Poll seedPollWithTwoQuestions() {
-      UUID pollId = UUID.randomUUID();
-      UUID q1 = UUID.randomUUID();
-      UUID q2 = UUID.randomUUID();
-      List<Option> q1Options =
-          new ArrayList<>(
-              List.of(
-                  new Option(UUID.randomUUID(), q1, "A", 0),
-                  new Option(UUID.randomUUID(), q1, "B", 1)));
-      List<Option> q2Options =
-          new ArrayList<>(
-              List.of(
-                  new Option(UUID.randomUUID(), q2, "C", 0),
-                  new Option(UUID.randomUUID(), q2, "D", 1)));
-
-      Poll poll =
-          new Poll(
-              pollId,
-              "concurrency-owner",
-              "Concurrency test poll",
-              "concurrency-" + pollId.toString().substring(0, 8),
-              PollStatus.DRAFT,
-              null,
-              List.of(
-                  new Question(
-                      q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null),
-                  new Question(
-                      q2, pollId, "Q2?", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null)),
-              List.of(), // allowedOrigins
-              null,
-              null);
-      return repository.insert(poll);
+          finalState.questions().stream().filter(q -> q.status() == QuestionStatus.ACTIVE).count();
+      assertThat(activeCount)
+          .as("the poll has exactly one ACTIVE question after the race")
+          .isEqualTo(1);
+      assertThat(finalState.activeQuestionId())
+          .as("polls.active_question_id matches the surviving ACTIVE row")
+          .isIn(q1, q2);
     }
   }
 
-  @Nested
-  class OnPostgres extends CommonOneActive {
-    @Override
-    protected DSLContext dsl() {
-      return AbstractPostgresTest.dsl();
-    }
+  private void runSerialActivation(DSLContext dsl, String tag) {
+    PollRepositoryImpl repository = newRepo(dsl, tag);
+    Poll seeded = seedPollWithTwoQuestions(repository, tag);
+    UUID q1 = seeded.questions().getFirst().id();
+
+    Poll after = repository.activateQuestion(seeded.id(), q1);
+
+    Question activated =
+        after.questions().stream().filter(q -> q.id().equals(q1)).findFirst().orElseThrow();
+    assertThat(activated.status()).isEqualTo(QuestionStatus.ACTIVE);
+    assertThat(after.activeQuestionId()).isEqualTo(q1);
+    assertThat(after.status()).isEqualTo(PollStatus.OPEN);
   }
 
-  @Nested
-  class OnH2 extends CommonOneActive {
-    private final DataSource ds = AbstractH2Test.freshH2();
+  private void runReactivateIdempotent(DSLContext dsl, String tag) {
+    PollRepositoryImpl repository = newRepo(dsl, tag);
+    Poll seeded = seedPollWithTwoQuestions(repository, tag);
+    UUID q1 = seeded.questions().getFirst().id();
 
-    @Override
-    protected DSLContext dsl() {
-      return AbstractH2Test.dsl(ds);
-    }
+    repository.activateQuestion(seeded.id(), q1);
+    Poll after = repository.activateQuestion(seeded.id(), q1);
+
+    long activeCount =
+        after.questions().stream().filter(q -> q.status() == QuestionStatus.ACTIVE).count();
+    assertThat(activeCount).isEqualTo(1);
+    assertThat(after.activeQuestionId()).isEqualTo(q1);
+  }
+
+  private PollRepositoryImpl newRepo(DSLContext dsl, String tag) {
+    PollRepositoryImpl repository = new PollRepositoryImpl(dsl);
+    // Each test needs an admin_user row to satisfy the polls.owner_username FK added in V3.
+    dsl.insertInto(ADMIN_USER)
+        .set(ADMIN_USER.USERNAME, ownerFor(tag))
+        .set(ADMIN_USER.PASSWORD_HASH, "n/a")
+        .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
+        .onConflictDoNothing()
+        .execute();
+    return repository;
+  }
+
+  private static String ownerFor(String tag) {
+    return "concurrency-owner-" + tag;
+  }
+
+  private Poll seedPollWithTwoQuestions(PollRepositoryImpl repository, String tag) {
+    UUID pollId = UUID.randomUUID();
+    UUID q1 = UUID.randomUUID();
+    UUID q2 = UUID.randomUUID();
+    List<Option> q1Options =
+        new ArrayList<>(
+            List.of(
+                new Option(UUID.randomUUID(), q1, "A", 0),
+                new Option(UUID.randomUUID(), q1, "B", 1)));
+    List<Option> q2Options =
+        new ArrayList<>(
+            List.of(
+                new Option(UUID.randomUUID(), q2, "C", 0),
+                new Option(UUID.randomUUID(), q2, "D", 1)));
+
+    Poll poll =
+        new Poll(
+            pollId,
+            ownerFor(tag),
+            "Concurrency test poll",
+            "concurrency-" + tag + "-" + pollId.toString().substring(0, 8),
+            PollStatus.DRAFT,
+            null,
+            List.of(
+                new Question(
+                    q1, pollId, "Q1?", 0, QuestionStatus.DRAFT, 1, 1, q1Options, null, null),
+                new Question(
+                    q2, pollId, "Q2?", 1, QuestionStatus.DRAFT, 1, 1, q2Options, null, null)),
+            List.of(),
+            null,
+            null);
+    return repository.insert(poll);
   }
 }

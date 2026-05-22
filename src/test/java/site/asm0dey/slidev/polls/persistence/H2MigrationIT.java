@@ -52,7 +52,7 @@ class H2MigrationIT extends AbstractH2Test {
                 + pollId
                 + "','p2',1,'ACTIVE',CURRENT_TIMESTAMP)");
         org.junit.jupiter.api.Assertions.fail("expected unique violation");
-      } catch (Exception _) {
+      } catch (Exception expected) {
         /* expected */
       }
     }
@@ -76,7 +76,7 @@ class H2MigrationIT extends AbstractH2Test {
                 + UUID.randomUUID()
                 + "','h','title','sameslug')");
         org.junit.jupiter.api.Assertions.fail("expected unique violation");
-      } catch (Exception _) {
+      } catch (Exception expected) {
         /* expected */
       }
     }

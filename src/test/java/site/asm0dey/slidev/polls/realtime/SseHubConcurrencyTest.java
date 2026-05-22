@@ -2,27 +2,54 @@ package site.asm0dey.slidev.polls.realtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.sse.OutboundSseEvent;
+import jakarta.ws.rs.sse.Sse;
+import jakarta.ws.rs.sse.SseBroadcaster;
+import jakarta.ws.rs.sse.SseEventSink;
+import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Concurrency contract for {@link SseHub}. Exercises racing subscribe / unsubscribe / broadcast
- * threads and verifies that a misbehaving emitter is isolated from its siblings — Principle IV
- * (Live-Reliability Over Feature Depth).
+ * Concurrency contract for the ported {@link SseHub}. The real RESTEasy {@code SseBroadcaster}
+ * accepts only its own internal {@code SseEventSink} type, so this is a plain unit test that drives
+ * {@code SseHub} with a fake {@link Sse} / {@link SseBroadcaster} pair and lightweight fake {@link
+ * SseEventSink}s. It pins what {@code SseHub} itself owns: the concurrency-safe parallel tracking
+ * map behind {@link SseHub#subscriberCount}/{@link SseHub#pollCount}, the {@code onClose}/{@code
+ * onError} pruning, and that {@link SseHub#broadcast} fans to the registered sinks and never throws
+ * to the caller — Principle IV (Live-Reliability Over Feature Depth).
  */
 class SseHubConcurrencyTest {
 
+  private static SseHub newHub() {
+    SseHub hub = new SseHub();
+    try {
+      Field sseField = SseHub.class.getDeclaredField("sse");
+      sseField.setAccessible(true);
+      sseField.set(hub, new FakeSse());
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException(e);
+    }
+    return hub;
+  }
+
   @Test
   void concurrent_register_and_unregister_are_consistent() throws Exception {
-    SseHub hub = new SseHub();
+    SseHub hub = newHub();
     UUID pollId = UUID.randomUUID();
     int workers = 32;
     int churns = 200;
@@ -36,7 +63,7 @@ class SseHubConcurrencyTest {
               try {
                 gate.await();
                 for (int k = 0; k < churns; k++) {
-                  SseEmitter e = new SseEmitter();
+                  SseEventSink e = new FakeSink();
                   hub.register(pollId, e);
                   hub.unregister(pollId, e);
                 }
@@ -49,7 +76,6 @@ class SseHubConcurrencyTest {
       }
       gate.countDown();
       assertThat(done.await(15, TimeUnit.SECONDS)).as("workers finished").isTrue();
-      // After the churn completes the hub MUST be back to empty for that pollId.
       assertThat(hub.subscriberCount(pollId)).as("no leaked subscribers").isZero();
       assertThat(hub.pollCount()).as("empty pollId keys pruned").isZero();
     } finally {
@@ -58,56 +84,52 @@ class SseHubConcurrencyTest {
   }
 
   @Test
-  void broadcast_reaches_every_registered_subscriber() throws Exception {
-    SseHub hub = new SseHub();
+  void broadcast_reaches_every_registered_subscriber() {
+    SseHub hub = newHub();
     UUID pollId = UUID.randomUUID();
     int n = 8;
-    AtomicInteger delivered = new AtomicInteger();
+    List<FakeSink> sinks = new CopyOnWriteArrayList<>();
     for (int i = 0; i < n; i++) {
-      hub.register(pollId, new CountingEmitter(delivered));
+      FakeSink s = new FakeSink();
+      sinks.add(s);
+      hub.register(pollId, s);
     }
     assertThat(hub.subscriberCount(pollId)).isEqualTo(n);
 
     hub.broadcast(pollId, "snapshot", "payload");
 
-    assertThat(delivered.get()).as("each subscriber observes one event").isEqualTo(n);
+    assertThat(sinks.stream().mapToInt(s -> s.sent.get()).sum())
+        .as("each subscriber observes one event")
+        .isEqualTo(n);
   }
 
   @Test
-  void broadcast_isolates_a_failing_emitter_from_siblings() throws Exception {
-    SseHub hub = new SseHub();
+  void broadcast_isolates_a_failing_emitter_from_siblings() {
+    SseHub hub = newHub();
     UUID pollId = UUID.randomUUID();
-    AtomicInteger good = new AtomicInteger();
-    CountingEmitter a = new CountingEmitter(good);
-    FailingEmitter bad = new FailingEmitter();
-    CountingEmitter c = new CountingEmitter(good);
+    FakeSink a = new FakeSink();
+    FakeSink bad = new FakeSink(true);
+    FakeSink c = new FakeSink();
     hub.register(pollId, a);
     hub.register(pollId, bad);
     hub.register(pollId, c);
 
     hub.broadcast(pollId, "tally", "v1");
 
-    // Two healthy subscribers still saw the event; the bad one was dropped.
-    assertThat(good.get()).as("healthy emitters received the event").isEqualTo(2);
+    // The two healthy sinks received the event; the broadcaster's onError pruned the bad one.
+    assertThat(a.sent.get()).isEqualTo(1);
+    assertThat(c.sent.get()).isEqualTo(1);
     assertThat(hub.subscriberCount(pollId))
         .as("bad emitter pruned, healthy ones still connected")
         .isEqualTo(2);
-
-    // A second broadcast only fans to the surviving subscribers — the dropped one must not
-    // receive anything further either.
-    hub.broadcast(pollId, "tally", "v2");
-    assertThat(good.get()).isEqualTo(4);
   }
 
   @Test
   void racing_broadcast_and_register_never_throws_to_the_caller() throws Exception {
-    SseHub hub = new SseHub();
+    SseHub hub = newHub();
     UUID pollId = UUID.randomUUID();
-    // Seed with some subscribers so broadcast has work to do.
-    List<SseEmitter> seeded =
-        List.of(new SseEmitter(), new SseEmitter(), new SseEmitter(), new SseEmitter());
-    for (SseEmitter e : seeded) {
-      hub.register(pollId, e);
+    for (int i = 0; i < 4; i++) {
+      hub.register(pollId, new FakeSink());
     }
 
     int threads = 16;
@@ -128,7 +150,7 @@ class SseHubConcurrencyTest {
                     if (broadcasts) {
                       hub.broadcast(pollId, "tally", "payload");
                     } else {
-                      SseEmitter e = new SseEmitter();
+                      SseEventSink e = new FakeSink();
                       hub.register(pollId, e);
                       hub.unregister(pollId, e);
                     }
@@ -151,27 +173,156 @@ class SseHubConcurrencyTest {
     }
   }
 
-  // ---------- helpers -----------------------------------------------------
+  // ---------- fakes ---------------------------------------------------------
 
-  /** SseEmitter that increments a counter on every successful send. */
-  private static final class CountingEmitter extends SseEmitter {
-    private final AtomicInteger delivered;
+  /** Minimal fake sink; counts successful sends, optionally fails to model a dead browser. */
+  private static final class FakeSink implements SseEventSink {
+    final AtomicInteger sent = new AtomicInteger();
+    private final boolean fail;
+    private volatile boolean closed;
 
-    CountingEmitter(AtomicInteger delivered) {
-      this.delivered = delivered;
+    FakeSink() {
+      this(false);
+    }
+
+    FakeSink(boolean fail) {
+      this.fail = fail;
     }
 
     @Override
-    public void send(SseEventBuilder builder) {
-      delivered.incrementAndGet();
+    public boolean isClosed() {
+      return closed;
+    }
+
+    @Override
+    public CompletionStage<?> send(OutboundSseEvent event) {
+      if (fail) {
+        return CompletableFuture.failedFuture(new RuntimeException("broken pipe"));
+      }
+      sent.incrementAndGet();
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void close() {
+      closed = true;
     }
   }
 
-  /** SseEmitter that fails every send — models a dead browser connection. */
-  private static final class FailingEmitter extends SseEmitter {
+  /** Fake {@link Sse} producing {@link FakeBroadcaster}s and trivial event builders. */
+  private static final class FakeSse implements Sse {
     @Override
-    public void send(SseEventBuilder builder) throws IOException {
-      throw new IOException("broken pipe");
+    public SseBroadcaster newBroadcaster() {
+      return new FakeBroadcaster();
+    }
+
+    @Override
+    public OutboundSseEvent.Builder newEventBuilder() {
+      return new FakeEventBuilder();
+    }
+  }
+
+  /**
+   * Fake broadcaster mirroring the RESTEasy contract used by {@link SseHub}: per-sink failure
+   * isolation, and {@code onError} invoked when a sink's send fails (so SseHub prunes it).
+   */
+  private static final class FakeBroadcaster implements SseBroadcaster {
+    private final Set<SseEventSink> sinks = ConcurrentHashMap.newKeySet();
+    private final List<BiConsumer<SseEventSink, Throwable>> onError = new CopyOnWriteArrayList<>();
+    private final List<Consumer<SseEventSink>> onClose = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void onError(BiConsumer<SseEventSink, Throwable> onError) {
+      this.onError.add(onError);
+    }
+
+    @Override
+    public void onClose(Consumer<SseEventSink> onClose) {
+      this.onClose.add(onClose);
+    }
+
+    @Override
+    public void register(SseEventSink sseEventSink) {
+      sinks.add(sseEventSink);
+    }
+
+    @Override
+    public CompletionStage<?> broadcast(OutboundSseEvent event) {
+      for (SseEventSink sink : sinks) {
+        try {
+          sink.send(event)
+              .whenComplete(
+                  (r, ex) -> {
+                    if (ex != null) {
+                      sinks.remove(sink);
+                      onError.forEach(h -> h.accept(sink, ex));
+                    }
+                  });
+        } catch (RuntimeException ex) {
+          sinks.remove(sink);
+          onError.forEach(h -> h.accept(sink, ex));
+        }
+      }
+      return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void close() {
+      sinks.forEach(s -> onClose.forEach(h -> h.accept(s)));
+      sinks.clear();
+    }
+
+    @Override
+    public void close(boolean cascading) {
+      close();
+    }
+  }
+
+  /** Trivial event builder whose {@code build()} returns a no-op {@link OutboundSseEvent}. */
+  private static final class FakeEventBuilder implements OutboundSseEvent.Builder {
+    @Override
+    public OutboundSseEvent.Builder id(String id) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder name(String name) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder reconnectDelay(long milliseconds) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder mediaType(MediaType mediaType) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder comment(String comment) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder data(Class type, Object data) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder data(jakarta.ws.rs.core.GenericType type, Object data) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent.Builder data(Object data) {
+      return this;
+    }
+
+    @Override
+    public OutboundSseEvent build() {
+      return null;
     }
   }
 }

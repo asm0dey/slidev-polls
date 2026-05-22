@@ -1,55 +1,29 @@
 package site.asm0dey.slidev.polls.persistence;
 
-import javax.sql.DataSource;
-import org.flywaydb.core.Flyway;
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
-import org.jooq.impl.DSL;
-import org.jooq.impl.DefaultConfiguration;
-import org.junit.jupiter.api.BeforeAll;
-import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
- * Base class for every {@code poll-persistence} integration test that needs a real Postgres. A
- * single PostgreSQL 16 container is started on class load and reused by every subclass for the rest
- * of the JVM's lifetime — starting a fresh container per test class would dominate wall- clock;
- * {@code @BeforeAll} wipes and re-applies Flyway instead so each class still begins from a clean,
- * fully-migrated schema.
+ * Base class for persistence integration tests that need a real Postgres. Under Quarkus the
+ * throwaway Postgres is supplied by Dev Services (the {@code postgres} datasource has no JDBC URL
+ * in the {@code %test} profile), and Flyway has already migrated the active vendor on startup via
+ * {@code FlywayMigrator}. Subclasses get the application's {@code @Default} {@link DSLContext} —
+ * the very one production code uses — pointed at that container.
  *
- * <p>Subclasses get a ready-to-use {@link DSLContext} pointing at the same container, keeping the
- * test's query surface identical to production. The class is deliberately not Spring-aware: {@code
- * poll-core} and {@code poll-persistence} keep Spring Boot out of their test classpaths (Principle
- * V), and the repositories under test in later tasks only need a JDBC {@link DataSource} plus jOOQ.
+ * <p>Replaces the prior Testcontainers/Spring boot: no manual container lifecycle, no manual
+ * Flyway, no Spring. The schema is created once per JVM by the app's startup migration; tests
+ * insert unique rows (UUID-suffixed slugs / owner usernames) so they do not collide across classes.
  */
+@QuarkusTest
 public abstract class AbstractPostgresTest {
 
-  protected static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:16-alpine");
+  @Inject DSLContext injectedDsl;
 
-  static {
-    POSTGRES.start();
-  }
-
-  @BeforeAll
-  static void migrate() {
-    Flyway.configure()
-        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-        .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-        .cleanDisabled(false)
-        .load()
-        .migrate();
-  }
-
-  protected static DataSource dataSource() {
-    PGSimpleDataSource ds = new PGSimpleDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUser(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
-    return ds;
-  }
-
-  protected static DSLContext dsl() {
-    return DSL.using(new DefaultConfiguration().set(dataSource()).set(SQLDialect.POSTGRES));
+  /**
+   * The application's active-vendor {@link DSLContext} (Dev Services Postgres under {@code %test}).
+   */
+  protected DSLContext pgDsl() {
+    return injectedDsl;
   }
 }
