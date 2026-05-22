@@ -4,12 +4,15 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.jdbc.config.annotation.web.http.EnableJdbcHttpSession;
 import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 
@@ -22,9 +25,13 @@ import org.springframework.session.security.SpringSessionBackedSessionRegistry;
  * name {@code "sessionRepository"}. The {@link #cachingSessionRepository} method uses a
  * {@code @Qualifier} to inject that bean directly (avoiding the circular-dependency that would
  * arise if Spring resolved the {@link Primary} {@code CachingSessionRepository} instead).
+ *
+ * <p>The cleanup schedule is the single source of truth in {@code application.yml} under {@code
+ * spring.session.jdbc.cleanup-cron}; it is applied via a {@link SessionRepositoryCustomizer} so the
+ * {@code @EnableJdbcHttpSession} annotation does not need to duplicate it.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableJdbcHttpSession(cleanupCron = "0 * * * * *")
+@EnableJdbcHttpSession
 public class SessionConfig {
 
   /** Short TTL bounds how long a revoked session can survive in a node's cache. */
@@ -34,6 +41,18 @@ public class SessionConfig {
         .expireAfterWrite(Duration.ofSeconds(5))
         .maximumSize(10_000)
         .build();
+  }
+
+  /**
+   * Applies the cleanup cron from {@code application.yml} so the annotation does not duplicate the
+   * schedule. {@code @EnableJdbcHttpSession} does not resolve {@code ${…}} placeholders in its
+   * {@code cleanupCron} attribute, so a {@link SessionRepositoryCustomizer} is the correct way to
+   * propagate the property.
+   */
+  @Bean
+  SessionRepositoryCustomizer<JdbcIndexedSessionRepository> cleanupCronCustomizer(
+      @Value("${spring.session.jdbc.cleanup-cron:0 * * * * *}") String cleanupCron) {
+    return repo -> repo.setCleanupCron(cleanupCron);
   }
 
   /**
