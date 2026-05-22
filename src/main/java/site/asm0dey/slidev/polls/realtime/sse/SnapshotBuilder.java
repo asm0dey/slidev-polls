@@ -1,12 +1,12 @@
 package site.asm0dey.slidev.polls.realtime.sse;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.stereotype.Component;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.Question;
@@ -18,7 +18,7 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * so {@code StreamController} can emit the initial snapshot on connect through the same code path,
  * keeping the waiting-state ({@code activeQuestion == null}) handling in one place.
  */
-@Component
+@ApplicationScoped
 public class SnapshotBuilder {
 
   private final PollRepository polls;
