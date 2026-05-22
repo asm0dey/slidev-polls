@@ -1,9 +1,10 @@
-# One-command dev stack: Postgres + a fat-JAR backend container that serves
-# both SPAs from the same origin. Use `task up` (from the repo Taskfile) —
-# it runs the jOOQ codegen against Postgres before `docker compose build`,
-# which is what the reactor's poll-persistence module needs.
+# One-command dev stack: Postgres + a native-image backend container that serves
+# both SPAs from the same origin. Use `task up` (from the repo Taskfile) — it
+# runs the jOOQ codegen against Postgres before `docker compose build`, which is
+# what the reactor's poll-persistence module needs (and what the native build's
+# COPY target/generated-sources expects).
 #
-# For inner-loop work with Vite HMR and `spring-boot:run` on the host, use
+# For inner-loop work with Vite HMR and `mvnw quarkus:dev` on the host, use
 # `task dev` instead — this file targets the "closer to prod" flow.
 
 services:
@@ -33,14 +34,15 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # Override the application.yml defaults (which point at localhost:5432)
-      # so the backend reaches the sibling service over the compose network.
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/polls
-      SPRING_DATASOURCE_USERNAME: polls
-      SPRING_DATASOURCE_PASSWORD: polls
-      # Ship with the prod profile flipped on so the SP_SESSION cookie carries
-      # the Secure flag when the reverse proxy terminates TLS.
-      SPRING_PROFILES_ACTIVE: prod
+      # Override the application.properties prod defaults (which point at
+      # localhost:5432) so the backend reaches the sibling service over the
+      # compose network. Quarkus maps these env vars onto config keys.
+      QUARKUS_DATASOURCE_POSTGRES_JDBC_URL: jdbc:postgresql://postgres:5432/polls
+      QUARKUS_DATASOURCE_POSTGRES_USERNAME: polls
+      QUARKUS_DATASOURCE_POSTGRES_PASSWORD: polls
+      # The session cookie encryption key (>= 32 bytes). Change for any real
+      # deployment; the application.properties default is a dev placeholder.
+      SP_SESSION_KEY: ${SP_SESSION_KEY:-dev-only-change-me-32-bytes-minimum!!}
     ports:
       - "8080:8080"
     restart: unless-stopped

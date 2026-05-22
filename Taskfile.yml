@@ -4,12 +4,14 @@ version: "3"
 # `brew install go-task/tap/go-task` or `go install github.com/go-task/task/v3/cmd/task@latest`.
 #
 # Common flows:
-#   task dev           — inner-loop (host backend + Vite HMR + Postgres in compose)
-#   task up            — "closer to prod" fat-JAR run via compose.dev.yml
+#   task dev           — inner-loop (host quarkus:dev + Vite HMR + Postgres in compose)
+#   task up            — "closer to prod" native-image run via compose.dev.yml
 #   task down          — stop everything and remove compose containers
+#   task build         — JVM jar (mvnw package -DskipTests)
+#   task build-native  — GraalVM native binary via the Mandrel builder container
 #   task test          — full suite (backend verify + every frontend vitest + shared bun test)
 #   task codegen       — regenerate jOOQ sources against a Testcontainers Postgres
-#   task frontends     — build the SPAs into src/main/resources/static
+#   task frontends     — build the SPAs into src/main/resources/META-INF/resources
 #   task format        — spotless:apply (java) + prettier --write (frontends)
 #   task hooks:install — install lefthook git hooks (prettier + IIKIT chain)
 
@@ -44,7 +46,7 @@ tasks:
       - docker compose -f {{.COMPOSE_BASE}} down
 
   up:
-    desc: Build and run the full fat-JAR stack (Postgres + backend on :8080)
+    desc: Build and run the full native-image stack (Postgres + backend on :8080)
     deps: [codegen]
     cmds:
       - docker compose -f {{.COMPOSE_DEV}} up --build
@@ -69,7 +71,7 @@ tasks:
   # ---------- Inner-loop dev ----------------------------------------------
 
   dev:
-    desc: Inner-loop (host spring-boot:run + Vite dev servers + Postgres in compose)
+    desc: Inner-loop (host quarkus:dev + Vite dev servers + Postgres in compose)
     cmds:
       - bash scripts/dev.sh
 
@@ -78,10 +80,11 @@ tasks:
     deps: [codegen, frontends]
     cmds:
       - |
-        SPRING_DATASOURCE_URL='jdbc:h2:file:${SP_DATA_DIR:-./data}/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE' \
-        SPRING_DATASOURCE_USERNAME=sa \
-        SPRING_DATASOURCE_PASSWORD='' \
-        ./mvnw spring-boot:run -Dspotless.check.skip=true
+        APP_DATABASE_VENDOR=h2 \
+        QUARKUS_DATASOURCE_H2_JDBC_URL='jdbc:h2:file:${SP_DATA_DIR:-./data}/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE' \
+        QUARKUS_DATASOURCE_H2_USERNAME=sa \
+        QUARKUS_DATASOURCE_H2_PASSWORD='' \
+        ./mvnw quarkus:dev -Dspotless.check.skip=true
 
   # ---------- Build surfaces ----------------------------------------------
 
@@ -93,13 +96,23 @@ tasks:
   codegen:
     desc: Regenerate jOOQ sources against a Testcontainers Postgres (needed before mvn package)
     cmds:
-      - ./mvnw -Pcodegen compile -Dspotless.check.skip=true
+      - ./mvnw -Pcodegen generate-sources -Dspotless.check.skip=true
 
-  package:
-    desc: Build the fat JAR on the host (runs codegen first)
+  build:
+    desc: Build the JVM jar on the host (target/quarkus-app; runs codegen + frontends first)
     deps: [codegen, frontends]
     cmds:
       - ./mvnw package -DskipTests -Dspotless.check.skip=true
+
+  build-native:
+    desc: Build the GraalVM native binary via the Mandrel builder container (no local GraalVM needed)
+    deps: [codegen, frontends]
+    cmds:
+      - ./mvnw package -Dnative -Dquarkus.native.container-build=true -DskipTests -Dspotless.check.skip=true
+
+  package:
+    desc: Alias for `build` — the JVM jar on the host (runs codegen first)
+    deps: [build]
 
   # ---------- Tests --------------------------------------------------------
 
