@@ -155,6 +155,18 @@
             <artifactId>jooq</artifactId>
             <version>${jooq.version}</version>
         </dependency>
+        <!--
+          jOOQ's org.jooq.impl.Tools optionally references jakarta.persistence annotations
+          (Entity/Column) for its DefaultRecordMapper JPA path. With link-at-build-time
+          (the Quarkus native default) the GraalVM analysis fails on these unresolved types when
+          the H2 driver's build-time initialization reaches Tools. We don't use jOOQ's JPA mapping,
+          but putting the API on the classpath lets Tools link cleanly. Harmless on the JVM build.
+        -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>3.2.0</version>
+        </dependency>
 
         <!-- Security -->
         <dependency>
