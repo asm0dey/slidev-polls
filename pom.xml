@@ -110,6 +110,16 @@
             <artifactId>h2</artifactId>
         </dependency>
 
+        <!-- Session -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- QR generation -->
         <dependency>
             <groupId>com.google.zxing</groupId>
