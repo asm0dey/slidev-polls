@@ -35,8 +35,17 @@
     </scm>
 
     <properties>
-        <java.version>25</java.version>
-        <maven.compiler.release>25</maven.compiler.release>
+        <!--
+          Build with JDK 25 (SDKMAN current) but emit Java 21 bytecode: Quarkus
+          3.15 LTS augmentation uses an ASM that cannot read class-file major 69
+          (Java 25). The JRE-25 runtime image runs 21 bytecode fine; only Java
+          22-25 *language* features are off the table. (Quarkus is no longer pinned
+          to 3.15 by quarkus-jooq, which was dropped — a future Quarkus upgrade
+          could restore a 25 target, but that flips Jackson 2->3 and changes the
+          security HttpAuthenticationMechanism APIs, so it is out of scope here.)
+        -->
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -132,10 +141,19 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-flyway</artifactId>
         </dependency>
+        <!--
+          jOOQ runtime, used directly via a custom CDI producer (config/JooqConfig).
+          The quarkiverse quarkus-jooq extension was dropped: it requires
+          quarkus.jooq.dialect and always produces a @Default DSLContext bound to a
+          single fixed datasource, which collides with the multi-datasource,
+          runtime-vendor-selected @Default DSLContext this app needs (D1b). jOOQ's
+          generated classes are registered for native reflection in Phase 8 (the only
+          capability the extension provided that we still need).
+        -->
         <dependency>
-            <groupId>io.quarkiverse.jooq</groupId>
-            <artifactId>quarkus-jooq</artifactId>
-            <version>${quarkus-jooq.version}</version>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+            <version>${jooq.version}</version>
         </dependency>
 
         <!-- Security -->
@@ -187,12 +205,6 @@
             <artifactId>javase</artifactId>
             <version>3.5.4</version>
         </dependency>
-
-        <!--
-          jOOQ runtime is pulled transitively by quarkus-jooq (pinned to
-          ${jooq.version}=3.19.22 by the extension); no explicit dependency
-          needed here.
-        -->
 
         <!--
           H2 is a runtime DB vendor (D1b): quarkus-jdbc-h2 (declared above with
