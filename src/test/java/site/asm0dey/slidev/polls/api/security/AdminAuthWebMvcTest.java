@@ -117,7 +117,7 @@ class AdminAuthWebMvcTest {
   @Test
   void foreign_presenter_get_returns_403() throws Exception {
     UUID pollId = UUID.randomUUID();
-    when(pollService.getForOwner(eq(pollId), eq("bob")))
+    when(pollService.getForEditor(eq(pollId), eq("bob")))
         .thenThrow(new NotOwnerException("poll " + pollId + " is not owned by bob"));
 
     mvc.perform(get("/api/admin/polls/" + pollId).with(user("bob").roles("AUTHENTICATED")))
@@ -166,7 +166,8 @@ class AdminAuthWebMvcTest {
   @Test
   void rightful_owner_can_read_their_own_poll() throws Exception {
     UUID pollId = UUID.randomUUID();
-    when(pollService.getForOwner(eq(pollId), eq("alice"))).thenReturn(fixturePoll(pollId, "alice"));
+    when(pollService.getForEditor(eq(pollId), eq("alice")))
+        .thenReturn(fixturePoll(pollId, "alice"));
 
     mvc.perform(get("/api/admin/polls/" + pollId).with(user("alice").roles("AUTHENTICATED")))
         .andExpect(status().isOk())
