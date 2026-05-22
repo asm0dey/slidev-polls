@@ -1,14 +1,16 @@
 package site.asm0dey.slidev.polls.api.pub;
 
-import java.io.IOException;
-import java.lang.System.Logger;
-import java.lang.System.Logger.Level;
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.sse.Sse;
+import jakarta.ws.rs.sse.SseEventSink;
 import java.time.Instant;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
@@ -18,28 +20,23 @@ import site.asm0dey.slidev.polls.realtime.sse.SnapshotBuilder;
 import site.asm0dey.slidev.polls.realtime.sse.SnapshotPayload;
 
 /**
- * SSE endpoint backing {@code <PollResults/>}. Long-lived per-subscriber {@link SseEmitter} held
- * open by Spring MVC; the hub keys subscribers by {@code pollId} so a mid-session slug rotation
- * does not drop the stream (see {@code contracts/sse-events.md §Transport}).
+ * SSE endpoint backing {@code <PollResults/>}. Each subscriber's {@link SseEventSink} is held open
+ * by Quarkus REST; the hub keys subscribers by {@code pollId} so a mid-session slug rotation does
+ * not drop the stream (see {@code contracts/sse-events.md §Transport}).
  *
- * <p>On connect the controller resolves slug → poll, emits an initial {@code snapshot} event so the
- * client starts from a consistent state (Principle IV, SC-006), then registers the emitter with the
+ * <p>On connect the resource resolves slug → poll, emits an initial {@code snapshot} event so the
+ * client starts from a consistent state (Principle IV, SC-006), then registers the sink with the
  * hub for subsequent {@code tally} / {@code snapshot} / {@code question-closed} fan-out from {@code
- * TallyBroadcaster}. A malformed or unknown slug surfaces as 404 {@code NOT_FOUND} — same edge
- * behaviour as {@link PublicPollController#getBySlug}.
+ * TallyBroadcaster}. A malformed or unknown slug surfaces as 404 {@code NOT_FOUND} via the shared
+ * {@code DomainExceptionMappers} — same edge behaviour as {@link PublicPollController#getBySlug}.
+ *
+ * <p>Runs on a virtual thread: the blocking poll lookup + initial snapshot build happen off the
+ * event loop, and the sink stays open after the method returns.
  */
-@RestController
-@RequestMapping("/api/polls")
+@Path("/api/polls")
+@ApplicationScoped
+@RunOnVirtualThread
 public class StreamController {
-
-  private static final Logger LOG = System.getLogger(StreamController.class.getName());
-
-  /**
-   * 24h absolute ceiling on the emitter hold-open. The browser will reconnect well before this
-   * fires; the timeout only exists so a client that walks away from their laptop overnight does not
-   * wedge a worker thread forever.
-   */
-  private static final long EMITTER_TIMEOUT_MS = 24L * 60L * 60L * 1000L;
 
   private final PollRepository pollRepository;
   private final SseHub hub;
@@ -51,8 +48,10 @@ public class StreamController {
     this.snapshots = snapshots;
   }
 
-  @GetMapping("/{slug}/stream")
-  public SseEmitter stream(@PathVariable String slug) {
+  @GET
+  @Path("/{slug}/stream")
+  @Produces(MediaType.SERVER_SENT_EVENTS)
+  public void stream(@PathParam("slug") String slug, @Context SseEventSink sink, @Context Sse sse) {
     if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
@@ -61,17 +60,8 @@ public class StreamController {
             .findBySlug(slug)
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
 
-    SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
     SnapshotPayload initial = snapshots.build(poll, Instant.now());
-    try {
-      emitter.send(SseEmitter.event().name("snapshot").data(initial));
-    } catch (IOException ex) {
-      // Connection died before we could write the initial snapshot — client will reconnect and
-      // we'll try again. Don't propagate; logging is enough.
-      LOG.log(Level.DEBUG, "initial snapshot send failed for slug {0}: {1}", slug, ex);
-      emitter.completeWithError(ex);
-      return emitter;
-    }
-    return hub.register(poll.id(), emitter);
+    sink.send(sse.newEventBuilder().name("snapshot").data(initial).build());
+    hub.register(poll.id(), sink);
   }
 }
