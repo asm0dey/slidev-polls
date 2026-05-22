@@ -110,12 +110,14 @@ addon into your deck once.
 CI pushes a backend image to GHCR after every successful `main` build:
 `ghcr.io/asm0dey/slidev-polls-backend` (tags: `latest`, `sha-<commit>`).
 
-The image supports two storage backends, picked at runtime by
-`SPRING_DATASOURCE_URL`:
+The image supports two storage backends, both compiled into the native binary
+and picked at runtime by `APP_DATABASE_VENDOR` (`postgres` default, or `h2`):
 
-- PostgreSQL is the production default. Needs a sibling `postgres` service.
+- PostgreSQL is the production default. Needs a sibling `postgres` service and
+  a `QUARKUS_DATASOURCE_POSTGRES_JDBC_URL` pointing at it.
 - H2 in file mode lets you run a single container, with the database
-  persisted to a volume. Good when you're self-hosting one talk.
+  persisted to a volume. Good when you're self-hosting one talk. Set
+  `APP_DATABASE_VENDOR=h2` and a `QUARKUS_DATASOURCE_H2_JDBC_URL`.
 
 GHCR images are public when the repo is public. If the package is private,
 run `docker login ghcr.io` with a PAT that has `read:packages` first.
@@ -147,12 +149,11 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      # `prod` flips the SP_SESSION cookie to Secure — only enable when you
-      # terminate TLS in front of the container.
-      SPRING_PROFILES_ACTIVE: prod
+      QUARKUS_DATASOURCE_POSTGRES_JDBC_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      QUARKUS_DATASOURCE_POSTGRES_USERNAME: ${POSTGRES_USER}
+      QUARKUS_DATASOURCE_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # >= 32-byte key used to encrypt the SP_SESSION cookie. Set a real value.
+      SP_SESSION_KEY: ${SP_SESSION_KEY}
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -167,12 +168,16 @@ Example `.env`:
 POSTGRES_DB=polls
 POSTGRES_USER=polls
 POSTGRES_PASSWORD=change-me
+SP_SESSION_KEY=please-generate-a-32-byte-or-longer-secret
 ```
 
 The DB user and password are shared between the two services on purpose.
 Postgres provisions the role from `POSTGRES_USER` / `POSTGRES_PASSWORD`, and
-the backend authenticates with the same pair via `SPRING_DATASOURCE_USERNAME`
-and `SPRING_DATASOURCE_PASSWORD`. Application-level credentials (the first
+the backend authenticates with the same pair via
+`QUARKUS_DATASOURCE_POSTGRES_USERNAME` and
+`QUARKUS_DATASOURCE_POSTGRES_PASSWORD`. The packaged image runs the `prod`
+profile by default, so the `SP_SESSION` cookie carries the `Secure` flag —
+front the container with TLS. Application-level credentials (the first
 presenter account) are created interactively at `http://localhost:8080/admin/`
 on first run.
 
@@ -186,12 +191,11 @@ services:
   backend:
     image: ghcr.io/asm0dey/slidev-polls-backend:latest
     environment:
-      SPRING_DATASOURCE_URL: 'jdbc:h2:file:/data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
-      SPRING_DATASOURCE_USERNAME: sa
-      SPRING_DATASOURCE_PASSWORD: ''
-      # `prod` flips the SP_SESSION cookie to Secure — only enable when you
-      # terminate TLS in front of the container.
-      SPRING_PROFILES_ACTIVE: prod
+      APP_DATABASE_VENDOR: h2
+      QUARKUS_DATASOURCE_H2_JDBC_URL: 'jdbc:h2:file:/data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
+      QUARKUS_DATASOURCE_H2_USERNAME: sa
+      QUARKUS_DATASOURCE_H2_PASSWORD: ''
+      SP_SESSION_KEY: please-generate-a-32-byte-or-longer-secret
     volumes:
       - polls-data:/data
     ports:
@@ -210,23 +214,23 @@ docker run --rm -v polls-data:/data -v $PWD:/out alpine \
   tar czf /out/polls-backup.tgz -C /data .
 ```
 
-**Never** set `spring.h2.console.enabled=true`. That exposes a SQL shell at
-`/h2-console` and bypasses every other auth surface in the app.
+### Running on H2 from a JVM jar (no Docker)
 
-### Running on H2 from a fat-JAR (no Docker)
-
-Same env-var trio, but pointed at a host path:
+Same env vars, but pointed at a host path. The JVM jar lives under
+`target/quarkus-app/` after `./mvnw package`:
 
 ```bash
-SPRING_DATASOURCE_URL='jdbc:h2:file:./data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE'
-SPRING_DATASOURCE_USERNAME=sa
-SPRING_DATASOURCE_PASSWORD=
-java -jar slidev-polls.jar
+APP_DATABASE_VENDOR=h2 \
+QUARKUS_DATASOURCE_H2_JDBC_URL='jdbc:h2:file:./data/polls;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE' \
+QUARKUS_DATASOURCE_H2_USERNAME=sa \
+QUARKUS_DATASOURCE_H2_PASSWORD= \
+java -jar target/quarkus-app/quarkus-run.jar
 ```
 
 The DB lands at `./data/polls.mv.db`. Override the path inside
-`SPRING_DATASOURCE_URL` for a different location (e.g.
-`jdbc:h2:file:/var/lib/slidev-polls/polls;...`).
+`QUARKUS_DATASOURCE_H2_JDBC_URL` for a different location (e.g.
+`jdbc:h2:file:/var/lib/slidev-polls/polls;...`). The standalone native binary
+(`target/*-runner`) takes the same env vars.
 
 ## Slidev deck integration
 
@@ -253,8 +257,8 @@ Take a snapshot before upgrading: `pg_dump -Fc -f slidev-polls-pre-V9.dump`.
 Flyway then runs both migrations on boot.
 
 V1–V7 also move from `db/migration/` to `db/migration/postgresql/`. Flyway's
-history table records the bare filename (`V1__core_tables.sql`), so standard
-Spring Boot autoconfig validates fine across the move. If your deployment
+history table records the bare filename (`V1__core_tables.sql`), so validation
+passes fine across the move. If your deployment
 customised Flyway to record full classpath paths, run `flyway repair` once
 before the next boot.
 
@@ -262,13 +266,17 @@ before the next boot.
 
 ### Stack
 
-- Backend: Java 25, Spring Boot 4, jOOQ for type-safe SQL, Flyway for
-  migrations, Server-Sent Events for live tally fan-out. The build produces
-  a single fat-JAR; the voter and admin SPAs ship inside it as static assets.
-- Storage: PostgreSQL (prod) and H2 in file mode (single-container) share
-  one schema via Flyway's `{vendor}` placeholder. jOOQ's dialect is
-  auto-detected from the JDBC URL.
-- Auth: Spring Session cookie (`SP_SESSION`) for presenters, an HttpOnly
+- Backend: Quarkus 3.15.7 on Java 21 bytecode (built with JDK 25), jOOQ for
+  type-safe SQL, Flyway for migrations, Server-Sent Events for live tally
+  fan-out. Ships both as a JVM jar and as a GraalVM/Mandrel native binary; the
+  voter and admin SPAs are served from `META-INF/resources`, baked into the
+  artifact.
+- Storage: PostgreSQL (prod) and H2 in file mode (single-container) are both
+  compiled in; the active engine is picked at runtime by `app.database.vendor`
+  (env `APP_DATABASE_VENDOR`, default `postgres`). Each vendor has its own
+  Quarkus named datasource; Flyway runs the matching vendor's migrations on
+  startup.
+- Auth: a Quarkus session cookie (`SP_SESSION`) for presenters, an HttpOnly
   `SP_VOTER` cookie for voters, and a separate bearer-token filter for the
   Slidev addon (deck tokens).
 - Frontends: Vue 3 + Vite in a `bun` workspace with four packages.
@@ -294,8 +302,10 @@ All orchestration lives in `Taskfile.yml`. Run `task` with no args to list
 entrypoints.
 
 ```bash
-task up            # prod-like: multi-stage build, Postgres + JAR in Docker, :8080
-task dev           # inner loop: Postgres + spring-boot:run + Vite HMR (:5173 voter, :5174 backoffice)
+task up            # prod-like: multi-stage build, Postgres + native binary in Docker, :8080
+task dev           # inner loop: Postgres + quarkus:dev + Vite HMR (:5173 voter, :5174 backoffice)
+task build         # JVM jar on the host (target/quarkus-app)
+task build-native  # GraalVM native binary via the Mandrel builder container
 task down          # tear down compose stack
 task codegen       # regenerate jOOQ sources from the live schema
 task test          # full suite (backend verify + every frontend runner)
@@ -310,16 +320,16 @@ sanity check before pushing.
 ### Repository layout
 
 ```
-pom.xml                  # single Spring Boot application
+pom.xml                  # single Quarkus application (quarkus-bom 3.15.7)
 src/main/java/site/asm0dey/slidev/polls/
   core/                  # domain + services, no web, no JDBC
   persistence/           # jOOQ + Flyway migrations
   realtime/              # SSE hub + tally broadcaster
-  api/                   # entrypoint, controllers, SPA hosting
+  api/                   # entrypoint, REST resources, SPA hosting
 src/main/resources/
-  application.yml
+  application.properties # Quarkus config (multi-datasource, native build args)
   db/migration/          # Flyway migrations (common + per-vendor)
-  static/                # built voter + backoffice SPAs (gitignored)
+  META-INF/resources/    # built voter + backoffice SPAs (gitignored)
 src/test/java/...        # unit + integration tests (mirrors main packages)
 frontends/               # bun workspace
   shared/                # @slidev-polls/shared — DTOs, api-client, sse-client

@@ -6,7 +6,10 @@ exist. Authoritative tech choices still live in each feature's `plan.md`
 
 ## Backend
 
-- Spring (Java / Spring Boot)
+- Quarkus 3.15.7 (Java 21 bytecode, built with JDK 25). Ships as a JVM jar
+  (`target/quarkus-app`) and as a GraalVM/Mandrel native binary
+  (`target/*-runner`). jOOQ for type-safe SQL, Flyway for migrations,
+  Server-Sent Events for live tally fan-out.
 
 ## Slidev component
 
@@ -14,15 +17,17 @@ exist. Authoritative tech choices still live in each feature's `plan.md`
 
 ## Databases
 
-Two engines are supported. **No Spring profiles** — the engine is selected by
-`SPRING_DATASOURCE_URL` alone. Spring Boot's Flyway autoconfig substitutes the
-`{vendor}` placeholder in `spring.flyway.locations` based on the JDBC URL, and
-jOOQ's dialect is auto-detected from the same URL.
+Two engines are supported, both compiled into the artifact (including the
+native image). The active engine is selected at runtime by
+`app.database.vendor` (env `APP_DATABASE_VENDOR`, default `postgres`). Each
+engine has its own Quarkus named datasource (`postgres` / `h2`);
+`FlywayMigrator` runs the active vendor's migrations on `StartupEvent`, and
+jOOQ's dialect follows the active datasource.
 
-| Engine        | JDBC URL prefix       | When                                                            |
+| Engine        | Vendor flag           | When                                                            |
 |---------------|-----------------------|-----------------------------------------------------------------|
-| PostgreSQL 18 | `jdbc:postgresql://…` | Production, compose stacks, Testcontainers                      |
-| H2 2.x (file) | `jdbc:h2:file:…`      | Single-binary deploys, demos, offline dev (`go-task dev:h2`)    |
+| PostgreSQL 18 | `postgres` (default)  | Production, compose stacks, Testcontainers / Dev Services       |
+| H2 2.x (file) | `h2`                  | Single-binary deploys, demos, offline dev (`go-task dev:h2`)    |
 
 Flyway uses vendor-scoped locations:
 - `db/migration/postgresql` — V1–V9 history (PG only).
@@ -30,5 +35,3 @@ Flyway uses vendor-scoped locations:
 - `db/migration/common`     — every future migration; both engines apply.
 
 The runtime schema is portable: `text[]` was replaced by the `poll_allowed_origins` child table; the partial unique on `poll_questions(status='ACTIVE')` became a generated `active_poll_id` column with a NULL gap; the functional unique on `lower(slug)` became a generated `slug_lower` column. jOOQ codegen still runs against PostgreSQL — the generated types are identical for both engines.
-
-> **Security note:** `spring.h2.console.enabled` is left at its default (false). Never enable it — `/h2-console` would expose a SQL shell that bypasses every other auth surface.
