@@ -104,9 +104,9 @@ public class AdminUserService {
    * Adds an additional presenter on behalf of an authenticated admin. The pre-check on {@link
    * AdminUserRepository#existsByUsername(String)} is a check-then-act under READ COMMITTED, so the
    * primary key on {@code admin_user.username} is what actually serialises concurrent inserts. The
-   * {@link DataIntegrityViolationException} catch translates the late-detected collision into the
-   * same {@link UsernameTakenException} the pre-check would have thrown — the controller contract
-   * stays {@code 409 USERNAME_TAKEN} regardless of which thread won the race.
+   * {@link DataAccessException} catch translates the late-detected collision into the same {@link
+   * UsernameTakenException} the pre-check would have thrown — the controller contract stays {@code
+   * 409 USERNAME_TAKEN} regardless of which thread won the race.
    */
   @Transactional
   public AdminUser createAdmin(CreateAdminCommand command) {
