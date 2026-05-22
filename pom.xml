@@ -118,6 +118,10 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-narayana-jta</artifactId>
         </dependency>
         <dependency>
@@ -186,12 +190,12 @@
           needed here.
         -->
 
-        <!-- H2 for tests only (the test-only TouchPollUpdatedAtTrigger and H2 test migrations). -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!--
+          H2 is a runtime DB vendor (D1b): quarkus-jdbc-h2 (declared above with
+          quarkus-jdbc-postgresql) pulls the com.h2database:h2 driver onto the
+          runtime classpath, so persistence.h2.TouchPollUpdatedAtTrigger and the
+          H2 migrations run at runtime, not just under test.
+        -->
 
         <!-- Tests -->
         <dependency>
