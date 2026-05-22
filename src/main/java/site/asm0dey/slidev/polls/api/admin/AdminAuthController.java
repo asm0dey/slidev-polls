@@ -1,96 +1,120 @@
 package site.asm0dey.slidev.polls.api.admin;
 
-import jakarta.servlet.http.HttpServletRequest;
+import io.quarkus.security.credential.PasswordCredential;
+import io.quarkus.security.identity.IdentityProviderManager;
+import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.security.identity.request.UsernamePasswordAuthenticationRequest;
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
+import java.time.Duration;
+import java.util.UUID;
+import org.jboss.resteasy.reactive.RestResponse;
+import site.asm0dey.slidev.polls.api.security.AdminSessionCookie;
 
 /**
- * Presenter sign-in / sign-out. {@code POST /api/admin/login} takes a JSON body, runs it through
- * the configured {@link AuthenticationManager} (the {@code DaoAuthenticationProvider} in {@link
- * site.asm0dey.slidev.polls.api.security.SecurityConfig}) and — on success — publishes the
- * resulting {@link Authentication} to a persisted {@code SecurityContext} so the next request from
- * the same session cookie is authenticated.
+ * Presenter sign-in / sign-out. {@code POST /api/admin/login} authenticates the supplied
+ * credentials through Quarkus' {@link IdentityProviderManager} (the {@code
+ * AdminPasswordIdentityProvider}) and — on success — mints the encrypted {@code SP_SESSION} cookie
+ * via {@link AdminSessionCookie} so the next request from the same browser is authenticated by
+ * {@code AdminSessionMechanism}. No server-side session store is involved (the cookie is
+ * self-contained).
  *
- * <p>Errors come out of the {@code GlobalExceptionHandler} as {@code Problem{AUTH_REQUIRED}} 401s
- * via the {@code AuthenticationException} handler chain, keeping the envelope consistent with every
- * other 401 on the API (@TS-001).
+ * <p>A readable {@code XSRF-TOKEN} cookie is set on login so the SPA can echo it back as {@code
+ * X-XSRF-TOKEN} for the {@code AdminCsrfFilter}.
+ *
+ * <p>Bad credentials fail the authentication {@link io.smallrye.mutiny.Uni} with an {@code
+ * AuthenticationFailedException}, which {@code SecurityProblemMappers} maps to a 401 {@code
+ * AUTH_REQUIRED} without leaking internal wording (@TS-001).
  */
-@RestController
-@RequestMapping("/api/admin")
+@Path("/api/admin")
+@ApplicationScoped
+@RunOnVirtualThread
 public class AdminAuthController {
 
-  private final AuthenticationManager authenticationManager;
-  private final SecurityContextRepository securityContextRepository =
-      new HttpSessionSecurityContextRepository();
+  /** Absolute lifetime of an admin session; matches the cookie Max-Age. */
+  private static final Duration SESSION_TTL = Duration.ofHours(12);
 
-  public AdminAuthController(AuthenticationManager authenticationManager) {
-    this.authenticationManager = authenticationManager;
+  /**
+   * Readable double-submit CSRF cookie name. Mirrors the {@code AdminCsrfFilter} expectation; the
+   * SPA reads it (HttpOnly=false) and echoes it as the {@code X-XSRF-TOKEN} header.
+   */
+  private static final String XSRF_COOKIE_NAME = "XSRF-TOKEN";
+
+  private final IdentityProviderManager idm;
+  private final AdminSessionCookie sessionCookie;
+
+  public AdminAuthController(IdentityProviderManager idm, AdminSessionCookie sessionCookie) {
+    this.idm = idm;
+    this.sessionCookie = sessionCookie;
   }
 
-  @PostMapping("/login")
-  public ResponseEntity<Void> login(
-      @Valid @RequestBody LoginRequest body,
-      HttpServletRequest request,
-      jakarta.servlet.http.HttpServletResponse response) {
-    UsernamePasswordAuthenticationToken token =
-        UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password());
-    try {
-      Authentication authenticated = authenticationManager.authenticate(token);
-      SecurityContext context = SecurityContextHolder.createEmptyContext();
-      context.setAuthentication(authenticated);
-      SecurityContextHolder.setContext(context);
-      // Writing the context to the repository forces a session on first login and stores the
-      // authentication against JSESSIONID/SP_SESSION; subsequent requests are reloaded
-      // automatically by SecurityContextPersistenceFilter.
-      securityContextRepository.saveContext(context, request, response);
-    } catch (BadCredentialsException ex) {
-      // Rewrap so the GlobalExceptionHandler's AuthenticationException branch fires. The default
-      // BadCredentialsException message leaks internal wording ("Bad credentials"); we keep the
-      // user-facing message on the wrapped exception.
-      throw new BadCredentialsAsAuthException("invalid username or password", ex);
-    }
-    return ResponseEntity.noContent().build();
+  @POST
+  @Path("/login")
+  public RestResponse<Void> login(@Valid LoginRequest body, @Context RoutingContext ctx) {
+    // Blocking await is safe here: the method runs on a virtual thread. A failed credential fails
+    // the Uni with AuthenticationFailedException, which propagates to SecurityProblemMappers → 401.
+    SecurityIdentity identity =
+        idm.authenticate(
+                new UsernamePasswordAuthenticationRequest(
+                    body.username(), new PasswordCredential(body.password().toCharArray())))
+            .await()
+            .indefinitely();
+
+    boolean secure = ctx.request().isSSL();
+    String username = identity.getPrincipal().getName();
+    String sessionValue = sessionCookie.mint(username, SESSION_TTL);
+    String sessionHeader = sessionCookie.setCookieHeader(sessionValue, SESSION_TTL, secure);
+    String xsrfHeader = buildXsrfCookie(UUID.randomUUID().toString(), SESSION_TTL, secure);
+
+    return RestResponse.ResponseBuilder.create(RestResponse.Status.NO_CONTENT, (Void) null)
+        .header(HttpHeaders.SET_COOKIE, sessionHeader)
+        .header(HttpHeaders.SET_COOKIE, xsrfHeader)
+        .build();
   }
 
-  @PostMapping("/logout")
-  public ResponseEntity<Void> logout(
-      HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
-    // Clear the SecurityContext (in-memory) and the stored context (session).
-    SecurityContextHolder.clearContext();
-    SecurityContext empty = SecurityContextHolder.createEmptyContext();
-    securityContextRepository.saveContext(empty, request, response);
-    var session = request.getSession(false);
-    if (session != null) {
-      session.invalidate();
+  @POST
+  @Path("/logout")
+  public RestResponse<Void> logout(@Context RoutingContext ctx) {
+    boolean secure = ctx.request().isSSL();
+    // No server session to invalidate — clearing the cookies is sufficient.
+    return RestResponse.ResponseBuilder.create(RestResponse.Status.NO_CONTENT, (Void) null)
+        .header(HttpHeaders.SET_COOKIE, sessionCookie.clearCookieHeader(secure))
+        .header(HttpHeaders.SET_COOKIE, clearXsrfCookie(secure))
+        .build();
+  }
+
+  private static String buildXsrfCookie(String value, Duration ttl, boolean secure) {
+    // Readable by JS (no HttpOnly) so the SPA can echo it as X-XSRF-TOKEN; SameSite=Lax, Path=/.
+    StringBuilder sb = new StringBuilder();
+    sb.append(XSRF_COOKIE_NAME).append('=').append(value);
+    sb.append("; Path=/");
+    sb.append("; SameSite=Lax");
+    sb.append("; Max-Age=").append(ttl.toSeconds());
+    if (secure) {
+      sb.append("; Secure");
     }
-    return ResponseEntity.noContent().build();
+    return sb.toString();
+  }
+
+  private static String clearXsrfCookie(boolean secure) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(XSRF_COOKIE_NAME).append('=');
+    sb.append("; Path=/");
+    sb.append("; SameSite=Lax");
+    sb.append("; Max-Age=0");
+    if (secure) {
+      sb.append("; Secure");
+    }
+    return sb.toString();
   }
 
   /** Mirrors {@code LoginRequest} in {@code openapi.yaml}. */
   public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
-
-  /**
-   * Carries the original {@link BadCredentialsException} as the cause so the global handler's
-   * {@code AuthenticationException} branch fires uniformly, without leaking Spring Security's
-   * internal "Bad credentials" wording.
-   */
-  static final class BadCredentialsAsAuthException extends AuthenticationException {
-    BadCredentialsAsAuthException(String msg, Throwable cause) {
-      super(msg, cause);
-    }
-  }
 }
