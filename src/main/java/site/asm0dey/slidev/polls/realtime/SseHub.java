@@ -42,16 +42,23 @@ public class SseHub {
    * {@code pollId} key is pruned once empty.
    */
   public void register(UUID pollId, SseEventSink sink) {
+    // Add the sink to the tracking set inside the same byPoll.compute critical section that
+    // creates/looks up the broadcaster, so register() and drop() (which also runs under
+    // byPoll.compute keyed by pollId) are serialized on the same per-key lock and cannot race the
+    // tracking set against the broadcaster map.
     SseBroadcaster broadcaster =
-        byPoll.computeIfAbsent(
+        byPoll.compute(
             pollId,
-            k -> {
-              SseBroadcaster nb = sse.newBroadcaster();
-              nb.onClose(s -> drop(pollId, s));
-              nb.onError((s, ex) -> drop(pollId, s));
-              return nb;
+            (k, existing) -> {
+              SseBroadcaster b = existing;
+              if (b == null) {
+                b = sse.newBroadcaster();
+                b.onClose(s -> drop(pollId, s));
+                b.onError((s, ex) -> drop(pollId, s));
+              }
+              sinks.computeIfAbsent(pollId, kk -> ConcurrentHashMap.newKeySet()).add(sink);
+              return b;
             });
-    sinks.computeIfAbsent(pollId, k -> ConcurrentHashMap.newKeySet()).add(sink);
     broadcaster.register(sink);
   }
 
@@ -65,15 +72,25 @@ public class SseHub {
   }
 
   private void drop(UUID pollId, SseEventSink sink) {
-    sinks.computeIfPresent(
+    // Prune both maps inside a single byPoll.compute critical section keyed by pollId so a
+    // concurrent register() (which also mutates byPoll via computeIfAbsent under the same per-key
+    // lock) cannot re-create the entry between the sink removal and the broadcaster removal and end
+    // up with an orphaned broadcaster. Whatever this returns for byPoll, the sinks map is updated
+    // to
+    // match atomically under the same lock.
+    byPoll.compute(
         pollId,
-        (k, set) -> {
-          set.remove(sink);
-          return set.isEmpty() ? null : set;
+        (k, broadcaster) -> {
+          Set<SseEventSink> set = sinks.get(pollId);
+          if (set != null) {
+            set.remove(sink);
+          }
+          if (set == null || set.isEmpty()) {
+            sinks.remove(pollId);
+            return null;
+          }
+          return broadcaster;
         });
-    if (!sinks.containsKey(pollId)) {
-      byPoll.remove(pollId);
-    }
   }
 
   /**
