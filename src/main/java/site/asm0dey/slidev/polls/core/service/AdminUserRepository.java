@@ -19,4 +19,8 @@ public interface AdminUserRepository {
   List<AdminUser> listAll();
 
   Optional<String> findPasswordHash(String username);
+
+  Optional<String> findBootstrapAdminUsername();
+
+  void updatePasswordHash(String username, String passwordHash);
 }

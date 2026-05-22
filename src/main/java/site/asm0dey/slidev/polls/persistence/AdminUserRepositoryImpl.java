@@ -58,4 +58,21 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
         .fetchOptional()
         .map(r -> r.get(ADMIN_USER.PASSWORD_HASH));
   }
+
+  @Override
+  public Optional<String> findBootstrapAdminUsername() {
+    return dsl.select(ADMIN_USER.USERNAME)
+        .from(ADMIN_USER)
+        .orderBy(ADMIN_USER.CREATED_AT.asc(), ADMIN_USER.USERNAME.asc())
+        .limit(1)
+        .fetchOptional(ADMIN_USER.USERNAME);
+  }
+
+  @Override
+  public void updatePasswordHash(String username, String passwordHash) {
+    dsl.update(ADMIN_USER)
+        .set(ADMIN_USER.PASSWORD_HASH, passwordHash)
+        .where(ADMIN_USER.USERNAME.eq(username))
+        .execute();
+  }
 }
