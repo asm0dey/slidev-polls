@@ -41,6 +41,15 @@ public class AdminUserService {
   }
 
   /**
+   * True when {@code username} is the bootstrap admin — the earliest-created account (tie-broken by
+   * username). This is the implicit privilege source for user creation, password reset, and
+   * block/unblock until an explicit role model exists.
+   */
+  public boolean isBootstrapAdmin(String username) {
+    return repository.findBootstrapAdminUsername().map(b -> b.equals(username)).orElse(false);
+  }
+
+  /**
    * Inserts the bootstrap presenter inside a SERIALIZABLE transaction. We use a programmatic
    * TransactionTemplate (not @Transactional) so the catch sits OUTSIDE the transaction boundary —
    * Postgres reports the serialization conflict at COMMIT time, which a try/catch inside
