@@ -70,7 +70,17 @@ class PollServiceLockTest {
             return holder[0];
           }
         };
-    PollService service = new PollService(repo, ev -> {}, provider, votes);
+    PollCollaboratorRepository collaborators = new NoCollaborators();
+    PollService service =
+        new PollService(
+            repo,
+            ev -> {},
+            provider,
+            votes,
+            new PollAuthorizer(collaborators),
+            collaborators,
+            null,
+            null);
     holder[0] = service;
 
     Poll created =
@@ -382,6 +392,30 @@ class PollServiceLockTest {
     @Override
     public Optional<List<UUID>> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
       throw new UnsupportedOperationException();
+    }
+  }
+
+  /** Owner-path lock tests never share a poll, so collaborator lookups always miss. */
+  static final class NoCollaborators implements PollCollaboratorRepository {
+    @Override
+    public site.asm0dey.slidev.polls.core.domain.PollCollaborator add(
+        UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void remove(UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean exists(UUID pollId, String username) {
+      return false;
+    }
+
+    @Override
+    public List<site.asm0dey.slidev.polls.core.domain.PollCollaborator> listByPoll(UUID pollId) {
+      return List.of();
     }
   }
 }

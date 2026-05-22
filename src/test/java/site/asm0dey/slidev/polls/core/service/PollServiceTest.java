@@ -53,9 +53,17 @@ class PollServiceTest {
             return service;
           }
         };
+    PollCollaboratorRepository collaborators = new NoCollaborators();
     service =
         new PollService(
-            repository, new RecordingEventPublisher(), selfProvider, fakeVoteRepository);
+            repository,
+            new RecordingEventPublisher(),
+            selfProvider,
+            fakeVoteRepository,
+            new PollAuthorizer(collaborators),
+            collaborators,
+            null,
+            null);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title
@@ -754,5 +762,29 @@ class PollServiceTest {
 
     @Override
     public void publishEvent(ApplicationEvent event) {}
+  }
+
+  /** No sharing in these tests, so the owner check in requireEditor is the only path taken. */
+  static final class NoCollaborators implements PollCollaboratorRepository {
+    @Override
+    public site.asm0dey.slidev.polls.core.domain.PollCollaborator add(
+        UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void remove(UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean exists(UUID pollId, String username) {
+      return false;
+    }
+
+    @Override
+    public List<site.asm0dey.slidev.polls.core.domain.PollCollaborator> listByPoll(UUID pollId) {
+      return List.of();
+    }
   }
 }
