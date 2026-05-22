@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.api.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.IdentityProviderManager;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.request.AuthenticationRequest;
@@ -16,7 +17,6 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import site.asm0dey.slidev.polls.api.error.ProblemCode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Authenticates admin requests from the {@code SP_SESSION} cookie minted by {@code

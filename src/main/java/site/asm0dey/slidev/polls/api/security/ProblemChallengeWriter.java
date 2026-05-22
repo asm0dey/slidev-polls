@@ -1,5 +1,7 @@
 package site.asm0dey.slidev.polls.api.security;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.buffer.Buffer;
@@ -8,7 +10,6 @@ import io.vertx.ext.web.RoutingContext;
 import org.jboss.logging.MDC;
 import site.asm0dey.slidev.polls.api.error.Problem;
 import site.asm0dey.slidev.polls.api.error.ProblemCode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Writes a {@link Problem} JSON envelope as an authentication challenge body straight to the Vert.x
@@ -33,7 +34,14 @@ final class ProblemChallengeWriter {
     Object correlationId = MDC.get(MDC_CORRELATION_KEY);
     Problem problem =
         new Problem(code, message, correlationId == null ? null : correlationId.toString());
-    byte[] body = mapper.writeValueAsBytes(problem);
+    byte[] body;
+    try {
+      // Jackson 2 (the version Quarkus 3.15 ships) declares writeValueAsBytes as throwing the
+      // checked JsonProcessingException; serialising a fixed-shape Problem record never trips it.
+      body = mapper.writeValueAsBytes(problem);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("failed to serialise Problem challenge body", e);
+    }
     HttpServerResponse response = context.response();
     response.setStatusCode(status);
     response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");

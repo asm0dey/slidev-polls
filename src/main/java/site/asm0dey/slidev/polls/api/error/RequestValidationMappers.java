@@ -3,6 +3,7 @@ package site.asm0dey.slidev.polls.api.error;
 import static site.asm0dey.slidev.polls.api.error.DomainExceptionMappers.respond;
 
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import io.quarkus.hibernate.validator.runtime.jaxrs.ResteasyReactiveViolationException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path;
 import jakarta.ws.rs.core.Response;
@@ -11,7 +12,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.jboss.resteasy.reactive.RestResponse;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
-import org.jboss.resteasy.reactive.server.validation.ResteasyReactiveViolationException;
 
 /**
  * Maps request-shape failures — bean-validation constraint violations and a body Jackson cannot

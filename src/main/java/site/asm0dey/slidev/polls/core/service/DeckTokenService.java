@@ -55,7 +55,7 @@ public class DeckTokenService {
     return new Minted(saved, plaintext);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public List<DeckToken> list(UUID pollId, String ownerUsername) {
     requireOwner(pollId, ownerUsername);
     return repository.findByPoll(pollId);
@@ -78,7 +78,7 @@ public class DeckTokenService {
   }
 
   /** Look up a live (non-revoked) token by plaintext. Used by the deck-auth filter. */
-  @Transactional(readOnly = true)
+  @Transactional
   public Optional<DeckToken> resolveLive(String plaintext) {
     if (plaintext == null || plaintext.isBlank()) {
       return Optional.empty();

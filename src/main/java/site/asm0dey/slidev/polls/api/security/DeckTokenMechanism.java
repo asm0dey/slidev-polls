@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.api.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.IdentityProviderManager;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.request.AuthenticationRequest;
@@ -18,7 +19,6 @@ import java.util.Set;
 import site.asm0dey.slidev.polls.api.error.ProblemCode;
 import site.asm0dey.slidev.polls.core.domain.DeckToken;
 import site.asm0dey.slidev.polls.core.service.DeckTokenService;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Authenticates {@code /api/deck/*} requests by matching the bearer in the {@code X-Deck-Token}

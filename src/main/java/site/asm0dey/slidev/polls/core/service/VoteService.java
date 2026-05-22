@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.NonNull;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.Question;
@@ -128,7 +127,7 @@ public class VoteService {
     events.fire(new VoteRetractedEvent(poll.id(), activeQuestionId, Instant.now()));
   }
 
-  private static @NonNull UUID getActiveQuestionId(String slug, Poll poll) {
+  private static UUID getActiveQuestionId(String slug, Poll poll) {
     UUID activeQuestionId = poll.activeQuestionId();
     if (activeQuestionId == null) {
       // Early-exit before the wasted round-trip to VoteRepository.insert. The repo-level
@@ -141,7 +140,7 @@ public class VoteService {
   }
 
   /** Best-effort hint used to populate {@code PublicPollView.alreadyVoted}. */
-  @Transactional(readOnly = true)
+  @Transactional
   public boolean alreadyVoted(UUID questionId, String voterToken) {
     if (questionId == null || voterToken == null || voterToken.isBlank()) {
       return false;

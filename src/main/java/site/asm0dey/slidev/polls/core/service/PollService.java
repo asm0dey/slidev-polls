@@ -86,12 +86,12 @@ public class PollService {
     return repository.insert(poll);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public List<Poll> listForOwner(String ownerUsername) {
     return repository.findByOwner(ownerUsername);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public Poll getForOwner(UUID pollId, String ownerUsername) {
     Poll poll =
         repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
