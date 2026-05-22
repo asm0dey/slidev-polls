@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import site.asm0dey.slidev.polls.api.logging.CorrelationIdFilter;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.AdminRequiredException;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
+import site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenInvalidException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenPollMismatchException;
 import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
@@ -65,6 +67,16 @@ public class GlobalExceptionHandler {
   ResponseEntity<Problem> handleNotOwner(NotOwnerException ex) {
     // A presenter authenticated, but the poll belongs to someone else. Same HTTP
     // status as a missing-permission case; FORBIDDEN is the right classification.
+    return respond(HttpStatus.FORBIDDEN, ProblemCode.FORBIDDEN, safe(ex));
+  }
+
+  @ExceptionHandler(AdminRequiredException.class)
+  ResponseEntity<Problem> handleAdminRequired(AdminRequiredException ex) {
+    return respond(HttpStatus.FORBIDDEN, ProblemCode.ADMIN_REQUIRED, safe(ex));
+  }
+
+  @ExceptionHandler(CurrentPasswordMismatchException.class)
+  ResponseEntity<Problem> handleCurrentPasswordMismatch(CurrentPasswordMismatchException ex) {
     return respond(HttpStatus.FORBIDDEN, ProblemCode.FORBIDDEN, safe(ex));
   }
 
