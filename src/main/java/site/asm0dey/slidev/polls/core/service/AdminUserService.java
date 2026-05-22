@@ -6,7 +6,7 @@ import jakarta.transaction.UserTransaction;
 import java.time.Instant;
 import java.util.List;
 import org.jooq.exception.DataAccessException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import site.asm0dey.slidev.polls.api.security.Argon2PasswordHasher;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
@@ -20,15 +20,15 @@ import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 public class AdminUserService {
 
   private final AdminUserRepository repository;
-  private final PasswordEncoder passwordEncoder;
+  private final Argon2PasswordHasher passwordHasher;
   private final UserTransaction userTransaction;
 
   public AdminUserService(
       AdminUserRepository repository,
-      PasswordEncoder passwordEncoder,
+      Argon2PasswordHasher passwordHasher,
       UserTransaction userTransaction) {
     this.repository = repository;
-    this.passwordEncoder = passwordEncoder;
+    this.passwordHasher = passwordHasher;
     this.userTransaction = userTransaction;
   }
 
@@ -71,7 +71,7 @@ public class AdminUserService {
       if (repository.count() != 0L) {
         throw new SetupLockedException("setup already complete");
       }
-      String hash = passwordEncoder.encode(command.password());
+      String hash = passwordHasher.encode(command.password());
       repository.insert(command.username(), hash);
       AdminUser created = new AdminUser(command.username(), Instant.now());
       userTransaction.commit();
@@ -113,7 +113,7 @@ public class AdminUserService {
     if (repository.existsByUsername(command.username())) {
       throw new UsernameTakenException(command.username());
     }
-    String hash = passwordEncoder.encode(command.password());
+    String hash = passwordHasher.encode(command.password());
     try {
       repository.insert(command.username(), hash);
     } catch (DataAccessException _) {
