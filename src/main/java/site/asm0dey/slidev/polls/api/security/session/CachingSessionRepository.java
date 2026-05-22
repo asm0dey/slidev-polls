@@ -7,9 +7,15 @@ import org.springframework.session.Session;
 
 /**
  * Read-through cache over a {@link FindByIndexNameSessionRepository}. Only {@link #findById} is
- * cached (the per-request hot path); {@link #save}/{@link #deleteById} evict, and principal lookups
- * pass straight through so session revocation always observes the authoritative store. The short
- * cache TTL (configured on the {@link Cache} in {@link SessionConfig}) bounds cross-node staleness.
+ * cached (the per-request hot path); {@link #save} refreshes the entry, {@link #deleteById} evicts,
+ * and principal lookups pass straight through so session revocation always observes the
+ * authoritative store. The short cache TTL (configured on the {@link Cache} in {@link
+ * SessionConfig}) bounds cross-node staleness.
+ *
+ * <p>Cached entries are the delegate's own (mutable) session objects, shared by reference. Within a
+ * node, concurrent {@link #findById} callers therefore observe the same instance; correctness
+ * relies on the short TTL and the one-principal-per-session access pattern. The revocation path
+ * bypasses the cache, so a delete is always authoritative.
  *
  * @param <S> concrete session type of the delegate
  */

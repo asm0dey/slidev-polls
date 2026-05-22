@@ -56,10 +56,8 @@ public class TestcontainersConfiguration {
           underlying = (HttpServletRequest) wrapper.getRequest();
         }
         // Force creation of the native MockHttpSession (no-op if one already exists).
-        HttpSession nativeSession = underlying.getSession(true);
-        if (nativeSession != null) {
-          return nativeSession.getId();
-        }
+        // getSession(true) never returns null by the servlet contract.
+        return underlying.getSession(true).getId();
       }
       return UuidSessionIdGenerator.getInstance().generate();
     };
