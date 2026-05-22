@@ -1,12 +1,9 @@
 package site.asm0dey.slidev.polls.api.admin;
 
-import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.WriterException;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import io.quarkiverse.barcode.zxing.ZebraCrossing;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import io.vertx.ext.web.RoutingContext;
@@ -17,8 +14,6 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
@@ -55,21 +50,20 @@ public class QrController {
   public byte[] qr(
       @PathParam("pollId") UUID pollId,
       @Context SecurityIdentity identity,
-      @Context RoutingContext request)
-      throws IOException, WriterException {
+      @Context RoutingContext request) {
     Poll poll = pollService.getForOwner(pollId, identity.getPrincipal().getName());
     String url = PublicUrlBase.of(request) + "/" + poll.slug();
     return renderPng(url, QR_SIZE_PX);
   }
 
-  private static byte[] renderPng(String payload, int size) throws IOException, WriterException {
+  private static byte[] renderPng(String payload, int size) {
+    // quarkus-zxing's ZebraCrossing wraps ZXing's QRCodeWriter + MatrixToImageWriter/ImageIO with
+    // GraalVM-native AWT support, so this works in the native image where the raw
+    // ImageIO/BufferedImage path was unregistered.
     Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
     hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
     hints.put(EncodeHintType.MARGIN, 1);
-    BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size, hints);
-    try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      MatrixToImageWriter.writeToStream(matrix, "PNG", baos);
-      return baos.toByteArray();
-    }
+    BitMatrix matrix = ZebraCrossing.qrCode(payload, size, size, hints);
+    return ZebraCrossing.barcodetoPng(matrix);
   }
 }

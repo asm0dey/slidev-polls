@@ -206,16 +206,21 @@
             <version>1.84</version>
         </dependency>
 
-        <!-- QR generation -->
+        <!--
+          QR generation. quarkus-zxing (quarkiverse quarkus-barcode 1.0.0, built against
+          Quarkus 3.15.1 — API-compatible with our 3.15.7 platform) wraps ZXing with GraalVM
+          native support: it pulls quarkus-awt (native-registered AWT/ImageIO) and the ZXing
+          core + javase jars transitively, so QrController no longer touches raw
+          MatrixToImageWriter/ImageIO/BufferedImage directly and the native image keeps the
+          AWT/ImageIO codepath registered. QrController encodes via
+          io.quarkiverse.barcode.zxing.ZebraCrossing. The ZXing decode classes used only by
+          QrEndpointIT (MultiFormatReader, BufferedImageLuminanceSource, …) also come from this
+          extension's transitive ZXing core + javase, so the raw com.google.zxing deps are dropped.
+        -->
         <dependency>
-            <groupId>com.google.zxing</groupId>
-            <artifactId>core</artifactId>
-            <version>3.5.4</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.zxing</groupId>
-            <artifactId>javase</artifactId>
-            <version>3.5.4</version>
+            <groupId>io.quarkiverse.barcode</groupId>
+            <artifactId>quarkus-zxing</artifactId>
+            <version>1.0.0</version>
         </dependency>
 
         <!--
