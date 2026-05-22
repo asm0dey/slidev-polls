@@ -19,9 +19,10 @@ public record PollDto(
     String slug,
     PollStatus status,
     String publicUrl,
-    UUID activeQuestionId) {
+    UUID activeQuestionId,
+    boolean isOwner) {
 
-  public static PollDto from(Poll domain, String publicUrlBase) {
+  public static PollDto from(Poll domain, String publicUrlBase, boolean isOwner) {
     String base = publicUrlBase == null ? "" : stripTrailingSlash(publicUrlBase);
     return new PollDto(
         domain.id(),
@@ -29,7 +30,8 @@ public record PollDto(
         domain.slug(),
         domain.status(),
         base + "/" + domain.slug(),
-        domain.activeQuestionId());
+        domain.activeQuestionId(),
+        isOwner);
   }
 
   private static String stripTrailingSlash(String base) {

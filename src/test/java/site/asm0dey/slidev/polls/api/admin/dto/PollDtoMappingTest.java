@@ -25,7 +25,7 @@ class PollDtoMappingTest {
   void poll_dto_composes_public_url_from_base_and_slug() {
     Poll poll = fixturePoll("my-talk");
 
-    PollDto dto = PollDto.from(poll, "http://example.test");
+    PollDto dto = PollDto.from(poll, "http://example.test", true);
 
     assertThat(dto.publicUrl()).isEqualTo("http://example.test/my-talk");
     assertThat(dto.slug()).isEqualTo("my-talk");
@@ -38,7 +38,7 @@ class PollDtoMappingTest {
   void poll_dto_strips_trailing_slash_from_base() {
     Poll poll = fixturePoll("my-talk");
 
-    PollDto dto = PollDto.from(poll, "http://example.test/");
+    PollDto dto = PollDto.from(poll, "http://example.test/", true);
 
     assertThat(dto.publicUrl()).isEqualTo("http://example.test/my-talk");
   }
@@ -48,7 +48,7 @@ class PollDtoMappingTest {
   void poll_detail_dto_carries_questions_and_options() {
     Poll poll = fixturePoll("my-talk");
 
-    PollDetailDto detail = PollDetailDto.from(poll, "http://example.test");
+    PollDetailDto detail = PollDetailDto.from(poll, "http://example.test", true);
 
     assertThat(detail.questions()).hasSize(1);
     assertThat(detail.questions().get(0).options()).hasSize(2);

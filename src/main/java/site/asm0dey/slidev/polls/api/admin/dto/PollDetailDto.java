@@ -23,10 +23,12 @@ public record PollDetailDto(
     String publicUrl,
     UUID activeQuestionId,
     List<QuestionDto> questions,
-    List<String> allowedOrigins) {
+    List<String> allowedOrigins,
+    boolean isOwner) {
 
-  public static PollDetailDto from(Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts) {
-    PollDto summary = PollDto.from(domain, publicUrlBase);
+  public static PollDetailDto from(
+      Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts, boolean isOwner) {
+    PollDto summary = PollDto.from(domain, publicUrlBase, isOwner);
     List<QuestionDto> questions =
         domain.questions().stream()
             .map(q -> QuestionDto.from(q, voteCounts.getOrDefault(q.id(), 0L).intValue()))
@@ -39,11 +41,12 @@ public record PollDetailDto(
         summary.publicUrl(),
         summary.activeQuestionId(),
         questions,
-        domain.allowedOrigins());
+        domain.allowedOrigins(),
+        isOwner);
   }
 
   /** Convenience for callers that don't yet have vote counts — every question reports {@code 0}. */
-  public static PollDetailDto from(Poll domain, String publicUrlBase) {
-    return from(domain, publicUrlBase, Map.of());
+  public static PollDetailDto from(Poll domain, String publicUrlBase, boolean isOwner) {
+    return from(domain, publicUrlBase, Map.of(), isOwner);
   }
 }
