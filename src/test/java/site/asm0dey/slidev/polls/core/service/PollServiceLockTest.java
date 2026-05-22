@@ -190,6 +190,16 @@ class PollServiceLockTest {
     }
 
     @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
+      return byId.values().stream().filter(p -> p.ownerUsername().equals(username)).toList();
+    }
+
+    @Override
     public boolean slugTaken(String slug, UUID excludingPollId) {
       return byId.values().stream()
           .anyMatch(

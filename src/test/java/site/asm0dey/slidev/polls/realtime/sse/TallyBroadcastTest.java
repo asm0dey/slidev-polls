@@ -310,6 +310,16 @@ class TallyBroadcastTest {
     }
 
     @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean slugTaken(String slug, UUID excludingPollId) {
       throw new UnsupportedOperationException();
     }

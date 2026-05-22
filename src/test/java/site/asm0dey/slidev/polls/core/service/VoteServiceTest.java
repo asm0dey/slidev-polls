@@ -295,6 +295,16 @@ class VoteServiceTest {
     }
 
     @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
+      return List.copyOf(byId.values());
+    }
+
+    @Override
     public boolean slugTaken(String slug, UUID excludingPollId) {
       return false;
     }
