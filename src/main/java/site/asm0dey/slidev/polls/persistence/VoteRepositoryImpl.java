@@ -4,6 +4,7 @@ import static org.jooq.impl.DSL.exists;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -13,8 +14,6 @@ import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.exception.IntegrityConstraintViolationException;
 import org.jooq.impl.DSL;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.domain.Vote;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
@@ -43,7 +42,7 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  * between the preflight and the gated DELETE, we re-read the question status to disambiguate "row
  * vanished concurrently" (idempotent no-op) from "question flipped to CLOSED" (FR-010 violation).
  */
-@Repository
+@ApplicationScoped
 public class VoteRepositoryImpl implements VoteRepository {
 
   private final DSLContext dsl;
@@ -85,7 +84,7 @@ public class VoteRepositoryImpl implements VoteRepository {
                               .eq(vote.questionId())
                               .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))))
               .execute();
-    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException _) {
+    } catch (IntegrityConstraintViolationException _) {
       throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
     }
     if (inserted == 0) {

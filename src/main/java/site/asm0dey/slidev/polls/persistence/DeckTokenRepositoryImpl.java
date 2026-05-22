@@ -2,6 +2,7 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.DECK_TOKENS;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -9,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
 import org.jooq.Record;
-import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.DeckToken;
 import site.asm0dey.slidev.polls.core.service.DeckTokenRepository;
 import site.asm0dey.slidev.polls.core.service.DeckTokenService;
@@ -18,7 +18,7 @@ import site.asm0dey.slidev.polls.core.service.DeckTokenService;
  * jOOQ-backed implementation of {@link DeckTokenRepository}. Only the SHA-256 hash lands in
  * storage; the plaintext is returned by {@link DeckTokenService#mint} once and discarded.
  */
-@Repository
+@ApplicationScoped
 public class DeckTokenRepositoryImpl implements DeckTokenRepository {
 
   private final DSLContext dsl;

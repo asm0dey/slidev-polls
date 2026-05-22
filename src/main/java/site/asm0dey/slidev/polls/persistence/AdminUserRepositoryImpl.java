@@ -2,15 +2,15 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.DSLContext;
-import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 import site.asm0dey.slidev.polls.core.service.AdminUserRepository;
 
-@Repository
+@ApplicationScoped
 public class AdminUserRepositoryImpl implements AdminUserRepository {
 
   private final DSLContext dsl;

@@ -10,6 +10,7 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +21,6 @@ import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
-import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
@@ -42,7 +42,7 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
  * on {@link site.asm0dey.slidev.polls.core.service.PollService}); this class does not open its own
  * transactions.
  */
-@Repository
+@ApplicationScoped
 public class PollRepositoryImpl implements PollRepository {
 
   private final DSLContext dsl;
