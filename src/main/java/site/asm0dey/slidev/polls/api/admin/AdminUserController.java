@@ -1,21 +1,23 @@
 package site.asm0dey.slidev.polls.api.admin;
 
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
 import java.util.List;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.jboss.resteasy.reactive.RestResponse;
 import site.asm0dey.slidev.polls.api.admin.dto.CreateUserRequest;
 import site.asm0dey.slidev.polls.api.admin.dto.UserResponse;
 import site.asm0dey.slidev.polls.core.service.AdminUserService;
 import site.asm0dey.slidev.polls.core.service.CreateAdminCommand;
 
-@RestController
-@RequestMapping("/api/admin/users")
+@Path("/api/admin/users")
+@ApplicationScoped
+@RunOnVirtualThread
+@RolesAllowed("ADMIN")
 public class AdminUserController {
 
   private final AdminUserService service;
@@ -24,17 +26,18 @@ public class AdminUserController {
     this.service = service;
   }
 
-  @GetMapping
+  @GET
   public List<UserResponse> list() {
     return service.listAdmins().stream()
         .map(u -> new UserResponse(u.username(), u.createdAt()))
         .toList();
   }
 
-  @PostMapping
-  public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest body) {
+  @POST
+  public RestResponse<UserResponse> create(@Valid CreateUserRequest body) {
     var created = service.createAdmin(new CreateAdminCommand(body.username(), body.password()));
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.createdAt()));
+    return RestResponse.ResponseBuilder.create(
+            RestResponse.Status.CREATED, new UserResponse(created.username(), created.createdAt()))
+        .build();
   }
 }

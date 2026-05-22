@@ -1,13 +1,12 @@
 package site.asm0dey.slidev.polls.api.admin;
 
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import org.jboss.resteasy.reactive.RestResponse;
 import site.asm0dey.slidev.polls.api.admin.dto.SetupRequest;
 import site.asm0dey.slidev.polls.api.admin.dto.SetupStatusResponse;
 import site.asm0dey.slidev.polls.api.admin.dto.UserResponse;
@@ -17,10 +16,11 @@ import site.asm0dey.slidev.polls.core.service.CreateAdminCommand;
 /**
  * First-run bootstrap. Both endpoints are public on the filter chain — the gating happens in the
  * service: createInitialAdmin throws SetupLockedException once admin_user is non-empty, which the
- * GlobalExceptionHandler maps to 409 Problem(SETUP_LOCKED).
+ * DomainExceptionMappers map to 409 Problem(SETUP_LOCKED).
  */
-@RestController
-@RequestMapping("/api/admin/setup")
+@Path("/api/admin/setup")
+@ApplicationScoped
+@RunOnVirtualThread
 public class AdminSetupController {
 
   private final AdminUserService service;
@@ -29,16 +29,18 @@ public class AdminSetupController {
     this.service = service;
   }
 
-  @GetMapping("/status")
+  @GET
+  @Path("/status")
   public SetupStatusResponse status() {
     return new SetupStatusResponse(service.isSetupRequired());
   }
 
-  @PostMapping
-  public ResponseEntity<UserResponse> setup(@Valid @RequestBody SetupRequest body) {
+  @POST
+  public RestResponse<UserResponse> setup(@Valid SetupRequest body) {
     var created =
         service.createInitialAdmin(new CreateAdminCommand(body.username(), body.password()));
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.createdAt()));
+    return RestResponse.ResponseBuilder.create(
+            RestResponse.Status.CREATED, new UserResponse(created.username(), created.createdAt()))
+        .build();
   }
 }
