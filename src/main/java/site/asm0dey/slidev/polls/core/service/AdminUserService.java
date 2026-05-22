@@ -18,8 +18,8 @@ import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 
 /**
  * Manages presenter accounts. The first account is created via {@link #createInitialAdmin} which is
- * gated on an empty table; subsequent accounts go through {@link #createAdmin} which only requires
- * the caller to be authenticated (the controller enforces that, not this class).
+ * gated on an empty table; subsequent accounts go through {@link #createAdmin} which requires
+ * bootstrap-admin authority (the controller enforces that via its admin gate, not this class).
  */
 @Service
 public class AdminUserService {
