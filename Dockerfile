@@ -1,19 +1,24 @@
-# Four-stage build:
+# Three-stage build for the Quarkus GraalVM native image:
 #   1. frontends-builder — bun install + build the voter / backoffice SPAs
 #      (the Slidev addon is consumed in-deck; its dist is irrelevant for the
-#      single-JAR runtime).
-#   2. backend-builder   — mvnw package against the unified project, with
-#      the frontend dists staged under src/main/resources/static. jOOQ
-#      generated sources must already exist in the context — `task codegen`
-#      runs the codegen profile against a running Postgres before the compose
-#      build is invoked by `task up`.
-#   3. aot-trainer       — distroless JRE that extracts the fat JAR into the
-#      Spring Boot layered form and performs the JDK AOT cache training run.
-#      Must share the runtime stage's base image so the cached `lib/modules`
-#      hash matches at load time.
-#   4. runtime           — distroless JRE serving the extracted app + cache
-#      on :8080. Per-layer COPY keeps `lib/` (big, rarely changes) in its
-#      own Docker layer separate from the app jar and AOT cache.
+#      single-binary runtime).
+#   2. native-builder    — the Quarkus Mandrel builder image (GraalVM + JDK 21).
+#      Runs `mvnw package -Dnative` against the unified project with the frontend
+#      dists staged under src/main/resources/META-INF/resources. jOOQ generated
+#      sources must already exist in the build context — `task codegen` runs the
+#      codegen profile against a Postgres on the host before the compose build is
+#      invoked by `task up` (codegen needs Docker, which this stage doesn't have).
+#      Produces target/slidev-polls-*-runner, a dynamically-linked glibc binary.
+#   3. runtime           — quarkus-micro-image (glibc, NOT Alpine/musl) serving
+#      the native binary on :8080 as a non-root user.
+#
+# Env overrides honoured by the runtime container (Quarkus maps env vars to
+# config automatically):
+#   QUARKUS_DATASOURCE_POSTGRES_JDBC_URL  — overrides the prod default localhost URL
+#   QUARKUS_DATASOURCE_POSTGRES_USERNAME  — DB user
+#   QUARKUS_DATASOURCE_POSTGRES_PASSWORD  — DB password
+#   SP_SESSION_KEY                        — session cookie encryption key
+#   APP_DATABASE_VENDOR                   — postgres (default) or h2
 
 FROM oven/bun:1 AS frontends-builder
 WORKDIR /build
@@ -30,7 +35,8 @@ RUN bun run --filter '@slidev-polls/shared'     build \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.3_11-glibc AS backend-builder
+FROM quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 AS native-builder
+USER root
 WORKDIR /src
 
 COPY mvnw ./
@@ -40,44 +46,28 @@ COPY src ./src
 COPY target/generated-sources ./target/generated-sources
 RUN chmod +x mvnw
 
-# Stage the built SPAs into the locations SpaForwardingConfig expects.
-COPY --from=frontends-builder /build/voter/dist/      src/main/resources/static/
-COPY --from=frontends-builder /build/backoffice/dist/ src/main/resources/static/admin/
+# Stage the built SPAs into the locations the static-resource server expects
+# (voter shell + assets/ at the resource root, backoffice under admin/).
+COPY --from=frontends-builder /build/voter/dist/      src/main/resources/META-INF/resources/
+COPY --from=frontends-builder /build/backoffice/dist/ src/main/resources/META-INF/resources/admin/
 
-# Package the fat JAR. Skip tests and spotless — CI and `./mvnw verify` cover
-# those on the host.
-RUN ./mvnw package -DskipTests -Dspotless.check.skip=true
-
-# ---------------------------------------------------------------------------
-
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS aot-trainer
-WORKDIR /app
-COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /tmp/slidev-polls-0.0.1-SNAPSHOT.jar
-
-# Extract into Spring Boot 4 layered form (/app/<jar> + /app/lib/). The output
-# jar takes its name from the input jar's filename, so the input must keep its
-# release-style name to match the runtime ENTRYPOINT.
-RUN ["java", "-Djarmode=tools", "-jar", "/tmp/slidev-polls-0.0.1-SNAPSHOT.jar", "extract", "--destination", "/app"]
-
-# JDK AOT cache training run. Disable Flyway and let HikariCP fail-fast off
-# so the context can refresh against a dummy DataSource — Flyway's autoconfig
-# condition re-evaluates at runtime (the cache is class-loading data, not a
-# pre-baked bean factory) and reaches the real Postgres there.
-RUN ["java", \
-     "-Dspring.flyway.enabled=false", \
-     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/aot-training", \
-     "-Dspring.datasource.hikari.initialization-fail-timeout=-1", \
-     "-XX:AOTCacheOutput=/app/app.aot", \
-     "-Dspring.context.exit=onRefresh", \
-     "-jar", "/app/slidev-polls-0.0.1-SNAPSHOT.jar"]
+# Build the native binary. This stage already IS the GraalVM environment, so we
+# do NOT pass -Dquarkus.native.container-build=true. Native build args (e.g. the
+# initialize-at-run-time list) live in application.properties so they apply here.
+# Skip tests and spotless — CI and `./mvnw verify` cover those on the host.
+RUN ./mvnw package -Dnative -Dmaven.test.skip=true -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS runtime
-WORKDIR /app
-COPY --from=aot-trainer /app/lib/ /app/lib/
-COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
-COPY --from=aot-trainer /app/app.aot /app/
+FROM quay.io/quarkus/quarkus-micro-image:2.0 AS runtime
+WORKDIR /work/
+RUN chown 1001 /work \
+    && chmod "g+rwX" /work \
+    && chown 1001:root /work
+COPY --from=native-builder --chown=1001:root /src/target/*-runner /work/application
+RUN chmod 775 /work/application
+
 EXPOSE 8080
-ENV JDK_JAVA_OPTIONS=""
-ENTRYPOINT ["java", "-XX:AOTCache=app.aot", "-jar", "slidev-polls-0.0.1-SNAPSHOT.jar"]
+USER 1001
+
+ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0", "-Dquarkus.http.port=8080"]
