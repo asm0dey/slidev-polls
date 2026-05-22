@@ -51,7 +51,8 @@ public class DeckTokenService {
     String hash = sha256(plaintext);
     DeckToken saved =
         repository.insert(
-            new DeckToken(UUID.randomUUID(), pollId, hash, label, Instant.now(), null));
+            new DeckToken(
+                UUID.randomUUID(), pollId, hash, label, Instant.now(), null, ownerUsername));
     return new Minted(saved, plaintext);
   }
 
