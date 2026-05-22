@@ -4,19 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
-        <relativePath/>
-    </parent>
-
     <groupId>site.asm0dey.slidev.polls</groupId>
     <artifactId>slidev-polls</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>slidev-polls</name>
-    <description>Slidev Polls — unified Spring Boot application</description>
+    <description>Slidev Polls — unified Quarkus application</description>
     <url>https://github.com/asm0dey/slidev-polls</url>
 
     <licenses>
@@ -45,69 +38,134 @@
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!--
+          Quarkus 3.15.x is the LTS line that quarkiverse quarkus-jooq 2.1.0 was
+          built against (its parent pins quarkus.version=3.15.1); 3.15.7 is the
+          latest LTS patch and stays API-compatible with the extension's core
+          deps (agroal, narayana-jta, arc).
+        -->
+        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+        <quarkus.platform.version>3.15.7</quarkus.platform.version>
+        <quarkus-jooq.version>2.1.0</quarkus-jooq.version>
+
+        <!--
+          jOOQ runtime version shipped by quarkus-jooq 2.1.0 (its parent pins
+          org.jooq.version=3.19.22). The codegen profile below references
+          ${jooq.version}; runtime and codegen MUST agree to avoid the symbol
+          drift the codegen plugin defaults to (it emits newer codegen symbols
+          absent from the runtime jar otherwise).
+        -->
+        <jooq.version>3.19.22</jooq.version>
+
         <db.codegen.schema>polls_codegen</db.codegen.schema>
         <postgresql.version>42.7.11</postgresql.version>
+        <!--
+          testcontainers used only by the codegen plugin's testcontainers-jooq
+          plugin dependency (org.testcontainers:testcontainers-postgresql, which
+          is published only in the 2.0.x line). Previously inherited from the
+          Spring Boot parent; pinned explicitly now that the parent is gone.
+        -->
+        <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-jooq-codegen-maven-plugin.version>1.0.0</testcontainers-jooq-codegen-maven-plugin.version>
+
+        <compiler-plugin.version>3.13.0</compiler-plugin.version>
+        <surefire-plugin.version>3.2.5</surefire-plugin.version>
+        <maven.compiler.parameters>true</maven.compiler.parameters>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
-        <!-- Web + security + validation -->
+        <!-- Web + JSON + validation -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-validator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-vertx-http</artifactId>
+        </dependency>
+
+        <!-- Persistence -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-narayana-jta</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.jooq</groupId>
+            <artifactId>quarkus-jooq</artifactId>
+            <version>${quarkus-jooq.version}</version>
+        </dependency>
+
+        <!-- Security -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-elytron-security</artifactId>
         </dependency>
         <!--
-          Argon2PasswordEncoder (SecurityConfig#passwordEncoder) delegates
-          to org.bouncycastle.crypto.generators.Argon2BytesGenerator.
-          Spring Security ships the encoder but not the BC primitive.
-          Recorded under Constitution §VIII: justified by the
-          password-hashing upgrade documented in
+          quarkus-csrf-reactive was relocated to quarkus-rest-csrf (Quarkus
+          Migration Guide 3.9); use the current artifactId. CSRF wiring for the
+          JSON admin flow is configured in Phase 4 (design risk R2).
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-csrf</artifactId>
+        </dependency>
+
+        <!-- Scheduling -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+
+        <!--
+          Argon2 primitive. Argon2PasswordHasher (Phase 4) wraps
+          org.bouncycastle.crypto.generators.Argon2BytesGenerator, replacing the
+          old Spring Argon2PasswordEncoder. Recorded under Constitution §VIII:
+          justified by the password-hashing upgrade documented in
           docs/superpowers/specs/2026-05-09-replace-hardcoded-admin-credentials-design.md.
         -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
             <version>1.84</version>
-        </dependency>
-
-        <!-- Persistence -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jooq</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jackson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-flyway</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-        </dependency>
-        <dependency>
-            <!--
-              H2 is on the compile classpath (rather than runtime) because
-              site.asm0dey.slidev.polls.persistence.h2.TouchPollUpdatedAtTrigger
-              implements org.h2.api.Trigger and is referenced by name from the
-              H2 migration that creates the poll_questions_touch_polls trigger.
-            -->
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
         </dependency>
 
         <!-- QR generation -->
@@ -122,35 +180,33 @@
             <version>3.5.4</version>
         </dependency>
 
-        <!-- Test -->
+        <!--
+          jOOQ runtime is pulled transitively by quarkus-jooq (pinned to
+          ${jooq.version}=3.19.22 by the extension); no explicit dependency
+          needed here.
+        -->
+
+        <!-- H2 for tests only (the test-only TouchPollUpdatedAtTrigger and H2 test migrations). -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Tests -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit5</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-test-security</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-postgresql</artifactId>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -158,11 +214,19 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>site.asm0dey.slidev.polls.api.PollApiApplication</mainClass>
-                </configuration>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!--
@@ -195,8 +259,7 @@
             </plugin>
 
             <!--
-              Failsafe runs `*IT.java` at integration-test / verify. Spring
-              Boot's parent only manages the version; binding lives here.
+              Failsafe runs `*IT.java` at integration-test / verify.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -267,7 +330,7 @@
                                 <version>${postgresql.version}</version>
                             </dependency>
                             <!--
-                              Pin jOOQ tooling to the runtime BOM (3.19.32).
+                              Pin jOOQ tooling to the runtime version (3.19.22).
                               The plugin defaults to a newer codegen that
                               emits symbols absent from the runtime jar.
                             -->
@@ -339,6 +402,20 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+
+        <profile>
+            <id>native</id>
+            <activation>
+                <property>
+                    <name>native</name>
+                </property>
+            </activation>
+            <properties>
+                <skipITs>false</skipITs>
+                <quarkus.native.enabled>true</quarkus.native.enabled>
+                <quarkus.package.jar.enabled>false</quarkus.package.jar.enabled>
+            </properties>
         </profile>
     </profiles>
 </project>
