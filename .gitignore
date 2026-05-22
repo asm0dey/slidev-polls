@@ -35,6 +35,3 @@ src/main/resources/META-INF/resources/
 # values do not collide.
 frontends/slidev-demo/data.ts
 .superpowers/
-
-# Parked Spring tests awaiting Quarkus port
-src/test/.pending-port/
