@@ -140,6 +140,21 @@ public class DomainExceptionMappers {
   // win because resteasy-reactive resolves the most specific declared type first.
   @ServerExceptionMapper
   public RestResponse<Problem> mapUnexpected(Exception ex) {
+    // A user-defined @ServerExceptionMapper for Exception is MORE specific than resteasy-reactive's
+    // built-in WebApplicationException handling, so framework-thrown status carriers (a 404 for an
+    // unmatched route, a 405 for a bad method, etc.) would otherwise be rewritten to 500 here.
+    // Preserve their declared status + code instead of masking them as a TRANSPORT_FAILURE.
+    if (ex instanceof jakarta.ws.rs.WebApplicationException wae) {
+      int statusCode = wae.getResponse().getStatus();
+      Response.Status status = Response.Status.fromStatusCode(statusCode);
+      if (status != null) {
+        ProblemCode code =
+            statusCode == Response.Status.NOT_FOUND.getStatusCode()
+                ? ProblemCode.NOT_FOUND
+                : ProblemCode.TRANSPORT_FAILURE;
+        return respond(status, code, status.getReasonPhrase());
+      }
+    }
     LOG.error("unexpected server fault", ex);
     return respond(
         Response.Status.INTERNAL_SERVER_ERROR,

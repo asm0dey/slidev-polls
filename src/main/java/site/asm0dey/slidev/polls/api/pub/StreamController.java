@@ -61,7 +61,12 @@ public class StreamController {
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
 
     SnapshotPayload initial = snapshots.build(poll, Instant.now());
-    sink.send(sse.newEventBuilder().name("snapshot").data(initial).build());
+    sink.send(
+        sse.newEventBuilder()
+            .name("snapshot")
+            .mediaType(MediaType.APPLICATION_JSON_TYPE)
+            .data(initial)
+            .build());
     hub.register(poll.id(), sink);
   }
 }

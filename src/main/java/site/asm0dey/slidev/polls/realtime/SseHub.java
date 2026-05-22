@@ -86,7 +86,12 @@ public class SseHub {
     if (broadcaster == null) {
       return;
     }
-    broadcaster.broadcast(sse.newEventBuilder().name(eventName).data(payload).build());
+    broadcaster.broadcast(
+        sse.newEventBuilder()
+            .name(eventName)
+            .mediaType(jakarta.ws.rs.core.MediaType.APPLICATION_JSON_TYPE)
+            .data(payload)
+            .build());
   }
 
   /** Visible for tests: number of live subscribers on {@code pollId}. */
