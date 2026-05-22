@@ -11,6 +11,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
+import site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException;
+import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 
@@ -103,6 +105,39 @@ public class AdminUserService {
       throw new UsernameTakenException(command.username());
     }
     return new AdminUser(command.username(), Instant.now());
+  }
+
+  /**
+   * Self-service change. Verifies {@code currentPassword} against the stored Argon2 hash, then
+   * re-encodes {@code newPassword}. Does not touch sessions — the controller revokes the user's
+   * other sessions after this returns.
+   *
+   * @throws site.asm0dey.slidev.polls.core.error.NotFoundException if the user does not exist
+   * @throws site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException on a wrong
+   *     current
+   */
+  @Transactional
+  public void changeOwnPassword(String username, String currentPassword, String newPassword) {
+    String hash =
+        repository.findPasswordHash(username).orElseThrow(() -> new NotFoundException(username));
+    if (!passwordEncoder.matches(currentPassword, hash)) {
+      throw new CurrentPasswordMismatchException();
+    }
+    repository.updatePasswordHash(username, passwordEncoder.encode(newPassword));
+  }
+
+  /**
+   * Admin reset. No current-password check — caller authorization (bootstrap admin) is enforced by
+   * the controller. The controller revokes all of the target's sessions after this returns.
+   *
+   * @throws site.asm0dey.slidev.polls.core.error.NotFoundException if the target does not exist
+   */
+  @Transactional
+  public void resetPassword(String targetUsername, String newPassword) {
+    if (repository.findPasswordHash(targetUsername).isEmpty()) {
+      throw new NotFoundException(targetUsername);
+    }
+    repository.updatePasswordHash(targetUsername, passwordEncoder.encode(newPassword));
   }
 
   public List<AdminUser> listAdmins() {
