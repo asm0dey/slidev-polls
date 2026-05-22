@@ -18,8 +18,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-import javax.sql.DataSource;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -35,10 +35,10 @@ import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
  * race to insert a vote on the same question for the same voter_token; exactly one row lands, the
  * other's insert surfaces as {@link AlreadyVotedException}.
  *
- * <p>Ported to {@code @QuarkusTest}: Postgres uses the application's injected {@code @Default}
- * {@link DSLContext} (Dev Services Postgres); H2 uses a self-contained raw-H2 {@link DSLContext}.
- * The {@code @Nested} engine subclasses were flattened into per-engine test methods. The repository
- * maps jOOQ's own {@link org.jooq.exception.IntegrityConstraintViolationException} (no Spring
+ * <p>Postgres uses the application's injected {@code @Default} {@link DSLContext} (the JVM-wide Dev
+ * Services Postgres); H2 uses a fresh self-contained raw-H2 {@link DSLContext} per test. The shared
+ * test body lives on {@link Base} and runs once per {@code @Nested} engine. The repository maps
+ * jOOQ's own {@link org.jooq.exception.IntegrityConstraintViolationException} (no Spring
  * translator) to {@link AlreadyVotedException}.
  */
 @QuarkusTest
@@ -46,20 +46,33 @@ class DuplicateVoteRaceIT {
 
   @Inject DSLContext pgDsl;
 
-  // @TS-024 — two submissions with the same voter_token arrive concurrently; exactly one lands.
-  @Test
-  void concurrent_duplicate_submissions_yield_exactly_one_recorded_vote_postgres()
-      throws Exception {
-    seedOwner(pgDsl);
-    runRace(pgDsl);
+  abstract class Base {
+
+    abstract DSLContext dsl();
+
+    // @TS-024 — two submissions with the same voter_token arrive concurrently; exactly one lands.
+    @Test
+    void concurrent_duplicate_submissions_yield_exactly_one_recorded_vote() throws Exception {
+      DSLContext dsl = dsl();
+      seedOwner(dsl);
+      runRace(dsl);
+    }
   }
 
-  @Test
-  void concurrent_duplicate_submissions_yield_exactly_one_recorded_vote_h2() throws Exception {
-    DataSource ds = AbstractH2Test.freshH2();
-    DSLContext dsl = AbstractH2Test.dsl(ds);
-    seedOwner(dsl);
-    runRace(dsl);
+  @Nested
+  class Postgres extends Base {
+    @Override
+    DSLContext dsl() {
+      return pgDsl;
+    }
+  }
+
+  @Nested
+  class H2 extends Base {
+    @Override
+    DSLContext dsl() {
+      return AbstractH2Test.dsl(AbstractH2Test.freshH2());
+    }
   }
 
   private static void seedOwner(DSLContext dsl) {

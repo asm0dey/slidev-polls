@@ -14,8 +14,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.sql.DataSource;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
@@ -29,9 +29,9 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
  * {@code activateQuestion}/{@code closeActiveQuestion}; the single-statement CASE UPDATEs run on
  * the ambient transaction and per-statement atomicity keeps the storm consistent.
  *
- * <p>Ported to {@code @QuarkusTest}: Postgres uses the application's injected {@code @Default}
- * {@link DSLContext} (Dev Services Postgres); H2 uses a self-contained raw-H2 {@link DSLContext}.
- * The {@code @Nested} engine subclasses were flattened into per-engine test methods.
+ * <p>The shared storm body lives on {@link Base} and runs once per {@code @Nested} engine. Postgres
+ * uses the application's injected {@code @Default} {@link DSLContext} (JVM-wide Dev Services
+ * Postgres); H2 uses a fresh self-contained raw-H2 {@link DSLContext} per test.
  */
 @QuarkusTest
 class PollActivateDeadlockIT {
@@ -41,18 +41,32 @@ class PollActivateDeadlockIT {
 
   @Inject DSLContext pgDsl;
 
-  @Test
-  void interleaved_activate_and_header_update_does_not_deadlock_postgres() throws Exception {
-    seedOwner(pgDsl);
-    runStorm(pgDsl);
+  abstract class Base {
+
+    abstract DSLContext dsl();
+
+    @Test
+    void interleaved_activate_and_header_update_does_not_deadlock() throws Exception {
+      DSLContext dsl = dsl();
+      seedOwner(dsl);
+      runStorm(dsl);
+    }
   }
 
-  @Test
-  void interleaved_activate_and_header_update_does_not_deadlock_h2() throws Exception {
-    DataSource ds = AbstractH2Test.freshH2();
-    DSLContext dsl = AbstractH2Test.dsl(ds);
-    seedOwner(dsl);
-    runStorm(dsl);
+  @Nested
+  class Postgres extends Base {
+    @Override
+    DSLContext dsl() {
+      return pgDsl;
+    }
+  }
+
+  @Nested
+  class H2 extends Base {
+    @Override
+    DSLContext dsl() {
+      return AbstractH2Test.dsl(AbstractH2Test.freshH2());
+    }
   }
 
   private static void seedOwner(DSLContext dsl) {
