@@ -77,6 +77,13 @@
           (it COPYs target/generated-sources and has no Docker daemon inside).
         -->
         <db.codegen.skip>false</db.codegen.skip>
+        <!--
+          The black-box SmokeIT (@QuarkusIntegrationTest, tagged `smoke`) runs
+          in its own isolated Failsafe execution (`smoke-it`). It is skipped by
+          default so a plain `verify` never packages+launches the artifact; the
+          `smoke` and `native` profiles set this false to run it.
+        -->
+        <skip.smoke.it>true</skip.smoke.it>
         <postgresql.version>42.7.11</postgresql.version>
         <!--
           testcontainers used only by the codegen plugin's testcontainers-jooq
@@ -352,15 +359,59 @@
                     <systemPropertyVariables>
                         <api.version>1.43</api.version>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <!--
+                          @QuarkusIntegrationTest reflectively invokes every registered
+                          QuarkusTest*Callback against its launched-process context. The
+                          quarkus-test-security and mockito callbacks expect a
+                          QuarkusTestMethodContext/QuarkusTestContext loaded by a different
+                          classloader, so getMethod throws NoSuchMethodException and breaks
+                          SmokeIT. These callbacks are only meaningful for in-JVM @QuarkusTest
+                          (no `*IT` uses @TestSecurity/@InjectMock — they live in `*Test`
+                          surefire classes), so keep them off the IT path. The flag defaults
+                          false but is pinned here so the launched IT never tries to run them.
+                        -->
+                        <quarkus.test.enable-callbacks-for-integration-tests>false</quarkus.test.enable-callbacks-for-integration-tests>
                     </systemPropertyVariables>
                 </configuration>
                 <executions>
+                    <!--
+                      Default IT run: the in-JVM @QuarkusTest-backed `*IT` suite. The black-box
+                      SmokeIT (tagged `smoke`) is always excluded here — it must run in its own
+                      fork because a @QuarkusTest in the shared JVM enables the QuarkusTest*Callback
+                      machinery, which then blows up the @QuarkusIntegrationTest launch with a
+                      cross-classloader NoSuchMethodException on the security/mockito callbacks.
+                    -->
                     <execution>
                         <id>default-it</id>
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
                         </goals>
+                        <configuration>
+                            <excludedGroups>smoke</excludedGroups>
+                        </configuration>
+                    </execution>
+                    <!--
+                      Dedicated, isolated execution for the black-box SmokeIT
+                      (@QuarkusIntegrationTest). Skipped by default; the `smoke` and `native`
+                      profiles flip ${skip.smoke.it} to false. Runs ONLY SmokeIT in a fresh forked
+                      JVM (own reports dir) so no @QuarkusTest has primed the callback machinery.
+                    -->
+                    <execution>
+                        <id>smoke-it</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skip.smoke.it}</skip>
+                            <groups>smoke</groups>
+                            <includes>
+                                <include>**/SmokeIT.java</include>
+                            </includes>
+                            <reportsDirectory>${project.build.directory}/failsafe-reports-smoke</reportsDirectory>
+                            <summaryFile>${project.build.directory}/failsafe-reports-smoke/failsafe-summary.xml</summaryFile>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -499,6 +550,19 @@
             <id>codegen</id>
         </profile>
 
+        <!--
+          Opt-in profile that runs the black-box SmokeIT (@QuarkusIntegrationTest,
+          tagged `smoke`) against the packaged jar: empties the Failsafe
+          excludedGroups so the `smoke` tag is no longer filtered out. Use:
+          `./mvnw verify -Psmoke`.
+        -->
+        <profile>
+            <id>smoke</id>
+            <properties>
+                <skip.smoke.it>false</skip.smoke.it>
+            </properties>
+        </profile>
+
         <profile>
             <id>native</id>
             <activation>
@@ -510,6 +574,8 @@
                 <skipITs>false</skipITs>
                 <quarkus.native.enabled>true</quarkus.native.enabled>
                 <quarkus.package.jar.enabled>false</quarkus.package.jar.enabled>
+                <!-- Run SmokeIT against the native image: the QR/native path is the point. -->
+                <skip.smoke.it>false</skip.smoke.it>
             </properties>
         </profile>
     </profiles>
