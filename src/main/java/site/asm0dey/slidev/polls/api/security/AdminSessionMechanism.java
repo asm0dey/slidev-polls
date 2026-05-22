@@ -73,6 +73,13 @@ public class AdminSessionMechanism implements HttpAuthenticationMechanism {
 
   @Override
   public Uni<Boolean> sendChallenge(RoutingContext context) {
+    // Defer on deck paths so the DeckTokenMechanism owns their DECK_TOKEN_INVALID envelope; this
+    // mechanism writes AUTH_REQUIRED for everything else. Path-scoping both mechanisms makes the
+    // emitted code independent of Quarkus' (unstable) challenge-mechanism selection order.
+    String path = context.normalizedPath();
+    if (path != null && path.startsWith("/api/deck/")) {
+      return Uni.createFrom().item(false);
+    }
     return ProblemChallengeWriter.send(
         context, objectMapper, 401, ProblemCode.AUTH_REQUIRED, "authentication required");
   }

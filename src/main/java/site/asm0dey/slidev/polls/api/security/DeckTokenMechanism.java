@@ -89,6 +89,15 @@ public class DeckTokenMechanism implements HttpAuthenticationMechanism {
 
   @Override
   public Uni<Boolean> sendChallenge(RoutingContext context) {
+    // Only own the challenge for deck paths. Quarkus may pick any registered mechanism to send the
+    // 401 for an unauthenticated request; if this one were to fire on an /api/admin/** request it
+    // would mislabel the envelope DECK_TOKEN_INVALID. Defer (return false) on non-deck paths so the
+    // AdminSessionMechanism writes AUTH_REQUIRED instead. The selection order is otherwise unstable
+    // across runs, which surfaced as a flaky AUTH_REQUIRED-vs-DECK_TOKEN_INVALID assertion.
+    String path = context.normalizedPath();
+    if (path == null || !path.startsWith(DECK_PATH_PREFIX)) {
+      return Uni.createFrom().item(false);
+    }
     return ProblemChallengeWriter.send(
         context,
         objectMapper,
