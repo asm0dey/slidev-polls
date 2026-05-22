@@ -2,16 +2,13 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import java.util.List;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import site.asm0dey.slidev.polls.api.PollApiApplication;
-import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
+import site.asm0dey.slidev.polls.api.security.Argon2PasswordHasher;
 import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
 import site.asm0dey.slidev.polls.core.service.PollRepository;
@@ -19,20 +16,22 @@ import site.asm0dey.slidev.polls.core.service.PollService;
 
 /**
  * Verifies that per-question arity ({@code min_selections}, {@code max_selections}) round-trips
- * through {@link PollRepositoryImpl}'s insert path and multiset hydration. Boots the real
- * application against Testcontainers Postgres so the column defaults / NOT NULL constraints from
- * Flyway V11 are exercised end-to-end.
+ * through {@link PollRepositoryImpl}'s insert path and multiset hydration. Exercised end-to-end via
+ * the application's {@link PollService} so the column defaults / NOT NULL constraints from Flyway
+ * are exercised.
+ *
+ * <p>Ported to {@code @QuarkusTest}: the prior {@code @SpringBootTest} + Testcontainers boot is
+ * replaced by Dev Services Postgres and CDI injection of the production beans; the presenter admin
+ * row is seeded via {@link AdminUserTestFixtures} against the injected {@code @Default} {@link
+ * DSLContext}.
  */
-@SpringBootTest(
-    classes = PollApiApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@Import(TestcontainersConfiguration.class)
+@QuarkusTest
 class PollRepositoryImplArityRoundTripIT {
 
-  @Autowired PollService pollService;
-  @Autowired PollRepository pollRepository;
-  @Autowired DSLContext dsl;
-  @Autowired PasswordEncoder encoder;
+  @Inject PollService pollService;
+  @Inject PollRepository pollRepository;
+  @Inject DSLContext dsl;
+  @Inject Argon2PasswordHasher encoder;
 
   @BeforeEach
   void seedPresenter() {

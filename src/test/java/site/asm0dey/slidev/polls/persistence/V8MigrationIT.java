@@ -2,23 +2,22 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.quarkus.test.junit.QuarkusTest;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
-import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-@Testcontainers
-class V8MigrationIT {
-
-  @Container
-  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
+/**
+ * V8 drops the polls.style column. Ported to {@code @QuarkusTest}: a throwaway database on the Dev
+ * Services Postgres server (via {@link #freshPgDatabase()}) replaces the prior Testcontainers
+ * Postgres.
+ */
+@QuarkusTest
+class V8MigrationIT extends AbstractPostgresTest {
 
   @Test
   void style_column_is_gone_after_V8() throws Exception {
-    DataSource ds = ds();
+    DataSource ds = freshPgDatabase();
     Flyway.configure()
         .dataSource(ds)
         .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
@@ -33,13 +32,5 @@ class V8MigrationIT {
       rs.next();
       assertThat(rs.getInt(1)).isZero();
     }
-  }
-
-  private static DataSource ds() {
-    PGSimpleDataSource ds = new PGSimpleDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUser(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
-    return ds;
   }
 }

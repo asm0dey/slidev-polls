@@ -2,6 +2,7 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.quarkus.test.junit.QuarkusTest;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -9,20 +10,20 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
-import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.Test;
-import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * Asserts that the post-V9 PostgreSQL schema and the H2 V1 baseline have the same set of (table,
+ * Asserts that the post-V9 PostgreSQL schema and the H2 baseline have the same set of (table,
  * column, is_nullable, is_generated) tuples for every domain table jOOQ codegen includes. Drift
  * would silently break the H2 runtime because codegen runs against PG only.
+ *
+ * <p>Ported to {@code @QuarkusTest}: the Postgres side runs against a throwaway database on the Dev
+ * Services Postgres server (via {@link #freshPgDatabase()}); the H2 side uses the same
+ * self-contained raw-H2 baseline {@link AbstractH2Test#freshH2()} that the application's H2
+ * datasource is built on.
  */
-@Testcontainers
-class SchemaSymmetryIT {
+@QuarkusTest
+class SchemaSymmetryIT extends AbstractPostgresTest {
 
   private static final Set<String> TABLES =
       Set.of(
@@ -34,13 +35,10 @@ class SchemaSymmetryIT {
           "votes",
           "deck_tokens");
 
-  @Container
-  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
-
   @Test
   void h2_baseline_matches_post_V9_postgres_columns() throws Exception {
     Set<String> pgCols = columnsFrom(pgDataSourceAfterAllPgMigrations());
-    Set<String> h2Cols = columnsFrom(h2DataSourceAfterBaseline());
+    Set<String> h2Cols = columnsFrom(AbstractH2Test.freshH2());
 
     assertThat(h2Cols)
         .as("H2 baseline must define the same columns as the post-V9 Postgres schema")
@@ -80,29 +78,11 @@ class SchemaSymmetryIT {
     return v == null ? "NEVER" : v.toUpperCase();
   }
 
-  private static DataSource pgDataSourceAfterAllPgMigrations() {
-    PGSimpleDataSource ds = new PGSimpleDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUser(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
+  private DataSource pgDataSourceAfterAllPgMigrations() {
+    DataSource ds = freshPgDatabase();
     Flyway.configure()
         .dataSource(ds)
         .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-        .load()
-        .migrate();
-    return ds;
-  }
-
-  private static DataSource h2DataSourceAfterBaseline() {
-    JdbcDataSource ds = new JdbcDataSource();
-    ds.setURL(
-        "jdbc:h2:mem:sym_"
-            + System.nanoTime()
-            + ";DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1");
-    ds.setUser("sa");
-    Flyway.configure()
-        .dataSource(ds)
-        .locations("classpath:db/migration/h2", "classpath:db/migration/common")
         .load()
         .migrate();
     return ds;

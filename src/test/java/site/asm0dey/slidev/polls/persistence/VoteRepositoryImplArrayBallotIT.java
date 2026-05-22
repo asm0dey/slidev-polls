@@ -1,0 +1,182 @@
+package site.asm0dey.slidev.polls.persistence;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
+
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.Test;
+import site.asm0dey.slidev.polls.core.domain.Option;
+import site.asm0dey.slidev.polls.core.domain.Poll;
+import site.asm0dey.slidev.polls.core.domain.PollStatus;
+import site.asm0dey.slidev.polls.core.domain.Question;
+import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
+import site.asm0dey.slidev.polls.core.domain.Vote;
+import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
+
+/**
+ * Storage-level coverage for the array-valued ballot shape. Every vote row stores its full ballot
+ * in {@code option_ids uuid[]}; the tally projection unnests that array so a single ballot can
+ * contribute counts to every option it selected. Run under both Postgres and H2.
+ *
+ * <p>Ported to {@code @QuarkusTest}: Postgres uses the application's injected {@code @Default}
+ * {@link DSLContext} (Dev Services Postgres); H2 uses a self-contained raw-H2 {@link DSLContext}.
+ * The {@code @Nested} engine subclasses were flattened into per-engine test methods.
+ */
+@QuarkusTest
+class VoteRepositoryImplArrayBallotIT {
+
+  record P(UUID pollId, UUID questionId, List<UUID> options) {}
+
+  @Inject DSLContext pgDsl;
+
+  private static void seedOwner(DSLContext dsl) {
+    dsl.insertInto(ADMIN_USER)
+        .set(ADMIN_USER.USERNAME, "array-owner")
+        .set(ADMIN_USER.PASSWORD_HASH, "n/a")
+        .set(ADMIN_USER.CREATED_AT, OffsetDateTime.now())
+        .onConflictDoNothing()
+        .execute();
+  }
+
+  private static DSLContext h2() {
+    return AbstractH2Test.dsl(AbstractH2Test.freshH2());
+  }
+
+  @Test
+  void storesArrayBallotAsSingleRow_postgres() {
+    seedOwner(pgDsl);
+    storesArrayBallotAsSingleRow(pgDsl);
+  }
+
+  @Test
+  void storesArrayBallotAsSingleRow_h2() {
+    DSLContext dsl = h2();
+    seedOwner(dsl);
+    storesArrayBallotAsSingleRow(dsl);
+  }
+
+  private void storesArrayBallotAsSingleRow(DSLContext dsl) {
+    VoteRepositoryImpl voteRepository = new VoteRepositoryImpl(dsl);
+    P p = activateMultiQuestion(dsl, 3, 1, 3);
+    UUID a = p.options().get(0);
+    UUID c = p.options().get(2);
+
+    Vote stored =
+        voteRepository.insert(
+            new Vote(
+                UUID.randomUUID(),
+                p.pollId(),
+                p.questionId(),
+                List.of(a, c),
+                "voter-1",
+                Instant.now()));
+
+    assertThat(stored.optionIds()).containsExactly(a, c);
+    assertThat(voteRepository.tally(p.questionId())).containsEntry(a, 1L).containsEntry(c, 1L);
+    assertThat(voteRepository.alreadyVoted(p.questionId(), "voter-1")).isTrue();
+  }
+
+  @Test
+  void emptyBallotStoredAsRow_postgres() {
+    seedOwner(pgDsl);
+    emptyBallotStoredAsRow(pgDsl);
+  }
+
+  @Test
+  void emptyBallotStoredAsRow_h2() {
+    DSLContext dsl = h2();
+    seedOwner(dsl);
+    emptyBallotStoredAsRow(dsl);
+  }
+
+  private void emptyBallotStoredAsRow(DSLContext dsl) {
+    VoteRepositoryImpl voteRepository = new VoteRepositoryImpl(dsl);
+    P p = activateMultiQuestion(dsl, 3, 0, 3);
+
+    Vote stored =
+        voteRepository.insert(
+            new Vote(
+                UUID.randomUUID(),
+                p.pollId(),
+                p.questionId(),
+                List.of(),
+                "abstainer",
+                Instant.now()));
+
+    assertThat(stored.optionIds()).isEmpty();
+    assertThat(voteRepository.alreadyVoted(p.questionId(), "abstainer")).isTrue();
+    assertThat(voteRepository.tally(p.questionId())).isEmpty();
+  }
+
+  @Test
+  void secondBallotFromSameVoterRejected_postgres() {
+    seedOwner(pgDsl);
+    secondBallotFromSameVoterRejected(pgDsl);
+  }
+
+  @Test
+  void secondBallotFromSameVoterRejected_h2() {
+    DSLContext dsl = h2();
+    seedOwner(dsl);
+    secondBallotFromSameVoterRejected(dsl);
+  }
+
+  private void secondBallotFromSameVoterRejected(DSLContext dsl) {
+    VoteRepositoryImpl voteRepository = new VoteRepositoryImpl(dsl);
+    P p = activateMultiQuestion(dsl, 3, 0, 3);
+    UUID a = p.options().get(0);
+    voteRepository.insert(
+        new Vote(
+            UUID.randomUUID(), p.pollId(), p.questionId(), List.of(a), "voter", Instant.now()));
+
+    assertThatThrownBy(
+            () ->
+                voteRepository.insert(
+                    new Vote(
+                        UUID.randomUUID(),
+                        p.pollId(),
+                        p.questionId(),
+                        List.of(a),
+                        "voter",
+                        Instant.now())))
+        .isInstanceOf(AlreadyVotedException.class);
+  }
+
+  private P activateMultiQuestion(DSLContext dsl, int options, int min, int max) {
+    PollRepositoryImpl pollRepository = new PollRepositoryImpl(dsl);
+    UUID pollId = UUID.randomUUID();
+    UUID questionId = UUID.randomUUID();
+    List<Option> opts = new ArrayList<>(options);
+    List<UUID> optionIds = new ArrayList<>(options);
+    for (int i = 0; i < options; i++) {
+      UUID oid = UUID.randomUUID();
+      optionIds.add(oid);
+      opts.add(new Option(oid, questionId, "opt-" + i, i));
+    }
+    Poll draft =
+        new Poll(
+            pollId,
+            "array-owner",
+            "Array poll",
+            "array-" + pollId.toString().substring(0, 8),
+            PollStatus.DRAFT,
+            null,
+            List.of(
+                new Question(
+                    questionId, pollId, "Q?", 0, QuestionStatus.DRAFT, min, max, opts, null, null)),
+            List.of(),
+            null,
+            null);
+    pollRepository.insert(draft);
+    pollRepository.activateQuestion(pollId, questionId);
+    return new P(pollId, questionId, List.copyOf(optionIds));
+  }
+}

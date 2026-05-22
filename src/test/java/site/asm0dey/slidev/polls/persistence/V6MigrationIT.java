@@ -4,35 +4,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 
+import io.quarkus.test.junit.QuarkusTest;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-// V6 must (a) delete polls owned by alice (cascading children), (b) delete the alice
-// admin_user row, (c) rename admin_user.bcrypt_hash to admin_user.password_hash.
-// Verified by stopping migrations at V5, seeding alice + a poll, then running V6.
-@Testcontainers
-class V6MigrationIT {
-
-  @Container
-  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
+/**
+ * V6 must (a) delete polls owned by alice (cascading children), (b) delete the alice admin_user
+ * row, (c) rename admin_user.bcrypt_hash to admin_user.password_hash. Verified by stopping
+ * migrations at V5, seeding alice + a poll, then running V6.
+ *
+ * <p>Ported to {@code @QuarkusTest}: the prior Testcontainers Postgres is replaced by a throwaway
+ * database provisioned on the Dev Services Postgres server via {@link #freshPgDatabase()}, so
+ * Flyway can be driven at controlled {@code target} versions against a pristine schema.
+ */
+@QuarkusTest
+class V6MigrationIT extends AbstractPostgresTest {
 
   @Test
   void v6DeletesSeedAliceWithOwnedPollsAndRenamesHashColumn() {
-    Flyway upToV5 =
-        Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-            .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-            .target("5")
-            .load();
-    upToV5.migrate();
+    DataSource ds = freshPgDatabase();
+    Flyway.configure()
+        .dataSource(ds)
+        .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
+        .target("5")
+        .load()
+        .migrate();
 
-    try (var dsl =
-        DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+    var dsl = DSL.using(ds, org.jooq.SQLDialect.POSTGRES);
+    {
       // Pre-V6 state: the bcrypt_hash column still exists on the V5 schema, but the
       // jOOQ-generated Tables.ADMIN_USER reflects the post-V6 schema (password_hash).
       // Raw SQL is the only option here; V3 already seeded alice so ON CONFLICT keeps
@@ -49,13 +51,12 @@ class V6MigrationIT {
               + "VALUES (?, 'alice', 'doomed', 'doomed', 'DRAFT', now(), now())",
           pollId);
 
-      Flyway upToV6 =
-          Flyway.configure()
-              .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-              .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-              .target("6")
-              .load();
-      upToV6.migrate();
+      Flyway.configure()
+          .dataSource(ds)
+          .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
+          .target("6")
+          .load()
+          .migrate();
 
       // After V6 runs, the schema matches jOOQ codegen — use the generated tables.
       int adminCount = dsl.fetchCount(ADMIN_USER, ADMIN_USER.USERNAME.eq("alice"));
