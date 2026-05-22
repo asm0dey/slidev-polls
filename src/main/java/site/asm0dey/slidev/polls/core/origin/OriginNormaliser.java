@@ -17,7 +17,7 @@ public final class OriginNormaliser {
     URI uri;
     try {
       uri = new URI(input.trim());
-    } catch (URISyntaxException _) {
+    } catch (URISyntaxException ignored) {
       throw new InvalidOriginException(input);
     }
     String rawScheme = uri.getScheme();

@@ -116,7 +116,7 @@ public class AdminUserService {
     String hash = passwordHasher.encode(command.password());
     try {
       repository.insert(command.username(), hash);
-    } catch (DataAccessException _) {
+    } catch (DataAccessException ignored) {
       throw new UsernameTakenException(command.username());
     }
     return new AdminUser(command.username(), Instant.now());
