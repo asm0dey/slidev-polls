@@ -1,16 +1,16 @@
 package site.asm0dey.slidev.polls.api.pub;
 
-import jakarta.servlet.http.HttpServletRequest;
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
+import org.jboss.resteasy.reactive.RestResponse;
 import site.asm0dey.slidev.polls.api.pub.dto.VoteAccepted;
 import site.asm0dey.slidev.polls.api.pub.dto.VoteRequest;
 import site.asm0dey.slidev.polls.core.domain.Vote;
@@ -35,8 +35,9 @@ import site.asm0dey.slidev.polls.core.slug.SlugValidator;
  * persisted" holds at the deserialisation boundary — by the time the request reaches the service
  * layer any {@code email}/{@code name}/other PII-shaped field has already been discarded.
  */
-@RestController
-@RequestMapping("/api/polls")
+@Path("/api/polls")
+@ApplicationScoped
+@RunOnVirtualThread
 public class VoteController {
 
   private final VoteService voteService;
@@ -45,40 +46,44 @@ public class VoteController {
     this.voteService = voteService;
   }
 
-  @PostMapping("/{slug}/votes")
-  public ResponseEntity<VoteAccepted> submit(
-      @PathVariable String slug, @Valid @RequestBody VoteRequest body, HttpServletRequest request) {
+  @POST
+  @Path("/{slug}/votes")
+  public RestResponse<VoteAccepted> submit(
+      @PathParam("slug") String slug, @Valid VoteRequest body, @Context RoutingContext ctx) {
     if (!SlugValidator.isValidFormat(slug)) {
       // Match PublicPollController's rejection: unparseable slug at the edge is 404 NOT_FOUND;
       // no point hitting the service only to fail the same way.
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
 
-    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
+    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(ctx);
     // {@code body.optionIds()} is @NotNull-validated at the binding boundary, so a legacy
     // {"optionId": "..."} payload (which Jackson silently swallows under
     // fail-on-unknown-properties: false) has already been rejected as 400 VALIDATION_FAILED by
     // the time we get here. An empty list is an abstention; the service enforces arity bounds.
     Vote recorded = voteService.recordVote(slug, body.optionIds(), voter.token());
 
-    ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.CREATED);
+    RestResponse.ResponseBuilder<VoteAccepted> response =
+        RestResponse.ResponseBuilder.create(
+            RestResponse.Status.CREATED, new VoteAccepted(recorded.id(), recorded.createdAt()));
     if (voter.setCookieHeader() != null) {
       response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
     }
-    return response.body(new VoteAccepted(recorded.id(), recorded.createdAt()));
+    return response.build();
   }
 
-  @DeleteMapping("/{slug}/votes")
-  public ResponseEntity<Void> retract(@PathVariable String slug, HttpServletRequest request) {
+  @DELETE
+  @Path("/{slug}/votes")
+  public RestResponse<Void> retract(@PathParam("slug") String slug, @Context RoutingContext ctx) {
     if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
-    String voterToken = VoterTokenCookie.read(request);
+    String voterToken = VoterTokenCookie.read(ctx);
     if (voterToken == null) {
       // No cookie → no row this voter could ever own. Return 204 without touching the service.
-      return ResponseEntity.noContent().build();
+      return RestResponse.noContent();
     }
     voteService.retractVote(slug, voterToken);
-    return ResponseEntity.noContent().build();
+    return RestResponse.noContent();
   }
 }

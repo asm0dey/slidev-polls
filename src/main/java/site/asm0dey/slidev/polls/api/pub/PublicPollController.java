@@ -1,14 +1,16 @@
 package site.asm0dey.slidev.polls.api.pub;
 
-import jakarta.servlet.http.HttpServletRequest;
+import io.smallrye.common.annotation.RunOnVirtualThread;
+import io.vertx.ext.web.RoutingContext;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.jboss.resteasy.reactive.RestResponse;
 import site.asm0dey.slidev.polls.api.pub.dto.PublicPollView;
 import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
@@ -33,8 +35,9 @@ import site.asm0dey.slidev.polls.realtime.sse.SnapshotPayload;
  * and attaches a Set-Cookie header so the subsequent {@code POST /votes} sees a stable identity
  * ({@code @TS-046}).
  */
-@RestController
-@RequestMapping("/api/polls")
+@Path("/api/polls")
+@ApplicationScoped
+@RunOnVirtualThread
 public class PublicPollController {
 
   private final PollRepository pollRepository;
@@ -48,9 +51,10 @@ public class PublicPollController {
     this.snapshots = snapshots;
   }
 
-  @GetMapping("/by-slug/{slug}")
-  public ResponseEntity<PublicPollView> getBySlug(
-      @PathVariable String slug, HttpServletRequest request) {
+  @GET
+  @Path("/by-slug/{slug}")
+  public RestResponse<PublicPollView> getBySlug(
+      @PathParam("slug") String slug, @Context RoutingContext ctx) {
     // @TS-045 — reject an unparseable slug at the edge; do not hit the repository.
     if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
@@ -60,7 +64,7 @@ public class PublicPollController {
             .findBySlug(slug)
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
 
-    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
+    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(ctx);
     Boolean alreadyVoted = null;
     if (poll.activeQuestionId() != null) {
       // Best-effort: report true only when the server has an identity AND has seen a vote from it
@@ -70,11 +74,11 @@ public class PublicPollController {
     }
     PublicPollView body = PublicPollView.from(poll, alreadyVoted);
 
-    ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+    RestResponse.ResponseBuilder<PublicPollView> response = RestResponse.ResponseBuilder.ok(body);
     if (voter.setCookieHeader() != null) {
       response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
     }
-    return response.body(body);
+    return response.build();
   }
 
   /**
@@ -86,9 +90,10 @@ public class PublicPollController {
    * treating it as "active" without inspecting status would be misled, which is acceptable because
    * the panel only cares about prompt/options/tally for the requested id.
    */
-  @GetMapping("/{slug}/questions/{questionId}/snapshot")
+  @GET
+  @Path("/{slug}/questions/{questionId}/snapshot")
   public SnapshotPayload questionSnapshot(
-      @PathVariable String slug, @PathVariable UUID questionId) {
+      @PathParam("slug") String slug, @PathParam("questionId") UUID questionId) {
     if (!SlugValidator.isValidFormat(slug)) {
       throw new NotFoundException("no poll with slug '" + slug + "'");
     }
