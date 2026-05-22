@@ -23,7 +23,7 @@ public interface DeckTokenRepository {
   DeckToken revoke(UUID tokenId);
 
   /** Soft-revoke (set revoked_at) all live tokens on {@code pollId} minted by {@code username}. */
-  void revokeByPollAndMinter(java.util.UUID pollId, String username);
+  void revokeByPollAndMinter(UUID pollId, String username);
 
   /** Soft-revoke all live tokens minted by {@code username}, across every poll. */
   void revokeAllByMinter(String username);
