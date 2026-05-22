@@ -55,7 +55,10 @@ COPY --from=frontends-builder /build/backoffice/dist/ src/main/resources/META-IN
 # do NOT pass -Dquarkus.native.container-build=true. Native build args (e.g. the
 # initialize-at-run-time list) live in application.properties so they apply here.
 # Skip tests and spotless — CI and `./mvnw verify` cover those on the host.
-RUN ./mvnw package -Dnative -Dmaven.test.skip=true -Dspotless.check.skip=true
+# -Ddb.codegen.skip=true: jOOQ codegen needs a Docker daemon (Testcontainers),
+# which is unavailable inside `docker build`; the generated sources are COPYed
+# in above, so codegen is skipped here.
+RUN ./mvnw package -Dnative -Ddb.codegen.skip=true -Dmaven.test.skip=true -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 

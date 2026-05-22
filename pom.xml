@@ -70,6 +70,13 @@
         <jooq.version>3.19.22</jooq.version>
 
         <db.codegen.schema>polls_codegen</db.codegen.schema>
+        <!--
+          jOOQ codegen runs by default at generate-sources (needs Docker). Set
+          -Ddb.codegen.skip=true to skip it when the generated sources already
+          exist in the build context — the container image build does this
+          (it COPYs target/generated-sources and has no Docker daemon inside).
+        -->
+        <db.codegen.skip>false</db.codegen.skip>
         <postgresql.version>42.7.11</postgresql.version>
         <!--
           testcontainers used only by the codegen plugin's testcontainers-jooq
@@ -359,11 +366,104 @@
             </plugin>
 
             <!--
-              build-helper attaches the on-disk jOOQ codegen output to every
-              invocation's compile source roots. The `codegen` profile produces
-              the sources; this plugin wires them to the compiler so a plain
-              `./mvnw compile` picks them up without re-running codegen each
-              time.
+              jOOQ codegen runs by default at generate-sources so a plain
+              `./mvnw clean package` / `verify` regenerates the generated sources
+              (Docker required). Skipped via -Ddb.codegen.skip=true when sources
+              are pre-supplied (the container image build COPYs them).
+              testcontainers-jooq-codegen spins up a throwaway Postgres, runs
+              Flyway, then jOOQ codegen.
+            -->
+            <plugin>
+                <groupId>dev.sivalabs</groupId>
+                <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+                <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.testcontainers</groupId>
+                        <artifactId>testcontainers-postgresql</artifactId>
+                        <version>${testcontainers.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.postgresql</groupId>
+                        <artifactId>postgresql</artifactId>
+                        <version>${postgresql.version}</version>
+                    </dependency>
+                    <!--
+                      Pin jOOQ tooling to the runtime version (3.19.22). The
+                      plugin defaults to a newer codegen that emits symbols
+                      absent from the runtime jar.
+                    -->
+                    <dependency>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq</artifactId>
+                        <version>${jooq.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-meta</artifactId>
+                        <version>${jooq.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-codegen</artifactId>
+                        <version>${jooq.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>codegen-generate</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${db.codegen.skip}</skip>
+                            <database>
+                                <type>POSTGRES</type>
+                                <containerImage>postgres:18</containerImage>
+                            </database>
+                            <flyway>
+                                <defaultSchema>${db.codegen.schema}</defaultSchema>
+                                <schemas>${db.codegen.schema}</schemas>
+                                <createSchemas>true</createSchemas>
+                                <!--
+                                  The plugin's FlywayRunner extends HashMap<String,String>
+                                  so Flyway config must be passed as flat scalar properties.
+                                  Nested <location> children are silently dropped by Plexus,
+                                  which lets the plugin's default `classpath:/db/migration`
+                                  win and recursively scan every vendor subdirectory
+                                  (postgresql/, h2/) — producing duplicate V1 migrations.
+                                  Use the comma-separated string form so `flyway.locations`
+                                  is set explicitly and the default is suppressed.
+                                -->
+                                <locations>filesystem:src/main/resources/db/migration/postgresql,filesystem:src/main/resources/db/migration/common</locations>
+                            </flyway>
+                            <jooq>
+                                <generator>
+                                    <database>
+                                        <name>org.jooq.meta.postgres.PostgresDatabase</name>
+                                        <includes>admin_user|polls|poll_questions|poll_options|poll_allowed_origins|votes|deck_tokens</includes>
+                                        <schemata>
+                                            <schema>
+                                                <inputSchema>${db.codegen.schema}</inputSchema>
+                                                <outputSchemaToDefault>true</outputSchemaToDefault>
+                                            </schema>
+                                        </schemata>
+                                    </database>
+                                    <target>
+                                        <packageName>site.asm0dey.slidev.polls.persistence.jooq</packageName>
+                                        <directory>${project.build.directory}/generated-sources/jooq</directory>
+                                    </target>
+                                </generator>
+                            </jooq>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              build-helper attaches the on-disk jOOQ codegen output to the
+              compile source roots so the compiler picks them up.
             -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -388,103 +488,15 @@
     </build>
 
     <profiles>
+        <!--
+          jOOQ codegen now runs by default in the main build (see the
+          testcontainers-jooq-codegen-maven-plugin above). This profile is kept
+          as a no-op so existing `-Pcodegen` invocations (CI steps, Taskfile,
+          docs) still resolve; it adds nothing because codegen is already on the
+          default lifecycle. Disable codegen with -Ddb.codegen.skip=true.
+        -->
         <profile>
             <id>codegen</id>
-            <build>
-                <plugins>
-                    <!--
-                      testcontainers-jooq-codegen-maven-plugin spins up a
-                      throwaway Postgres, runs Flyway, then jOOQ codegen.
-                      Docker on PATH is the only prerequisite.
-                    -->
-                    <plugin>
-                        <groupId>dev.sivalabs</groupId>
-                        <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
-                        <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.testcontainers</groupId>
-                                <artifactId>testcontainers-postgresql</artifactId>
-                                <version>${testcontainers.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>org.postgresql</groupId>
-                                <artifactId>postgresql</artifactId>
-                                <version>${postgresql.version}</version>
-                            </dependency>
-                            <!--
-                              Pin jOOQ tooling to the runtime version (3.19.22).
-                              The plugin defaults to a newer codegen that
-                              emits symbols absent from the runtime jar.
-                            -->
-                            <dependency>
-                                <groupId>org.jooq</groupId>
-                                <artifactId>jooq</artifactId>
-                                <version>${jooq.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>org.jooq</groupId>
-                                <artifactId>jooq-meta</artifactId>
-                                <version>${jooq.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>org.jooq</groupId>
-                                <artifactId>jooq-codegen</artifactId>
-                                <version>${jooq.version}</version>
-                            </dependency>
-                        </dependencies>
-                        <executions>
-                            <execution>
-                                <id>codegen-generate</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>generate</goal>
-                                </goals>
-                                <configuration>
-                                    <database>
-                                        <type>POSTGRES</type>
-                                        <containerImage>postgres:18</containerImage>
-                                    </database>
-                                    <flyway>
-                                        <defaultSchema>${db.codegen.schema}</defaultSchema>
-                                        <schemas>${db.codegen.schema}</schemas>
-                                        <createSchemas>true</createSchemas>
-                                        <!--
-                                          The plugin's FlywayRunner extends HashMap<String,String>
-                                          so Flyway config must be passed as flat scalar properties.
-                                          Nested <location> children are silently dropped by Plexus,
-                                          which lets the plugin's default `classpath:/db/migration`
-                                          win and recursively scan every vendor subdirectory
-                                          (postgresql/, h2/) — producing duplicate V1 migrations.
-                                          Use the comma-separated string form so `flyway.locations`
-                                          is set explicitly and the default is suppressed.
-                                        -->
-                                        <locations>filesystem:src/main/resources/db/migration/postgresql,filesystem:src/main/resources/db/migration/common</locations>
-                                    </flyway>
-                                    <jooq>
-                                        <generator>
-                                            <database>
-                                                <name>org.jooq.meta.postgres.PostgresDatabase</name>
-                                                <includes>admin_user|polls|poll_questions|poll_options|poll_allowed_origins|votes|deck_tokens</includes>
-                                                <schemata>
-                                                    <schema>
-                                                        <inputSchema>${db.codegen.schema}</inputSchema>
-                                                        <outputSchemaToDefault>true</outputSchemaToDefault>
-                                                    </schema>
-                                                </schemata>
-                                            </database>
-                                            <target>
-                                                <packageName>site.asm0dey.slidev.polls.persistence.jooq</packageName>
-                                                <directory>${project.build.directory}/generated-sources/jooq</directory>
-                                            </target>
-                                        </generator>
-                                    </jooq>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
         </profile>
 
         <profile>
