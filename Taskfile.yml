@@ -131,6 +131,16 @@ tasks:
     cmds:
       - ./mvnw verify -Dspotless.check.skip=true
 
+  smoke:
+    desc: Run ONLY the black-box integration smoke (SmokeIT) against the packaged JVM jar
+    cmds:
+      - ./mvnw verify -Psmoke -Dtest=_none_ -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=SmokeIT -Dspotless.check.skip=true
+
+  smoke:native:
+    desc: Run ONLY the smoke (SmokeIT) against a freshly built GraalVM native binary
+    cmds:
+      - ./mvnw verify -Pnative -Dquarkus.native.container-build=true -Dtest=_none_ -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=SmokeIT -Dspotless.check.skip=true
+
   test:shared:
     desc: Run vitest for @slidev-polls/shared
     dir: frontends/shared

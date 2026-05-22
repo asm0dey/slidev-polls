@@ -283,8 +283,12 @@ before the next boot.
   `shared` holds DTOs, the api-client, and the sse-client; `voter` is the
   SPA at `/`; `backoffice` is the SPA at `/admin/`; `slidev-component` is
   the Slidev addon.
-- Tests: vitest for every frontend, JUnit + Testcontainers for the backend
-  so integration tests exercise jOOQ against a real Postgres.
+- Tests: vitest for every frontend; `@QuarkusTest` + RestAssured for the backend.
+  Integration tests run against a real Postgres (Quarkus Dev Services) and the
+  jOOQ/repository layer is exercised against **both** Postgres and H2 (paired
+  `@Nested` engine classes); `SchemaSymmetryIT` guards PG↔H2 schema parity. A
+  black-box `SmokeIT` (`@QuarkusIntegrationTest`, `task smoke`/`smoke:native`)
+  drives the packaged jar and native binary end-to-end over HTTP.
 - CI: every successful `main` build pushes
   `ghcr.io/asm0dey/slidev-polls-backend:{latest,sha-<commit>}`.
 
@@ -309,13 +313,18 @@ task build-native  # GraalVM native binary via the Mandrel builder container
 task down          # tear down compose stack
 task codegen       # regenerate jOOQ sources from the live schema
 task test          # full suite (backend verify + every frontend runner)
-task test:backend  # ./mvnw verify
+task test:backend  # ./mvnw verify (unit + integration; Postgres via Dev Services + H2)
+task smoke         # ONLY the black-box SmokeIT against the packaged JVM jar
+task smoke:native  # ONLY SmokeIT against a freshly built native binary
 task test:voter    # vitest only
 ```
 
-`task up` runs `task codegen` first; subsequent runs are cached and fast.
-`task dev` is the better loop for frontend work, and `task up` is the better
-sanity check before pushing.
+jOOQ codegen runs by default at `generate-sources`, so a plain `./mvnw clean
+package` / `verify` regenerates the sources (Docker required). The container
+image build passes `-Ddb.codegen.skip=true` — it COPYs pre-generated sources and
+has no Docker daemon inside. `task up` runs `task codegen` first; subsequent runs
+are cached and fast. `task dev` is the better loop for frontend work, and
+`task up` is the better sanity check before pushing.
 
 ### Repository layout
 
