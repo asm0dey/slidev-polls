@@ -1,4 +1,6 @@
 import type {
+  AccountView,
+  CollaboratorView,
   CreatePollRequest,
   DeckToken,
   LoginRequest,
@@ -55,6 +57,7 @@ export interface CreateUserRequestBody {
 export interface AdminUserView {
   username: string;
   createdAt: string;
+  blocked: boolean;
 }
 
 const CSRF_COOKIE = "XSRF-TOKEN";
@@ -161,6 +164,78 @@ export class AdminApiClient {
 
   createUser(body: CreateUserRequestBody): Promise<AdminUserView> {
     return this.send<AdminUserView>("POST", "/api/admin/users", body);
+  }
+
+  getAccount(): Promise<AccountView> {
+    return this.send<AccountView>("GET", "/api/admin/account");
+  }
+
+  changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.send<void>(
+      "POST",
+      "/api/admin/account/password",
+      { currentPassword, newPassword },
+      false
+    );
+  }
+
+  resetUserPassword(username: string, newPassword: string): Promise<void> {
+    return this.send<void>(
+      "POST",
+      `/api/admin/users/${encodeURIComponent(username)}/password-reset`,
+      { newPassword },
+      false
+    );
+  }
+
+  blockUser(username: string): Promise<void> {
+    return this.send<void>(
+      "POST",
+      `/api/admin/users/${encodeURIComponent(username)}/block`,
+      undefined,
+      false
+    );
+  }
+
+  unblockUser(username: string): Promise<void> {
+    return this.send<void>(
+      "POST",
+      `/api/admin/users/${encodeURIComponent(username)}/unblock`,
+      undefined,
+      false
+    );
+  }
+
+  listCollaborators(pollId: string): Promise<CollaboratorView[]> {
+    return this.send<CollaboratorView[]>(
+      "GET",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/collaborators`
+    );
+  }
+
+  addCollaborator(pollId: string, username: string): Promise<CollaboratorView> {
+    return this.send<CollaboratorView>(
+      "POST",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/collaborators`,
+      { username }
+    );
+  }
+
+  removeCollaborator(pollId: string, username: string): Promise<void> {
+    return this.send<void>(
+      "DELETE",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/collaborators/${encodeURIComponent(username)}`,
+      undefined,
+      false
+    );
+  }
+
+  transferPoll(pollId: string, newOwnerUsername: string): Promise<PollDetail> {
+    return this.send<PollDetail>(
+      "POST",
+      `/api/admin/polls/${encodeURIComponent(pollId)}/transfer`,
+      { newOwnerUsername }
+    );
   }
 
   private async send<T>(

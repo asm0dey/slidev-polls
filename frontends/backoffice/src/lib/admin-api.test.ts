@@ -212,3 +212,146 @@ describe("AdminApiClient setup + user management", () => {
     });
   });
 });
+
+describe("AdminApiClient account + password", () => {
+  it("getAccount calls GET /api/admin/account", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { username: "alice", isAdmin: true }));
+    const client = new AdminApiClient({ fetchImpl: fetchImpl as unknown as typeof fetch });
+    const result = await client.getAccount();
+    expect(result.username).toBe("alice");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/admin/account",
+      expect.objectContaining({ method: "GET" })
+    );
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("changePassword posts to /api/admin/account/password with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.changePassword("oldpw", "newpw");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/account/password");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+    expect(JSON.parse(init.body as string)).toEqual({
+      currentPassword: "oldpw",
+      newPassword: "newpw"
+    });
+  });
+
+  it("resetUserPassword posts to the password-reset endpoint with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.resetUserPassword("bob", "newpw");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/users/bob/password-reset");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+  });
+});
+
+describe("AdminApiClient block/unblock", () => {
+  it("blockUser posts to the block endpoint with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.blockUser("alice");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/users/alice/block");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+  });
+
+  it("unblockUser posts to the unblock endpoint with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.unblockUser("alice");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/users/alice/unblock");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+  });
+
+  it("URL-encodes the username in blockUser", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.blockUser("user name");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/users/user%20name/block");
+  });
+});
+
+describe("AdminApiClient collaborators + transfer", () => {
+  it("listCollaborators calls GET on the collaborators endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = new AdminApiClient({ fetchImpl: fetchImpl as unknown as typeof fetch });
+    await client.listCollaborators("p1");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/admin/polls/p1/collaborators",
+      expect.objectContaining({ method: "GET" })
+    );
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("addCollaborator posts to the collaborators endpoint with CSRF token", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(201, { username: "bob", createdAt: "2026-05-23T00:00:00Z" }));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    const result = await client.addCollaborator("p1", "bob");
+    expect(result.username).toBe("bob");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/polls/p1/collaborators");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+    expect(JSON.parse(init.body as string)).toEqual({ username: "bob" });
+  });
+
+  it("removeCollaborator sends DELETE with CSRF token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(204));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.removeCollaborator("p1", "bob");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("DELETE");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/polls/p1/collaborators/bob");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+  });
+
+  it("transferPoll posts to the transfer endpoint with the new owner", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { id: "p1", isOwner: true }));
+    const client = new AdminApiClient({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      cookieReader: () => "XSRF-TOKEN=tok"
+    });
+    await client.transferPoll("p1", "bob");
+    expect(fetchImpl.mock.calls[0][0]).toContain("/api/admin/polls/p1/transfer");
+    const init = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["X-XSRF-TOKEN"]).toBe("tok");
+    expect(JSON.parse(init.body as string)).toEqual({ newOwnerUsername: "bob" });
+  });
+});
