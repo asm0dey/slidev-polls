@@ -1,7 +1,9 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
 
 /**
@@ -19,4 +21,14 @@ public interface AdminUserRepository {
   List<AdminUser> listAll();
 
   Optional<String> findPasswordHash(String username);
+
+  Optional<String> findBootstrapAdminUsername();
+
+  void updatePasswordHash(String username, String passwordHash);
+
+  /** Sets or clears the block timestamp ({@code null} unblocks). */
+  void setBlockedAt(String username, Instant blockedAt);
+
+  /** Usernames whose {@code blocked_at} is non-null. */
+  Set<String> listBlockedUsernames();
 }

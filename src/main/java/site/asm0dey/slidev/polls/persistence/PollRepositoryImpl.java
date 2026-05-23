@@ -6,6 +6,7 @@ import static org.jooq.impl.DSL.val;
 import static org.jooq.impl.DSL.when;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_COLLABORATORS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
@@ -100,6 +101,40 @@ public class PollRepositoryImpl implements PollRepository {
         .select(ORIGINS_FIELD)
         .from(POLLS)
         .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
+        .orderBy(POLLS.CREATED_AT.desc())
+        .fetch()
+        .map(this::toPoll);
+  }
+
+  @Override
+  public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+    int updated =
+        dsl.update(POLLS)
+            .set(POLLS.OWNER_USERNAME, newOwnerUsername)
+            .set(POLLS.UPDATED_AT, OffsetDateTime.now())
+            .where(POLLS.ID.eq(pollId))
+            .execute();
+    if (updated == 0) {
+      throw new NotFoundException("poll " + pollId + " does not exist");
+    }
+    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+  }
+
+  @Override
+  public List<Poll> findOwnedOrCollaborated(String username) {
+    return dsl.select(POLLS.fields())
+        .select(QUESTIONS_FIELD)
+        .select(ORIGINS_FIELD)
+        .from(POLLS)
+        .where(
+            POLLS
+                .OWNER_USERNAME
+                .eq(username)
+                .or(
+                    POLLS.ID.in(
+                        dsl.select(POLL_COLLABORATORS.POLL_ID)
+                            .from(POLL_COLLABORATORS)
+                            .where(POLL_COLLABORATORS.USERNAME.eq(username)))))
         .orderBy(POLLS.CREATED_AT.desc())
         .fetch()
         .map(this::toPoll);

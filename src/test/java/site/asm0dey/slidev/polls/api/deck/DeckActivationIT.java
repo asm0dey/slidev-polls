@@ -173,8 +173,8 @@ class DeckActivationIT {
   void revoked_token_is_rejected_with_deck_token_invalid() throws Exception {
     PollFixture poll = createPoll("deck-revoked");
     JsonNode minted = mintTokenRaw(poll);
-    UUID tokenId = UUID.fromString(minted.get("id").asText());
-    String plaintext = minted.get("plaintext").asText();
+    UUID tokenId = UUID.fromString(minted.get("id").asString());
+    String plaintext = minted.get("plaintext").asString();
 
     MockHttpSession session = loginAsAlice();
     mvc.perform(
@@ -207,7 +207,7 @@ class DeckActivationIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode minted = objectMapper.readTree(mint.getResponse().getContentAsString());
-    assertThat(minted.get("plaintext").asText()).as("plaintext surfaced on mint").isNotBlank();
+    assertThat(minted.get("plaintext").asString()).as("plaintext surfaced on mint").isNotBlank();
 
     MvcResult listing =
         mvc.perform(get("/api/admin/polls/" + poll.pollId() + "/deck-tokens").session(session))
@@ -312,7 +312,7 @@ class DeckActivationIT {
   }
 
   private String mintToken(PollFixture poll) throws Exception {
-    return mintTokenRaw(poll).get("plaintext").asText();
+    return mintTokenRaw(poll).get("plaintext").asString();
   }
 
   private JsonNode mintTokenRaw(PollFixture poll) throws Exception {
@@ -354,9 +354,9 @@ class DeckActivationIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
-    UUID q1 = UUID.fromString(poll.get("questions").get(0).get("id").asText());
-    UUID q2 = UUID.fromString(poll.get("questions").get(1).get("id").asText());
+    UUID pollId = UUID.fromString(poll.get("id").asString());
+    UUID q1 = UUID.fromString(poll.get("questions").get(0).get("id").asString());
+    UUID q2 = UUID.fromString(poll.get("questions").get(1).get("id").asString());
     return new PollFixture(pollId, q1, q2);
   }
 

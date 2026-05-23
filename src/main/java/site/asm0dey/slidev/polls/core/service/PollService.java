@@ -10,14 +10,18 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.Option;
 import site.asm0dey.slidev.polls.core.domain.Poll;
+import site.asm0dey.slidev.polls.core.domain.PollCollaborator;
 import site.asm0dey.slidev.polls.core.domain.PollStatus;
 import site.asm0dey.slidev.polls.core.domain.Question;
 import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.CannotShareWithOwnerException;
+import site.asm0dey.slidev.polls.core.error.CollaboratorExistsException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.NotOwnerException;
 import site.asm0dey.slidev.polls.core.error.ResourceHasVotesException;
@@ -51,16 +55,28 @@ public class PollService {
   // self-invocations still cross a transactional boundary.
   private final ObjectProvider<PollService> self;
   private final VoteRepository voteRepository;
+  private final PollAuthorizer authorizer;
+  private final PollCollaboratorRepository collaboratorRepository;
+  private final DeckTokenRepository deckTokenRepository;
+  private final AdminUserRepository adminUserRepository;
 
   public PollService(
       PollRepository repository,
       ApplicationEventPublisher events,
       ObjectProvider<PollService> self,
-      VoteRepository voteRepository) {
+      VoteRepository voteRepository,
+      PollAuthorizer authorizer,
+      PollCollaboratorRepository collaboratorRepository,
+      DeckTokenRepository deckTokenRepository,
+      AdminUserRepository adminUserRepository) {
     this.repository = repository;
     this.events = events;
     this.self = self;
     this.voteRepository = voteRepository;
+    this.authorizer = authorizer;
+    this.collaboratorRepository = collaboratorRepository;
+    this.deckTokenRepository = deckTokenRepository;
+    this.adminUserRepository = adminUserRepository;
   }
 
   @Transactional
@@ -100,9 +116,24 @@ public class PollService {
     return poll;
   }
 
+  /** Read a poll the caller may edit (owner or collaborator). 404 if absent, 403 if not editor. */
+  @Transactional(readOnly = true)
+  public Poll getForEditor(UUID pollId, String username) {
+    Poll poll =
+        repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    authorizer.requireEditor(poll, username);
+    return poll;
+  }
+
+  /** Polls the caller owns or collaborates on. */
+  @Transactional(readOnly = true)
+  public List<Poll> listVisibleTo(String username) {
+    return repository.findOwnedOrCollaborated(username);
+  }
+
   @Transactional
   public Poll updateForOwner(UUID pollId, String ownerUsername, UpdatePollCommand command) {
-    Poll existing = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll existing = self.getObject().getForEditor(pollId, ownerUsername);
     String title = command.title() != null ? command.title() : existing.title();
     String slug = existing.slug();
     if (command.slug() != null && !command.slug().equals(existing.slug())) {
@@ -226,7 +257,7 @@ public class PollService {
 
   @Transactional
   public Poll clearVotesForOwner(UUID pollId, String ownerUsername) {
-    self.getObject().getForOwner(pollId, ownerUsername);
+    self.getObject().getForEditor(pollId, ownerUsername);
     voteRepository.deleteForPoll(pollId);
     Poll after = repository.resetQuestionsToDraft(pollId);
     events.publishEvent(new PollVotesClearedEvent(pollId, Instant.now()));
@@ -242,7 +273,7 @@ public class PollService {
    */
   @Transactional
   public Poll cloneForOwner(UUID pollId, String ownerUsername) {
-    Poll src = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll src = self.getObject().getForEditor(pollId, ownerUsername);
     List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>(src.questions().size());
     for (Question q : src.questions()) {
       List<CreatePollCommand.OptionDraft> opts = new ArrayList<>(q.options().size());
@@ -259,19 +290,77 @@ public class PollService {
 
   @Transactional
   public Poll activateQuestionForOwner(UUID pollId, String ownerUsername, UUID questionId) {
-    self.getObject().getForOwner(pollId, ownerUsername);
+    self.getObject().getForEditor(pollId, ownerUsername);
     return self.getObject().activateQuestion(pollId, questionId);
   }
 
   @Transactional
   public Poll closeActiveQuestionForOwner(UUID pollId, String ownerUsername) {
-    Poll before = self.getObject().getForOwner(pollId, ownerUsername);
+    Poll before = self.getObject().getForEditor(pollId, ownerUsername);
     UUID wasActive = before.activeQuestionId();
     Poll after = repository.closeActiveQuestion(pollId);
     if (wasActive != null) {
       events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
     }
     return after;
+  }
+
+  /**
+   * Transfer ownership to {@code rawNewOwner}. Caller must currently own the poll. Self-transfer is
+   * a no-op. The old owner's deck tokens on this poll are revoked; if the new owner was a
+   * collaborator, that now-redundant row is removed. Other collaborators and deck tokens are kept.
+   */
+  @Transactional
+  public Poll transferForOwner(UUID pollId, String currentOwner, String rawNewOwner) {
+    Poll poll = self.getObject().getForOwner(pollId, currentOwner);
+    String newOwner = Usernames.normalize(rawNewOwner);
+    if (newOwner.equals(poll.ownerUsername())) {
+      return poll; // self-transfer: no-op
+    }
+    if (!adminUserRepository.existsByUsername(newOwner)) {
+      throw new NotFoundException(newOwner);
+    }
+    deckTokenRepository.revokeByPollAndMinter(pollId, poll.ownerUsername());
+    collaboratorRepository.remove(pollId, newOwner);
+    return repository.transferOwner(pollId, newOwner);
+  }
+
+  /** Owner-only: add an existing account as a collaborator. */
+  @Transactional
+  public PollCollaborator addCollaborator(UUID pollId, String owner, String rawUsername) {
+    Poll poll = self.getObject().getForOwner(pollId, owner);
+    String username = Usernames.normalize(rawUsername);
+    if (username.equals(poll.ownerUsername())) {
+      throw new CannotShareWithOwnerException(username);
+    }
+    if (!adminUserRepository.existsByUsername(username)) {
+      throw new NotFoundException(username);
+    }
+    if (collaboratorRepository.exists(pollId, username)) {
+      throw new CollaboratorExistsException(username);
+    }
+    try {
+      return collaboratorRepository.add(pollId, username);
+    } catch (DataIntegrityViolationException dup) {
+      // Lost a race against a concurrent add; PK (poll_id, username) is the serialization point.
+      throw new CollaboratorExistsException(username);
+    }
+  }
+
+  /** Owner-only: remove a collaborator (idempotent) and revoke their deck tokens on this poll. */
+  @Transactional
+  public void removeCollaborator(UUID pollId, String owner, String rawUsername) {
+    self.getObject().getForOwner(pollId, owner);
+    String username = Usernames.normalize(rawUsername);
+    collaboratorRepository.remove(pollId, username);
+    deckTokenRepository.revokeByPollAndMinter(pollId, username);
+  }
+
+  /** Owner or collaborator: list collaborators. */
+  @Transactional(readOnly = true)
+  public List<PollCollaborator> listCollaborators(UUID pollId, String requester) {
+    self.getObject().getForEditor(pollId, requester);
+    return collaboratorRepository.listByPoll(pollId);
   }
 
   /**

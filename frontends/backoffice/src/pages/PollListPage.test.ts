@@ -44,6 +44,7 @@ function poll(over: Partial<Poll> = {}): Poll {
     status: "DRAFT",
     publicUrl: "http://localhost:8080/quickstart-demo",
     activeQuestionId: null,
+    isOwner: true,
     ...over
   };
 }
@@ -286,5 +287,51 @@ describe("PollListPage", () => {
     expect(clonePoll).toHaveBeenCalledWith("p1");
     expect(wrapper.vm.$route.name).toBe("poll-edit");
     expect(wrapper.vm.$route.params.pollId).toBe("p-cloned");
+  });
+
+  it("gates owner-only actions: Delete only shows for owned polls, both rows are listed and editable", async () => {
+    const polls: Poll[] = [
+      poll({
+        id: "owned-1",
+        title: "My Poll",
+        slug: "my-poll",
+        publicUrl: "http://localhost:8080/my-poll",
+        isOwner: true
+      }),
+      poll({
+        id: "shared-1",
+        title: "Shared Poll",
+        slug: "shared-poll",
+        publicUrl: "http://localhost:8080/shared-poll",
+        isOwner: false
+      })
+    ];
+    const client = makeFake({ listPolls: vi.fn().mockResolvedValue(polls) });
+    const wrapper = await mountPage(client);
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="poll-row"]');
+    expect(rows).toHaveLength(2);
+
+    // Both rows are listed.
+    expect(rows[0].text()).toContain("My Poll");
+    expect(rows[1].text()).toContain("Shared Poll");
+
+    // Both rows have an Edit link (openable into editor).
+    expect(rows[0].find('[data-testid="poll-edit"]').exists()).toBe(true);
+    expect(rows[1].find('[data-testid="poll-edit"]').exists()).toBe(true);
+
+    // Delete is present on the owned row.
+    expect(rows[0].find('[data-testid="poll-delete"]').exists()).toBe(true);
+
+    // Delete is absent on the shared row.
+    expect(rows[1].find('[data-testid="poll-delete"]').exists()).toBe(false);
+
+    // Shared row shows a "Shared" badge with the correct label.
+    expect(rows[1].find('[data-testid="poll-shared-badge"]').exists()).toBe(true);
+    expect(rows[1].find('[data-testid="poll-shared-badge"]').text()).toContain("Shared");
+
+    // Owned row has no "Shared" badge.
+    expect(rows[0].find('[data-testid="poll-shared-badge"]').exists()).toBe(false);
   });
 });

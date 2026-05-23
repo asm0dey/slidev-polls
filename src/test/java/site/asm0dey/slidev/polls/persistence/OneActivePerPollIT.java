@@ -33,7 +33,7 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
  */
 class OneActivePerPollIT extends AbstractPostgresTest {
 
-  abstract class CommonOneActive {
+  abstract static class CommonOneActive {
     protected PollRepositoryImpl repository;
 
     protected abstract DSLContext dsl();

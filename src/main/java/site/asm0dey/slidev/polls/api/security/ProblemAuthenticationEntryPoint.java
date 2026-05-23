@@ -3,6 +3,7 @@ package site.asm0dey.slidev.polls.api.security;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,7 +35,9 @@ public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint
 
   @Override
   public void commence(
-      HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull AuthenticationException ex)
       throws IOException {
     response.setStatus(HttpStatus.UNAUTHORIZED.value());
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);

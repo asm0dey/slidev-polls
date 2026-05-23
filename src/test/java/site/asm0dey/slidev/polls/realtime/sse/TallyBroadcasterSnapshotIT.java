@@ -175,33 +175,35 @@ class TallyBroadcasterSnapshotIT {
 
   private void readStream(String path, ConcurrentLinkedQueue<SseEvent> sink) {
     try {
-      HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + port + path))
-              .header("Accept", "text/event-stream")
-              .GET()
-              .build();
-      HttpResponse<java.io.InputStream> response =
-          client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-      try (java.io.BufferedReader reader =
-          new java.io.BufferedReader(new java.io.InputStreamReader(response.body()))) {
-        String currentName = null;
-        List<String> dataLines = new ArrayList<>();
-        String line;
-        while (reading.get() && (line = reader.readLine()) != null) {
-          if (line.isEmpty()) {
-            if (currentName != null && !dataLines.isEmpty()) {
-              sink.add(new SseEvent(currentName, String.join("\n", dataLines)));
+      try (HttpClient client =
+          HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+        HttpRequest request =
+            HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .header("Accept", "text/event-stream")
+                .GET()
+                .build();
+        HttpResponse<java.io.InputStream> response =
+            client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        try (java.io.BufferedReader reader =
+            new java.io.BufferedReader(new java.io.InputStreamReader(response.body()))) {
+          String currentName = null;
+          List<String> dataLines = new ArrayList<>();
+          String line;
+          while (reading.get() && (line = reader.readLine()) != null) {
+            if (line.isEmpty()) {
+              if (currentName != null && !dataLines.isEmpty()) {
+                sink.add(new SseEvent(currentName, String.join("\n", dataLines)));
+              }
+              currentName = null;
+              dataLines.clear();
+              continue;
             }
-            currentName = null;
-            dataLines.clear();
-            continue;
-          }
-          if (line.startsWith("event:")) {
-            currentName = line.substring("event:".length()).trim();
-          } else if (line.startsWith("data:")) {
-            dataLines.add(line.substring("data:".length()).trim());
+            if (line.startsWith("event:")) {
+              currentName = line.substring("event:".length()).trim();
+            } else if (line.startsWith("data:")) {
+              dataLines.add(line.substring("data:".length()).trim());
+            }
           }
         }
       }
@@ -263,11 +265,11 @@ class TallyBroadcasterSnapshotIT {
             new HttpEntity<>(createBody, authed),
             String.class);
     JsonNode created = objectMapper.readTree(createdResponse.getBody());
-    UUID pollId = UUID.fromString(created.get("id").asText());
+    UUID pollId = UUID.fromString(created.get("id").asString());
     JsonNode question = created.get("questions").get(0);
-    UUID questionId = UUID.fromString(question.get("id").asText());
-    UUID optionA = UUID.fromString(question.get("options").get(0).get("id").asText());
-    UUID optionB = UUID.fromString(question.get("options").get(1).get("id").asText());
+    UUID questionId = UUID.fromString(question.get("id").asString());
+    UUID optionA = UUID.fromString(question.get("options").get(0).get("id").asString());
+    UUID optionB = UUID.fromString(question.get("options").get(1).get("id").asString());
 
     rest.exchange(
         "http://localhost:" + port + "/api/admin/polls/" + pollId + "/open",

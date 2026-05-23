@@ -110,6 +110,16 @@
             <artifactId>h2</artifactId>
         </dependency>
 
+        <!-- Session -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- QR generation -->
         <dependency>
             <groupId>com.google.zxing</groupId>
@@ -319,7 +329,7 @@
                                         <generator>
                                             <database>
                                                 <name>org.jooq.meta.postgres.PostgresDatabase</name>
-                                                <includes>admin_user|polls|poll_questions|poll_options|poll_allowed_origins|votes|deck_tokens</includes>
+                                                <includes>admin_user|polls|poll_questions|poll_options|poll_allowed_origins|poll_collaborators|votes|deck_tokens</includes>
                                                 <schemata>
                                                     <schema>
                                                         <inputSchema>${db.codegen.schema}</inputSchema>

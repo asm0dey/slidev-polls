@@ -31,7 +31,7 @@ defineEmits<{ "update:modelValue": [v: string] }>();
 .sp-textarea {
   width: 100%;
   box-sizing: border-box;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-size: 14px;
   padding: 12px 14px;
   border: 1px solid var(--sp-border);

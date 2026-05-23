@@ -38,10 +38,17 @@ public class DeckTokenRepositoryImpl implements DeckTokenRepository {
         .set(DECK_TOKENS.POLL_ID, token.pollId())
         .set(DECK_TOKENS.TOKEN_HASH, token.tokenHash())
         .set(DECK_TOKENS.LABEL, token.label())
+        .set(DECK_TOKENS.MINTED_BY, token.mintedBy())
         .set(DECK_TOKENS.CREATED_AT, createdAt)
         .execute();
     return new DeckToken(
-        token.id(), token.pollId(), token.tokenHash(), token.label(), createdAt.toInstant(), null);
+        token.id(),
+        token.pollId(),
+        token.tokenHash(),
+        token.label(),
+        createdAt.toInstant(),
+        null,
+        token.mintedBy());
   }
 
   @Override
@@ -83,6 +90,25 @@ public class DeckTokenRepositoryImpl implements DeckTokenRepository {
         .orElseThrow(() -> new IllegalStateException("deck token " + tokenId + " vanished"));
   }
 
+  @Override
+  public void revokeByPollAndMinter(UUID pollId, String username) {
+    dsl.update(DECK_TOKENS)
+        .set(DECK_TOKENS.REVOKED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+        .where(DECK_TOKENS.POLL_ID.eq(pollId))
+        .and(DECK_TOKENS.MINTED_BY.eq(username))
+        .and(DECK_TOKENS.REVOKED_AT.isNull())
+        .execute();
+  }
+
+  @Override
+  public void revokeAllByMinter(String username) {
+    dsl.update(DECK_TOKENS)
+        .set(DECK_TOKENS.REVOKED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+        .where(DECK_TOKENS.MINTED_BY.eq(username))
+        .and(DECK_TOKENS.REVOKED_AT.isNull())
+        .execute();
+  }
+
   private static DeckToken toDomain(Record record) {
     return new DeckToken(
         record.get(DECK_TOKENS.ID),
@@ -92,6 +118,7 @@ public class DeckTokenRepositoryImpl implements DeckTokenRepository {
         record.get(DECK_TOKENS.CREATED_AT).toInstant(),
         record.get(DECK_TOKENS.REVOKED_AT) == null
             ? null
-            : record.get(DECK_TOKENS.REVOKED_AT).toInstant());
+            : record.get(DECK_TOKENS.REVOKED_AT).toInstant(),
+        record.get(DECK_TOKENS.MINTED_BY));
   }
 }

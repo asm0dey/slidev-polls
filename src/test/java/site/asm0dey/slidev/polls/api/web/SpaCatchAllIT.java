@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
@@ -37,13 +38,13 @@ import site.asm0dey.slidev.polls.api.TestcontainersConfiguration;
  * production ships the real SPA bundles.
  *
  * <p>Note on assertion choice: the voter shell still goes through a {@code forward:} view so the
- * body is empty at the MockMvc boundary and {@link #forwardedUrl} is the authoritative check. The
- * backoffice shell is served directly by the static {@link
+ * body is empty at the MockMvc boundary and forward/response checking is the authoritative check.
+ * The backoffice shell is served directly by the static {@link
  * org.springframework.web.servlet.resource.PathResourceResolver} chain — MockMvc executes the
  * resource handler in-process, so we can (and must) assert on the rendered body.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+@AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class SpaCatchAllIT {
 

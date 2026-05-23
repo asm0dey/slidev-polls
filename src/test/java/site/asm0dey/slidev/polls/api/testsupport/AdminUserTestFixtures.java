@@ -1,6 +1,13 @@
 package site.asm0dey.slidev.polls.api.testsupport;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.DECK_TOKENS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_ALLOWED_ORIGINS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_COLLABORATORS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
+import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
 
 import org.jooq.DSLContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +23,24 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public final class AdminUserTestFixtures {
 
   private AdminUserTestFixtures() {}
+
+  /**
+   * Wipes admin_user and every table that references it, in FK-safe order, for ITs that need to
+   * start from an empty user table. A bare {@code delete from admin_user} fails whenever a poll
+   * (polls_owner_username_fk) or deck token (deck_tokens.minted_by) left by a sibling IT still
+   * references a user — the Spring-context ITs share one reused Testcontainers Postgres, so rows
+   * leak across classes. Deleting the dependents first avoids that constraint violation.
+   */
+  public static void wipeAdminUsers(DSLContext dsl) {
+    dsl.deleteFrom(DECK_TOKENS).execute();
+    dsl.deleteFrom(VOTES).execute();
+    dsl.deleteFrom(POLL_OPTIONS).execute();
+    dsl.deleteFrom(POLL_QUESTIONS).execute();
+    dsl.deleteFrom(POLL_ALLOWED_ORIGINS).execute();
+    dsl.deleteFrom(POLL_COLLABORATORS).execute();
+    dsl.deleteFrom(POLLS).execute();
+    dsl.deleteFrom(ADMIN_USER).execute();
+  }
 
   public static void seedAdmin(
       DSLContext dsl, PasswordEncoder encoder, String username, String password) {

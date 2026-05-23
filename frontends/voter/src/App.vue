@@ -28,7 +28,7 @@ body {
   margin: 0;
   background: var(--sp-bg-muted);
   color: var(--sp-fg);
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
 }
 </style>
 

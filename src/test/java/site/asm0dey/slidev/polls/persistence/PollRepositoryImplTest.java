@@ -27,7 +27,7 @@ import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
  */
 class PollRepositoryImplTest extends AbstractPostgresTest {
 
-  abstract class CommonRepo {
+  abstract static class CommonRepo {
     protected PollRepositoryImpl repo;
 
     protected abstract DSLContext dsl();
@@ -89,9 +89,9 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
     void replaceQuestions_preservesIdsForMatchedQuestionsAndOptions() {
       Poll inserted =
           insertPollWithQuestions("preserve-ids", new QuestionSeed("Q1?", List.of("A", "B")));
-      UUID qid = inserted.questions().get(0).id();
-      UUID oA = inserted.questions().get(0).options().get(0).id();
-      UUID oB = inserted.questions().get(0).options().get(1).id();
+      UUID qid = inserted.questions().getFirst().id();
+      UUID oA = inserted.questions().getFirst().options().getFirst().id();
+      UUID oB = inserted.questions().getFirst().options().get(1).id();
 
       Poll after =
           repo.replaceQuestions(
@@ -105,9 +105,9 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
                           new CreatePollCommand.OptionUpdate(oB, "B")))));
 
       assertThat(after.questions()).hasSize(1);
-      assertThat(after.questions().get(0).id()).isEqualTo(qid);
-      assertThat(after.questions().get(0).prompt()).isEqualTo("Q1 edited?");
-      assertThat(after.questions().get(0).options())
+      assertThat(after.questions().getFirst().id()).isEqualTo(qid);
+      assertThat(after.questions().getFirst().prompt()).isEqualTo("Q1 edited?");
+      assertThat(after.questions().getFirst().options())
           .extracting(Option::id, Option::label)
           .containsExactly(tuple(oA, "A edited"), tuple(oB, "B"));
     }
@@ -115,9 +115,9 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
     @Test
     void replaceQuestions_assignsFreshIdToNewQuestion() {
       Poll inserted = insertPollWithQuestions("new-q", new QuestionSeed("Q1?", List.of("A", "B")));
-      UUID qid = inserted.questions().get(0).id();
-      UUID oA = inserted.questions().get(0).options().get(0).id();
-      UUID oB = inserted.questions().get(0).options().get(1).id();
+      UUID qid = inserted.questions().getFirst().id();
+      UUID oA = inserted.questions().getFirst().options().getFirst().id();
+      UUID oB = inserted.questions().getFirst().options().get(1).id();
 
       Poll after =
           repo.replaceQuestions(
@@ -137,7 +137,7 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
                           new CreatePollCommand.OptionUpdate(null, "D")))));
 
       assertThat(after.questions()).hasSize(2);
-      assertThat(after.questions().get(0).id()).isEqualTo(qid);
+      assertThat(after.questions().getFirst().id()).isEqualTo(qid);
       assertThat(after.questions().get(1).id()).isNotEqualTo(qid).isNotNull();
       assertThat(after.questions().get(1).options()).extracting(Option::id).doesNotContainNull();
     }
@@ -149,9 +149,9 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
               "drop-q",
               new QuestionSeed("keep?", List.of("A", "B")),
               new QuestionSeed("drop?", List.of("C", "D")));
-      UUID keep = inserted.questions().get(0).id();
-      UUID oA = inserted.questions().get(0).options().get(0).id();
-      UUID oB = inserted.questions().get(0).options().get(1).id();
+      UUID keep = inserted.questions().getFirst().id();
+      UUID oA = inserted.questions().getFirst().options().getFirst().id();
+      UUID oB = inserted.questions().getFirst().options().get(1).id();
 
       Poll after =
           repo.replaceQuestions(
@@ -165,7 +165,7 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
                           new CreatePollCommand.OptionUpdate(oB, "B")))));
 
       assertThat(after.questions()).hasSize(1);
-      assertThat(after.questions().get(0).id()).isEqualTo(keep);
+      assertThat(after.questions().getFirst().id()).isEqualTo(keep);
     }
 
     @Test

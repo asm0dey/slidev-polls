@@ -47,6 +47,9 @@ class SchemaSymmetryIT {
         .isEqualTo(pgCols);
   }
 
+  // TABLES is a compile-time constant Set.of(...) of hardcoded table names; the interpolated
+  // WHERE clause is safe — SqlSourceToSinkFlow is a false positive here.
+  @SuppressWarnings("SqlSourceToSinkFlow")
   private static Set<String> columnsFrom(DataSource ds) throws Exception {
     Set<String> out = new LinkedHashSet<>();
     try (Connection c = ds.getConnection();

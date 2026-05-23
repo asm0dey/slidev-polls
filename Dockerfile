@@ -36,9 +36,14 @@ WORKDIR /src
 COPY mvnw ./
 COPY .mvn ./.mvn
 COPY pom.xml ./
+RUN chmod +x mvnw
+
+# Dependency layer: resolve everything pom.xml needs into the local repo.
+# Busts only when pom.xml changes, so src edits reuse the cached download.
+RUN ./mvnw -B dependency:go-offline -Dmaven.test.skip=true -Dspotless.check.skip=true
+
 COPY src ./src
 COPY target/generated-sources ./target/generated-sources
-RUN chmod +x mvnw
 
 # Stage the built SPAs into the locations SpaForwardingConfig expects.
 COPY --from=frontends-builder /build/voter/dist/      src/main/resources/static/
@@ -46,7 +51,7 @@ COPY --from=frontends-builder /build/backoffice/dist/ src/main/resources/static/
 
 # Package the fat JAR. Skip tests and spotless — CI and `./mvnw verify` cover
 # those on the host.
-RUN ./mvnw package -DskipTests -Dspotless.check.skip=true
+RUN ./mvnw package -Dmaven.test.skip=true -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 

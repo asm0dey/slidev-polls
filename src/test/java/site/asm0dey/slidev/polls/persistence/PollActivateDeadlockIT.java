@@ -41,7 +41,7 @@ class PollActivateDeadlockIT extends AbstractPostgresTest {
   private static final int THREADS = 16;
   private static final int ITERATIONS_PER_THREAD = 25;
 
-  abstract class CommonDeadlock {
+  abstract static class CommonDeadlock {
     protected PollRepositoryImpl repository;
 
     protected abstract DSLContext dsl();

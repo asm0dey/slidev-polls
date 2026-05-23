@@ -11,13 +11,16 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
+import site.asm0dey.slidev.polls.core.error.CannotBlockException;
+import site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException;
+import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
 import site.asm0dey.slidev.polls.core.error.UsernameTakenException;
 
 /**
  * Manages presenter accounts. The first account is created via {@link #createInitialAdmin} which is
- * gated on an empty table; subsequent accounts go through {@link #createAdmin} which only requires
- * the caller to be authenticated (the controller enforces that, not this class).
+ * gated on an empty table; subsequent accounts go through {@link #createAdmin} which requires
+ * bootstrap-admin authority (the controller enforces that via its admin gate, not this class).
  */
 @Service
 public class AdminUserService {
@@ -25,19 +28,31 @@ public class AdminUserService {
   private final AdminUserRepository repository;
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate serializableTx;
+  private final DeckTokenRepository deckTokenRepository;
 
   public AdminUserService(
       AdminUserRepository repository,
       PasswordEncoder passwordEncoder,
-      PlatformTransactionManager transactionManager) {
+      PlatformTransactionManager transactionManager,
+      DeckTokenRepository deckTokenRepository) {
     this.repository = repository;
     this.passwordEncoder = passwordEncoder;
     this.serializableTx = new TransactionTemplate(transactionManager);
     this.serializableTx.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+    this.deckTokenRepository = deckTokenRepository;
   }
 
   public boolean isSetupRequired() {
     return repository.count() == 0L;
+  }
+
+  /**
+   * True when {@code username} is the bootstrap admin — the earliest-created account (tie-broken by
+   * username). This is the implicit privilege source for user creation, password reset, and
+   * block/unblock until an explicit role model exists.
+   */
+  public boolean isBootstrapAdmin(String username) {
+    return repository.findBootstrapAdminUsername().map(b -> b.equals(username)).orElse(false);
   }
 
   /**
@@ -96,7 +111,75 @@ public class AdminUserService {
     return new AdminUser(command.username(), Instant.now());
   }
 
+  /**
+   * Self-service change. Verifies {@code currentPassword} against the stored Argon2 hash, then
+   * re-encodes {@code newPassword}. Does not touch sessions — the controller revokes the user's
+   * other sessions after this returns.
+   *
+   * @throws site.asm0dey.slidev.polls.core.error.NotFoundException if the user does not exist
+   * @throws site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException on a wrong
+   *     current
+   */
+  @Transactional
+  public void changeOwnPassword(String username, String currentPassword, String newPassword) {
+    String hash =
+        repository.findPasswordHash(username).orElseThrow(() -> new NotFoundException(username));
+    if (!passwordEncoder.matches(currentPassword, hash)) {
+      throw new CurrentPasswordMismatchException();
+    }
+    repository.updatePasswordHash(username, passwordEncoder.encode(newPassword));
+  }
+
+  /**
+   * Admin reset. No current-password check — caller authorization (bootstrap admin) is enforced by
+   * the controller. The controller revokes all of the target's sessions after this returns.
+   *
+   * @throws site.asm0dey.slidev.polls.core.error.NotFoundException if the target does not exist
+   */
+  @Transactional
+  public void resetPassword(String targetUsername, String newPassword) {
+    if (repository.findPasswordHash(targetUsername).isEmpty()) {
+      throw new NotFoundException(targetUsername);
+    }
+    repository.updatePasswordHash(targetUsername, passwordEncoder.encode(newPassword));
+  }
+
   public List<AdminUser> listAdmins() {
     return repository.listAll();
+  }
+
+  public java.util.Set<String> listBlockedUsernames() {
+    return repository.listBlockedUsernames();
+  }
+
+  /**
+   * Block {@code rawTarget}. Guards: the caller cannot block themselves, and the bootstrap admin
+   * cannot be blocked (lockout protection). Sets {@code blocked_at} and revokes every deck token
+   * the target minted. The controller separately expires the target's sessions.
+   */
+  @Transactional
+  public void block(String caller, String rawTarget) {
+    String target = Usernames.normalize(rawTarget);
+    if (target.equals(caller)) {
+      throw new CannotBlockException("cannot block yourself");
+    }
+    if (repository.findBootstrapAdminUsername().map(target::equals).orElse(false)) {
+      throw new CannotBlockException("cannot block the administrator");
+    }
+    if (repository.findPasswordHash(target).isEmpty()) {
+      throw new NotFoundException(target);
+    }
+    repository.setBlockedAt(target, Instant.now());
+    deckTokenRepository.revokeAllByMinter(target);
+  }
+
+  /** Unblock {@code rawTarget}. Restores login only; revoked tokens stay revoked. */
+  @Transactional
+  public void unblock(String rawTarget) {
+    String target = Usernames.normalize(rawTarget);
+    if (repository.findPasswordHash(target).isEmpty()) {
+      throw new NotFoundException(target);
+    }
+    repository.setBlockedAt(target, null);
   }
 }

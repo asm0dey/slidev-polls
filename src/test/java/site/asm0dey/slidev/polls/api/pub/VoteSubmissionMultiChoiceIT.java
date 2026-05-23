@@ -160,12 +160,12 @@ class VoteSubmissionMultiChoiceIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
+    UUID pollId = UUID.fromString(poll.get("id").asString());
     JsonNode question = poll.get("questions").get(0);
-    UUID questionId = UUID.fromString(question.get("id").asText());
+    UUID questionId = UUID.fromString(question.get("id").asString());
     List<UUID> optionIds = new ArrayList<>();
     for (JsonNode o : question.get("options")) {
-      optionIds.add(UUID.fromString(o.get("id").asText()));
+      optionIds.add(UUID.fromString(o.get("id").asString()));
     }
 
     mockMvc

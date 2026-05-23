@@ -20,7 +20,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import site.asm0dey.slidev.polls.api.logging.CorrelationIdFilter;
 import site.asm0dey.slidev.polls.core.error.ActivationRejectedException;
+import site.asm0dey.slidev.polls.core.error.AdminRequiredException;
 import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
+import site.asm0dey.slidev.polls.core.error.CannotBlockException;
+import site.asm0dey.slidev.polls.core.error.CannotShareWithOwnerException;
+import site.asm0dey.slidev.polls.core.error.CollaboratorExistsException;
+import site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenInvalidException;
 import site.asm0dey.slidev.polls.core.error.DeckTokenPollMismatchException;
 import site.asm0dey.slidev.polls.core.error.InvalidOriginException;
@@ -68,6 +73,16 @@ public class GlobalExceptionHandler {
     return respond(HttpStatus.FORBIDDEN, ProblemCode.FORBIDDEN, safe(ex));
   }
 
+  @ExceptionHandler(AdminRequiredException.class)
+  ResponseEntity<Problem> handleAdminRequired(AdminRequiredException ex) {
+    return respond(HttpStatus.FORBIDDEN, ProblemCode.ADMIN_REQUIRED, safe(ex));
+  }
+
+  @ExceptionHandler(CurrentPasswordMismatchException.class)
+  ResponseEntity<Problem> handleCurrentPasswordMismatch(CurrentPasswordMismatchException ex) {
+    return respond(HttpStatus.FORBIDDEN, ProblemCode.FORBIDDEN, safe(ex));
+  }
+
   @ExceptionHandler(AlreadyVotedException.class)
   ResponseEntity<Problem> handleAlreadyVoted(AlreadyVotedException ex) {
     return respond(HttpStatus.CONFLICT, ProblemCode.ALREADY_VOTED, safe(ex));
@@ -91,6 +106,21 @@ public class GlobalExceptionHandler {
         ProblemCode.RESOURCE_HAS_VOTES,
         safe(ex),
         Map.of(key, List.of(safe(ex))));
+  }
+
+  @ExceptionHandler(CollaboratorExistsException.class)
+  ResponseEntity<Problem> handleCollaboratorExists(CollaboratorExistsException ex) {
+    return respond(HttpStatus.CONFLICT, ProblemCode.COLLABORATOR_EXISTS, safe(ex));
+  }
+
+  @ExceptionHandler(CannotShareWithOwnerException.class)
+  ResponseEntity<Problem> handleCannotShareWithOwner(CannotShareWithOwnerException ex) {
+    return respond(HttpStatus.CONFLICT, ProblemCode.CANNOT_SHARE_WITH_OWNER, safe(ex));
+  }
+
+  @ExceptionHandler(CannotBlockException.class)
+  ResponseEntity<Problem> handleCannotBlock(CannotBlockException ex) {
+    return respond(HttpStatus.CONFLICT, ProblemCode.USER_BLOCKED, safe(ex));
   }
 
   @ExceptionHandler(SlugTakenException.class)

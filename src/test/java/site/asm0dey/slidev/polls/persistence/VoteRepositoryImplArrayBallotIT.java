@@ -32,7 +32,7 @@ class VoteRepositoryImplArrayBallotIT extends AbstractPostgresTest {
 
   record P(UUID pollId, UUID questionId, List<UUID> options) {}
 
-  abstract class CommonArrayBallot {
+  abstract static class CommonArrayBallot {
     protected DSLContext dsl;
     protected PollRepositoryImpl pollRepository;
     protected VoteRepositoryImpl voteRepository;
@@ -55,7 +55,7 @@ class VoteRepositoryImplArrayBallotIT extends AbstractPostgresTest {
     @Test
     void storesArrayBallotAsSingleRow() {
       P p = activateMultiQuestion(3, 1, 3);
-      UUID a = p.options().get(0);
+      UUID a = p.options().getFirst();
       UUID c = p.options().get(2);
 
       Vote stored =

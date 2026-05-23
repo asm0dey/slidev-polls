@@ -1,5 +1,6 @@
 package site.asm0dey.slidev.polls.api.security;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -70,7 +71,12 @@ public class SecurityConfig {
     // header value are identical (per Spring Security 7 docs).
     CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
     CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
-    csrfHandler.setCsrfRequestAttributeName(null);
+    // Passing null disables the extra request attribute (name falls back to
+    // csrfToken.getParameterName()).
+    // The parameter is unannotated in a @NullMarked package but null is an intentional, documented
+    // value.
+    @Nullable String noAttrName = null;
+    csrfHandler.setCsrfRequestAttributeName(noAttrName);
 
     http.cors(cors -> cors.configurationSource(corsSource))
         .authorizeHttpRequests(

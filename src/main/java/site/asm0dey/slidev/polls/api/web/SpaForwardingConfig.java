@@ -1,10 +1,13 @@
 package site.asm0dey.slidev.polls.api.web;
 
 import java.io.IOException;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
@@ -57,7 +60,7 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
   // a URL that could never be a real poll (upper-case, leading hyphen, dot-containing) falls
   // through to Spring's default 404 handling instead of serving the voter shell.
   @GetMapping({"/", "/{slug:[a-z0-9-]{3,40}}"})
-  public String voterShell() {
+  public String voterShell(@PathVariable(required = false) @Nullable String slug) {
     return "forward:/index.html";
   }
 
@@ -94,7 +97,8 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
    */
   private static final class SpaShellFallbackResolver extends PathResourceResolver {
     @Override
-    protected Resource getResource(String resourcePath, Resource location) throws IOException {
+    protected @Nullable Resource getResource(
+        @NonNull String resourcePath, @NonNull Resource location) throws IOException {
       if (resourcePath.isEmpty() || "/".equals(resourcePath)) {
         return readable(location.createRelative("index.html"));
       }

@@ -36,7 +36,8 @@ class VoteServiceArityTest {
   void singleChoiceRequiresExactlyOne() {
     Fixture f = fixture(/* min */ 1, /* max */ 1, /* options */ 2);
     assertThatThrownBy(
-            () -> f.service.recordVote("p", List.of(f.options.get(0), f.options.get(1)), "v"))
+            () ->
+                f.service.recordVote("p", List.of(f.options.getFirst(), f.options.getLast()), "v"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("between 1 and 1");
   }
@@ -45,7 +46,7 @@ class VoteServiceArityTest {
   void multiAllowsRange() {
     Fixture f = fixture(0, 3, 3);
     when(f.repo.insert(any())).thenAnswer(inv -> inv.getArgument(0));
-    f.service.recordVote("p", List.of(f.options.get(0), f.options.get(2)), "v");
+    f.service.recordVote("p", List.of(f.options.getFirst(), f.options.get(2)), "v");
     verify(f.events).publishEvent((Object) any());
   }
 
@@ -76,7 +77,7 @@ class VoteServiceArityTest {
     assertThatThrownBy(
             () ->
                 f.service.recordVote(
-                    "p", List.of(f.options.get(0), f.options.get(1), f.options.get(2)), "v"))
+                    "p", List.of(f.options.getFirst(), f.options.get(1), f.options.getLast()), "v"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -84,7 +85,8 @@ class VoteServiceArityTest {
   void duplicateOptionInBallotRejected() {
     Fixture f = fixture(0, 3, 3);
     assertThatThrownBy(
-            () -> f.service.recordVote("p", List.of(f.options.get(0), f.options.get(0)), "v"))
+            () ->
+                f.service.recordVote("p", List.of(f.options.getFirst(), f.options.getFirst()), "v"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("duplicate");
   }

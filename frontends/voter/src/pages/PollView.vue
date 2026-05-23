@@ -450,7 +450,7 @@ onUnmounted(() => stopStream?.());
   border-radius: var(--sp-radius-lg);
   padding: 14px 16px;
   font-size: 14px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   color: var(--sp-fg);
   cursor: pointer;
   display: flex;

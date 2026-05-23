@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.asm0dey.slidev.polls.core.domain.DeckToken;
+import site.asm0dey.slidev.polls.core.domain.Poll;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 
 /**
@@ -20,9 +21,9 @@ import site.asm0dey.slidev.polls.core.error.NotFoundException;
  * {@link Minted#plaintext} is the one and only time the bearer is visible — subsequent reads come
  * from {@link #list(UUID, String)} which returns hash-only rows.
  *
- * <p>All write and read paths check poll ownership ({@code @TS-057}); the deck-auth filter path
- * (see {@link #resolveLive(String)}) bypasses ownership by design — it is authorised by the bearer
- * itself.
+ * <p>All write and read paths check editor authorization — owner or collaborator ({@code @TS-057});
+ * the deck-auth filter path (see {@link #resolveLive(String)}) bypasses authorization by design —
+ * it is authorised by the bearer itself.
  */
 @Service
 public class DeckTokenService {
@@ -32,10 +33,13 @@ public class DeckTokenService {
 
   private final DeckTokenRepository repository;
   private final PollRepository pollRepository;
+  private final PollAuthorizer authorizer;
 
-  public DeckTokenService(DeckTokenRepository repository, PollRepository pollRepository) {
+  public DeckTokenService(
+      DeckTokenRepository repository, PollRepository pollRepository, PollAuthorizer authorizer) {
     this.repository = repository;
     this.pollRepository = pollRepository;
+    this.authorizer = authorizer;
   }
 
   /**
@@ -44,26 +48,27 @@ public class DeckTokenService {
    */
   @Transactional
   public Minted mint(UUID pollId, String ownerUsername, String label) {
-    requireOwner(pollId, ownerUsername);
+    requireEditor(pollId, ownerUsername);
     byte[] random = new byte[32];
     RNG.nextBytes(random);
     String plaintext = BASE64.encodeToString(random);
     String hash = sha256(plaintext);
     DeckToken saved =
         repository.insert(
-            new DeckToken(UUID.randomUUID(), pollId, hash, label, Instant.now(), null));
+            new DeckToken(
+                UUID.randomUUID(), pollId, hash, label, Instant.now(), null, ownerUsername));
     return new Minted(saved, plaintext);
   }
 
   @Transactional(readOnly = true)
   public List<DeckToken> list(UUID pollId, String ownerUsername) {
-    requireOwner(pollId, ownerUsername);
+    requireEditor(pollId, ownerUsername);
     return repository.findByPoll(pollId);
   }
 
   @Transactional
   public DeckToken revoke(UUID pollId, UUID tokenId, String ownerUsername) {
-    requireOwner(pollId, ownerUsername);
+    requireEditor(pollId, ownerUsername);
     DeckToken existing =
         repository.findById(tokenId).orElseThrow(() -> new NotFoundException(tokenId.toString()));
     if (!existing.pollId().equals(pollId)) {
@@ -86,11 +91,13 @@ public class DeckTokenService {
     return repository.findLiveByHash(sha256(plaintext));
   }
 
-  private void requireOwner(UUID pollId, String ownerUsername) {
-    pollRepository
-        .findById(pollId)
-        .filter(p -> p.ownerUsername().equals(ownerUsername))
-        .orElseThrow(() -> new NotFoundException(pollId.toString()));
+  private void requireEditor(UUID pollId, String username) {
+    Poll poll =
+        pollRepository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    if (!authorizer.isEditor(poll, username)) {
+      // 404 (not 403) so a non-editor cannot probe which polls exist.
+      throw new NotFoundException(pollId.toString());
+    }
   }
 
   static String sha256(String plaintext) {

@@ -38,7 +38,8 @@ https://github.com/user-attachments/assets/03e127df-656d-4e82-85a4-489e8cafc9b0
   the same tallies but never re-open a closed question.
 - A button in the Slidev toolbar takes your admin credentials and mints a
   short-lived deck token automatically. No admin-UI side trip to pre-create
-  one.
+  one. This works whether you own the poll or it was shared with you as a
+  collaborator.
 - While signed in, every on-slide result panel shows a QR toggle. Clicking it
   opens a fullscreen QR with the printed join URL so the audience can scan
   to join without typing. The QR is rendered locally; nothing leaves your
@@ -53,9 +54,23 @@ https://github.com/user-attachments/assets/03e127df-656d-4e82-85a4-489e8cafc9b0
 ### For administrators (`/admin/`)
 
 - First time you open the admin URL, a setup wizard creates the initial
-  presenter account. No env vars or SQL involved.
-- Add and remove additional presenter accounts from the **Presenters**
-  sidebar. Useful when a colleague is co-presenting.
+  presenter account. No env vars or SQL involved. That first account is the
+  *bootstrap admin* — it has the management powers below; later accounts are
+  ordinary presenters.
+- Add additional presenter accounts from the **Presenters** sidebar. Useful
+  when a colleague is co-presenting. The bootstrap admin can also reset another
+  presenter's password and block or unblock an account. Blocking ends that
+  presenter's sessions and revokes their deck tokens immediately, and a blocked
+  account can't sign in until unblocked.
+- Change your own password from the account menu. Doing so signs out your other
+  sessions but keeps the one you're using.
+- Share a poll with another presenter from the poll editor's **Share** panel.
+  Collaborators can edit the poll and run it from their own deck; deleting,
+  transferring, and managing collaborators stay with the owner. Shared polls are
+  flagged in the poll list, with the owner-only actions hidden on them. Removing
+  a collaborator revokes the deck tokens they minted.
+- Transfer a poll to another presenter to hand over ownership outright. You
+  confirm by typing the new owner's name, and you lose access once it's done.
 - Poll authoring:
     - Create a poll, give it a human-readable slug (with live availability
       check), and add an ordered list of questions.

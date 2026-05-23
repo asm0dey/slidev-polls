@@ -2,6 +2,7 @@
 import { ref, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import type { AdminApiClient } from "../lib/admin-api";
+import ChangePasswordForm from "./ChangePasswordForm.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -13,14 +14,21 @@ const props = withDefaults(
 
 const router = useRouter();
 const open = ref(false);
+const showChangePassword = ref(false);
 const root = ref<HTMLElement | null>(null);
 
 function toggle() {
   open.value = !open.value;
 }
 
+function openChangePassword() {
+  open.value = false;
+  showChangePassword.value = true;
+}
+
 async function logout() {
   open.value = false;
+  showChangePassword.value = false;
   try {
     await props.apiClient.logout();
   } catch (_err) {
@@ -57,6 +65,17 @@ if (typeof document !== "undefined") {
           type="button"
           class="um__item"
           role="menuitem"
+          data-testid="user-menu-change-password"
+          @click="openChangePassword"
+        >
+          Change password
+        </button>
+      </li>
+      <li role="none">
+        <button
+          type="button"
+          class="um__item"
+          role="menuitem"
           data-testid="user-menu-logout"
           @click="logout"
         >
@@ -64,6 +83,20 @@ if (typeof document !== "undefined") {
         </button>
       </li>
     </ul>
+    <div v-if="showChangePassword" class="um__panel">
+      <div class="um__panel-header">
+        <span class="um__panel-title">Change password</span>
+        <button
+          type="button"
+          class="um__panel-close"
+          aria-label="Close"
+          @click="showChangePassword = false"
+        >
+          ✕
+        </button>
+      </div>
+      <ChangePasswordForm :api-client="apiClient" />
+    </div>
   </div>
 </template>
 
@@ -109,6 +142,40 @@ if (typeof document !== "undefined") {
   border-radius: var(--sp-radius-sm);
 }
 .um__item:hover {
+  background: var(--sp-bg-muted);
+}
+.um__panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 260px;
+  padding: 12px;
+  background: var(--sp-bg);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+}
+.um__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.um__panel-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.um__panel-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--sp-fg);
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: var(--sp-radius-sm);
+}
+.um__panel-close:hover {
   background: var(--sp-bg-muted);
 }
 </style>

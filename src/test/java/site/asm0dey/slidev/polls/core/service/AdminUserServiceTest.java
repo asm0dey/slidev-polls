@@ -15,8 +15,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.CannotSerializeTransactionException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -30,6 +30,7 @@ class AdminUserServiceTest {
   AdminUserRepository repo;
   PasswordEncoder encoder;
   PlatformTransactionManager txManager;
+  DeckTokenRepository deckTokenRepo;
   AdminUserService service;
 
   @BeforeEach
@@ -37,12 +38,13 @@ class AdminUserServiceTest {
     repo = mock(AdminUserRepository.class);
     encoder = mock(PasswordEncoder.class);
     txManager = mock(PlatformTransactionManager.class);
+    deckTokenRepo = mock(DeckTokenRepository.class);
     // Pass-through transaction: TransactionTemplate.execute calls getTransaction first;
     // returning a plain status lets the lambda run as if inside a real transaction. The mock
     // ignores commit/rollback so the test never fails on missing JDBC resources.
     when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     when(encoder.encode("password-twelve")).thenReturn("$argon2id$encoded");
-    service = new AdminUserService(repo, encoder, txManager);
+    service = new AdminUserService(repo, encoder, txManager, deckTokenRepo);
   }
 
   @Test
@@ -138,7 +140,7 @@ class AdminUserServiceTest {
     when(repo.count()).thenReturn(0L);
     // Postgres reports SERIALIZABLE conflicts at COMMIT, not during the insert; the service's
     // try/catch wraps the whole TransactionTemplate so the translation still fires.
-    doThrow(new CannotSerializeTransactionException("could not serialize access"))
+    doThrow(new PessimisticLockingFailureException("could not serialize access"))
         .when(txManager)
         .commit(any(TransactionStatus.class));
 

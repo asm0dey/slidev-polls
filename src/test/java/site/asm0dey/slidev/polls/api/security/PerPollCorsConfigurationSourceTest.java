@@ -35,8 +35,9 @@ class PerPollCorsConfigurationSourceTest {
     Poll poll = pollWithOrigins(List.of("https://example.github.io"), "p", id);
     when(repo.findById(id)).thenReturn(Optional.of(poll));
     HttpServletRequest req = get("/api/deck/polls/" + id + "/activate");
-    assertThat(src.getCorsConfiguration(req).getAllowedOrigins())
-        .containsExactly("https://example.github.io");
+    CorsConfiguration cfg = src.getCorsConfiguration(req);
+    assertThat(cfg).isNotNull();
+    assertThat(cfg.getAllowedOrigins()).containsExactly("https://example.github.io");
   }
 
   @Test
@@ -44,8 +45,9 @@ class PerPollCorsConfigurationSourceTest {
     when(repo.isOriginAllowedByAnyPoll("http://localhost:3030")).thenReturn(true);
     MockHttpServletRequest req = (MockHttpServletRequest) get("/api/deck/auth/login");
     req.addHeader("Origin", "http://localhost:3030");
-    assertThat(src.getCorsConfiguration(req).getAllowedOrigins())
-        .containsExactly("http://localhost:3030");
+    CorsConfiguration cfg = src.getCorsConfiguration(req);
+    assertThat(cfg).isNotNull();
+    assertThat(cfg.getAllowedOrigins()).containsExactly("http://localhost:3030");
   }
 
   @Test

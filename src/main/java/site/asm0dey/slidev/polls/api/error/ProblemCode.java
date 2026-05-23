@@ -8,6 +8,7 @@ package site.asm0dey.slidev.polls.api.error;
 public enum ProblemCode {
   AUTH_REQUIRED,
   FORBIDDEN,
+  ADMIN_REQUIRED,
   NOT_FOUND,
   VALIDATION_FAILED,
   ALREADY_VOTED,
@@ -22,5 +23,8 @@ public enum ProblemCode {
   SETUP_LOCKED,
   USERNAME_TAKEN,
   RESOURCE_HAS_VOTES,
+  COLLABORATOR_EXISTS,
+  CANNOT_SHARE_WITH_OWNER,
+  USER_BLOCKED,
   TRANSPORT_FAILURE
 }

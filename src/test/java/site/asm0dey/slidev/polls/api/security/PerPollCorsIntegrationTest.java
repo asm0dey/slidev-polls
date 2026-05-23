@@ -131,8 +131,8 @@ class PerPollCorsIntegrationTest {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
-    String pollSlug = poll.get("slug").asText();
+    UUID pollId = UUID.fromString(poll.get("id").asString());
+    String pollSlug = poll.get("slug").asString();
     return new PollFixture(pollId, pollSlug);
   }
 

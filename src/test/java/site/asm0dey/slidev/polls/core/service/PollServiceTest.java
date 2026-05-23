@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEvent;
@@ -38,24 +39,31 @@ import site.asm0dey.slidev.polls.core.error.SlugTakenException;
  */
 class PollServiceTest {
 
-  private FakePollRepository repository;
   private FakeVoteRepository fakeVoteRepository;
   private PollService service;
 
   @BeforeEach
   void setUp() {
-    repository = new FakePollRepository();
+    FakePollRepository repository = new FakePollRepository();
     fakeVoteRepository = new FakeVoteRepository();
     org.springframework.beans.factory.ObjectProvider<PollService> selfProvider =
         new org.springframework.beans.factory.ObjectProvider<>() {
           @Override
-          public PollService getObject() {
+          public @NonNull PollService getObject() {
             return service;
           }
         };
+    PollCollaboratorRepository collaborators = new NoCollaborators();
     service =
         new PollService(
-            repository, new RecordingEventPublisher(), selfProvider, fakeVoteRepository);
+            repository,
+            new RecordingEventPublisher(),
+            selfProvider,
+            fakeVoteRepository,
+            new PollAuthorizer(collaborators),
+            collaborators,
+            null,
+            null);
   }
 
   // @TS-010 — when the presenter does not supply a slug, the server derives one from the title
@@ -171,7 +179,7 @@ class PollServiceTest {
             "alice",
             new CreatePollCommand(
                 "broken", "broken", List.of(questionDraft("Q?", "only-one")), null));
-    UUID qid = created.questions().get(0).id();
+    UUID qid = created.questions().getFirst().id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "alice", qid))
         .isInstanceOf(ActivationRejectedException.class);
@@ -217,7 +225,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand("x", "x-slug", List.of(questionDraft("Q?", "A", "B")), null));
-    UUID qid = created.questions().get(0).id();
+    UUID qid = created.questions().getFirst().id();
 
     assertThatThrownBy(() -> service.activateQuestionForOwner(created.id(), "bob", qid))
         .isInstanceOf(NotOwnerException.class);
@@ -275,9 +283,9 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand("t", "preserve", List.of(questionDraft("Q?", "A", "B")), null));
-    UUID qid = created.questions().get(0).id();
-    UUID oA = created.questions().get(0).options().get(0).id();
-    UUID oB = created.questions().get(0).options().get(1).id();
+    UUID qid = created.questions().getFirst().id();
+    UUID oA = created.questions().getFirst().options().getFirst().id();
+    UUID oB = created.questions().getFirst().options().get(1).id();
 
     Poll after =
         service.updateForOwner(
@@ -295,9 +303,11 @@ class PollServiceTest {
                             new CreatePollCommand.OptionUpdate(oB, "B")))),
                 null));
 
-    assertThat(after.questions().get(0).id()).isEqualTo(qid);
-    assertThat(after.questions().get(0).options()).extracting(Option::id).containsExactly(oA, oB);
-    assertThat(after.questions().get(0).prompt()).isEqualTo("Q renamed?");
+    assertThat(after.questions().getFirst().id()).isEqualTo(qid);
+    assertThat(after.questions().getFirst().options())
+        .extracting(Option::id)
+        .containsExactly(oA, oB);
+    assertThat(after.questions().getFirst().prompt()).isEqualTo("Q renamed?");
   }
 
   @Test
@@ -317,8 +327,8 @@ class PollServiceTest {
     assertThat(clone.title()).isEqualTo("Copy of My Talk");
     assertThat(clone.slug()).isNotEqualTo(src.slug());
     assertThat(clone.questions()).hasSize(1);
-    assertThat(clone.questions().get(0).id()).isNotEqualTo(src.questions().get(0).id());
-    assertThat(clone.questions().get(0).options())
+    assertThat(clone.questions().getFirst().id()).isNotEqualTo(src.questions().getFirst().id());
+    assertThat(clone.questions().getFirst().options())
         .extracting(Option::label)
         .containsExactly("A", "B");
     assertThat(clone.allowedOrigins()).containsExactly("https://example.com");
@@ -342,8 +352,8 @@ class PollServiceTest {
             "alice",
             new CreatePollCommand(
                 "t", "clear-votes", List.of(questionDraft("Q?", "A", "B")), null));
-    UUID qid = created.questions().get(0).id();
-    UUID oid = created.questions().get(0).options().get(0).id();
+    UUID qid = created.questions().getFirst().id();
+    UUID oid = created.questions().getFirst().options().getFirst().id();
     service.activateQuestionForOwner(created.id(), "alice", qid);
 
     fakeVoteRepository.insert(
@@ -353,8 +363,8 @@ class PollServiceTest {
 
     assertThat(after.activeQuestionId()).isNull();
     assertThat(after.status()).isEqualTo(PollStatus.DRAFT);
-    assertThat(after.questions().get(0).id()).isEqualTo(qid);
-    assertThat(after.questions().get(0).status()).isEqualTo(QuestionStatus.DRAFT);
+    assertThat(after.questions().getFirst().id()).isEqualTo(qid);
+    assertThat(after.questions().getFirst().status()).isEqualTo(QuestionStatus.DRAFT);
     assertThat(fakeVoteRepository.tally(qid)).isEmpty();
   }
 
@@ -375,7 +385,7 @@ class PollServiceTest {
         service.create(
             "alice",
             new CreatePollCommand("t", "deck-close", List.of(questionDraft("Q?", "A", "B")), null));
-    UUID qid = created.questions().get(0).id();
+    UUID qid = created.questions().getFirst().id();
     service.activateQuestionForOwner(created.id(), "alice", qid);
 
     Poll after = service.closeActiveQuestion(created.id());
@@ -440,12 +450,19 @@ class PollServiceTest {
     }
 
     @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
+      return byId.values().stream().filter(p -> p.ownerUsername().equals(username)).toList();
+    }
+
+    @Override
     public boolean slugTaken(String slug, UUID excludingPollId) {
       return byId.values().stream()
-          .anyMatch(
-              p ->
-                  p.slug().equalsIgnoreCase(slug)
-                      && (excludingPollId == null || !p.id().equals(excludingPollId)));
+          .anyMatch(p -> p.slug().equalsIgnoreCase(slug) && !p.id().equals(excludingPollId));
     }
 
     @Override
@@ -740,9 +757,33 @@ class PollServiceTest {
   static final class RecordingEventPublisher implements ApplicationEventPublisher {
 
     @Override
-    public void publishEvent(Object event) {}
+    public void publishEvent(@NonNull Object event) {}
 
     @Override
-    public void publishEvent(ApplicationEvent event) {}
+    public void publishEvent(@NonNull ApplicationEvent event) {}
+  }
+
+  /** No sharing in these tests, so the owner check in requireEditor is the only path taken. */
+  static final class NoCollaborators implements PollCollaboratorRepository {
+    @Override
+    public site.asm0dey.slidev.polls.core.domain.PollCollaborator add(
+        UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void remove(UUID pollId, String username) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean exists(UUID pollId, String username) {
+      return false;
+    }
+
+    @Override
+    public List<site.asm0dey.slidev.polls.core.domain.PollCollaborator> listByPoll(UUID pollId) {
+      return List.of();
+    }
   }
 }

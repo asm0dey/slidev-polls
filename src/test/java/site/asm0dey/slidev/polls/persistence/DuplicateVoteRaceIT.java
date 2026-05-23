@@ -39,7 +39,7 @@ import site.asm0dey.slidev.polls.core.error.AlreadyVotedException;
  */
 class DuplicateVoteRaceIT extends AbstractPostgresTest {
 
-  abstract class CommonDuplicateVote {
+  abstract static class CommonDuplicateVote {
     protected DSLContext dsl;
     protected PollRepositoryImpl pollRepository;
     protected VoteRepositoryImpl voteRepository;
@@ -74,7 +74,7 @@ class DuplicateVoteRaceIT extends AbstractPostgresTest {
         Callable<Object> submit =
             () -> {
               ready.countDown();
-              go.await(5, TimeUnit.SECONDS);
+              assertThat(go.await(5, TimeUnit.SECONDS)).as("start gate timed out").isTrue();
               try {
                 return voteRepository.insert(
                     new Vote(

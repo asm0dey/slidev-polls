@@ -34,6 +34,7 @@ function pollDetail(over: Partial<PollDetail> = {}): PollDetail {
     status: "DRAFT",
     publicUrl: "http://localhost:8080/quickstart-demo",
     activeQuestionId: null,
+    isOwner: true,
     questions: [
       {
         id: "q1",
@@ -59,6 +60,10 @@ function makeFake(overrides: Partial<AdminApiClient> = {}): AdminApiClient {
     createPoll: vi.fn(async (req: CreatePollRequest) => pollDetail({ title: req.title })),
     updatePoll: vi.fn(async (_id: string, _req) => pollDetail()),
     deletePoll: vi.fn().mockResolvedValue(undefined),
+    listCollaborators: vi.fn().mockResolvedValue([]),
+    addCollaborator: vi.fn().mockResolvedValue(undefined),
+    removeCollaborator: vi.fn().mockResolvedValue(undefined),
+    transferPoll: vi.fn().mockResolvedValue(undefined),
     qrUrl: (id: string) => `/api/admin/polls/${id}/qr.png`,
     ...overrides
   } as unknown as AdminApiClient;
@@ -291,15 +296,17 @@ describe("PollEditorPage — edit mode", () => {
     await wrapper.get('[data-testid="menu-item-delete"]').trigger("click");
     await flushPromises();
 
-    // Typed-slug confirmation required — the delete dialog is the second
-    // ConfirmDialog rendered after clear-votes (which stays mounted, closed).
+    // Typed-slug confirmation required — only the delete dialog has a typed input.
     const typed = wrapper.findAll('[data-testid="confirm-dialog-typed"]');
     expect(typed).toHaveLength(1);
     await typed[0].setValue("quickstart-demo");
 
-    const confirmButtons = wrapper.findAll('[data-testid="confirm-dialog-confirm"]');
-    // [0] is clear-votes (closed), [1] is delete (open with typed input)
-    await confirmButtons[confirmButtons.length - 1].trigger("click");
+    // Click the confirm button inside the same dialog as the typed input.
+    const dlg = typed[0].element.closest('[data-testid="confirm-dialog"]') as HTMLElement;
+    const confirmBtn = dlg.querySelector(
+      '[data-testid="confirm-dialog-confirm"]'
+    ) as HTMLButtonElement;
+    await confirmBtn.click();
     await flushPromises();
 
     expect(deletePoll).toHaveBeenCalledWith("p1");
@@ -437,6 +444,15 @@ describe("PollEditorPage — edit mode", () => {
     // After save snippet button should be back, hint gone
     expect(wrapper.find('[data-testid="question-copy-snippet"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="copy-snippet-disabled-hint"]').exists()).toBe(false);
+  });
+
+  it("hides collaborators panel and owner-only overflow menu when isOwner is false", async () => {
+    const getPoll = vi.fn().mockResolvedValue(pollDetail({ isOwner: false }));
+    const client = makeFake({ getPoll });
+    const { wrapper } = await mountEdit(client);
+
+    expect(wrapper.find('[data-testid="poll-collaborators"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="menu-trigger"]').exists()).toBe(false);
   });
 
   it("hides Clear votes and Delete behind an overflow menu", async () => {

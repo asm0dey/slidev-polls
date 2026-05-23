@@ -66,8 +66,8 @@ class TallyBroadcastTest {
   void vote_cast_event_broadcasts_fresh_snapshot() throws Exception {
     Poll poll = seedPollWithActiveQuestion("tally-talk");
     UUID activeQ = poll.activeQuestionId();
-    UUID optionA = poll.questions().get(0).options().get(0).id();
-    UUID optionB = poll.questions().get(0).options().get(1).id();
+    UUID optionA = poll.questions().getFirst().options().getFirst().id();
+    UUID optionB = poll.questions().getFirst().options().get(1).id();
     votes.seedTally(activeQ, Map.of(optionA, 7L, optionB, 2L));
     CapturingEmitter emitter = new CapturingEmitter();
     hub.register(poll.id(), emitter);
@@ -93,7 +93,7 @@ class TallyBroadcastTest {
   void vote_retracted_event_broadcasts_fresh_snapshot() {
     Poll poll = seedPollWithActiveQuestion("retract-talk");
     UUID activeQ = poll.activeQuestionId();
-    UUID optionA = poll.questions().get(0).options().get(0).id();
+    UUID optionA = poll.questions().getFirst().options().getFirst().id();
     votes.seedTally(activeQ, Map.of(optionA, 3L));
     CapturingEmitter emitter = new CapturingEmitter();
     hub.register(poll.id(), emitter);
@@ -118,7 +118,7 @@ class TallyBroadcastTest {
   void active_question_change_broadcasts_fresh_snapshot() throws Exception {
     Poll poll = seedPollWithTwoDraftQuestions("snapshot-talk");
     // Activate Q2 and check the snapshot covers Q2's options with zeroed tallies.
-    UUID q2 = poll.questions().get(1).id();
+    UUID q2 = poll.questions().getLast().id();
     polls.activateQuestion(poll.id(), q2);
     CapturingEmitter emitter = new CapturingEmitter();
     hub.register(poll.id(), emitter);
@@ -150,7 +150,7 @@ class TallyBroadcastTest {
 
     broadcaster.onQuestionClosed(new PollQuestionClosedEvent(poll.id(), activeId, Instant.now()));
 
-    CapturingEmitter.Captured ev = emitter.events.get(0);
+    CapturingEmitter.Captured ev = emitter.events.getFirst();
     assertThat(ev.name).isEqualTo("question-closed");
     QuestionClosedPayload payload = (QuestionClosedPayload) ev.data;
     assertThat(payload.pollId()).isEqualTo(poll.id());
@@ -187,8 +187,8 @@ class TallyBroadcastTest {
   void snapshot_carries_voter_count_distinct_from_selections() {
     Poll poll = seedPollWithActiveQuestion("voter-count-talk");
     UUID activeQ = poll.activeQuestionId();
-    UUID optionA = poll.questions().get(0).options().get(0).id();
-    UUID optionB = poll.questions().get(0).options().get(1).id();
+    UUID optionA = poll.questions().getFirst().options().getFirst().id();
+    UUID optionB = poll.questions().getFirst().options().get(1).id();
     // Selections sum to 7, but the fake's voterCount is max-per-option (4) — see
     // InMemoryVoteRepository#voterCount javadoc for why that's good enough here.
     votes.seedTally(activeQ, Map.of(optionA, 4L, optionB, 3L));
@@ -197,7 +197,7 @@ class TallyBroadcastTest {
 
     broadcaster.onVoteCast(new VoteCastEvent(poll.id(), activeQ, Instant.now()));
 
-    SnapshotPayload payload = (SnapshotPayload) emitter.events.get(0).data;
+    SnapshotPayload payload = (SnapshotPayload) emitter.events.getFirst().data;
     long selections = payload.tally().stream().mapToLong(SnapshotPayload.TallyEntry::count).sum();
     assertThat(selections).isEqualTo(7L);
     assertThat(payload.voterCount()).isEqualTo(4L);
@@ -211,7 +211,7 @@ class TallyBroadcastTest {
 
   private Poll seedPollWithActiveQuestion(String slug) {
     Poll poll = seedPollWithTwoDraftQuestions(slug);
-    return polls.activateQuestion(poll.id(), poll.questions().get(0).id());
+    return polls.activateQuestion(poll.id(), poll.questions().getFirst().id());
   }
 
   private Poll seedPollWithTwoDraftQuestions(String slug) {
@@ -306,6 +306,16 @@ class TallyBroadcastTest {
 
     @Override
     public List<Poll> findByOwner(String ownerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
       throw new UnsupportedOperationException();
     }
 

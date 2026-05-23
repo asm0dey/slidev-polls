@@ -33,6 +33,7 @@ export interface Poll {
   status: PollStatus;
   publicUrl: string;
   activeQuestionId: string | null;
+  isOwner: boolean;
 }
 
 /** Full poll with questions, options (GET /api/admin/polls/{id}). */
@@ -190,4 +191,16 @@ export interface QuestionClosedEvent {
   pollId: string;
   questionId: string;
   emittedAt: string;
+}
+
+/** GET /api/admin/account */
+export interface AccountView {
+  username: string;
+  isAdmin: boolean;
+}
+
+/** Collaborator entry (GET/POST /api/admin/polls/{id}/collaborators). */
+export interface CollaboratorView {
+  username: string;
+  createdAt: string;
 }

@@ -24,6 +24,12 @@ public interface PollRepository {
 
   List<Poll> findByOwner(String ownerUsername);
 
+  /** Re-assigns ownership; returns the reloaded poll. */
+  Poll transferOwner(UUID pollId, String newOwnerUsername);
+
+  /** Polls owned by {@code username} or where {@code username} is a collaborator. */
+  List<Poll> findOwnedOrCollaborated(String username);
+
   /** Case-insensitive slug lookup; excludes poll {@code excludingPollId} when non-null. */
   boolean slugTaken(String slug, UUID excludingPollId);
 

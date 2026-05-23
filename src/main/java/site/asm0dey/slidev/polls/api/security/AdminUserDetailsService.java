@@ -4,6 +4,7 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
 import java.util.Collections;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -32,21 +33,24 @@ public class AdminUserDetailsService implements UserDetailsService {
   }
 
   @Override
-  public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+  public @NonNull UserDetails loadUserByUsername(@NonNull String username)
+      throws UsernameNotFoundException {
     if (username.isBlank()) {
       throw new UsernameNotFoundException("empty username");
     }
     String lookup = username.toLowerCase();
     var row =
-        dsl.select(ADMIN_USER.USERNAME, ADMIN_USER.PASSWORD_HASH)
+        dsl.select(ADMIN_USER.USERNAME, ADMIN_USER.PASSWORD_HASH, ADMIN_USER.BLOCKED_AT)
             .from(ADMIN_USER)
             .where(ADMIN_USER.USERNAME.eq(lookup))
             .fetchOne();
     if (row == null) {
       throw new UsernameNotFoundException("no such presenter: " + lookup);
     }
+    boolean blocked = row.get(ADMIN_USER.BLOCKED_AT) != null;
     return User.withUsername(row.get(ADMIN_USER.USERNAME))
         .password(row.get(ADMIN_USER.PASSWORD_HASH))
+        .disabled(blocked)
         .authorities(Collections.singletonList(() -> ROLE_AUTHENTICATED))
         .build();
   }

@@ -69,9 +69,11 @@ public class DeckAuthController {
       throw new BadDeckCredentialsException("invalid username or password", ex);
     }
     String username = authenticated.getName();
-    List<Poll> polls = pollService.listForOwner(username);
+    // Owned OR collaborated polls — a collaborator who owns nothing must still be able to mint a
+    // deck token for a poll shared with them (mint() authorizes editors, not just owners).
+    List<Poll> polls = pollService.listVisibleTo(username);
     if (polls.isEmpty()) {
-      throw new BadDeckCredentialsException("presenter has no polls", null);
+      throw new BadDeckCredentialsException("presenter has no accessible poll", null);
     }
     Poll poll =
         polls.stream()

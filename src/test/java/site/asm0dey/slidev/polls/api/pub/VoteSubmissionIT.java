@@ -70,6 +70,7 @@ class VoteSubmissionIT {
     MvcResult seen =
         mvc.perform(get("/api/polls/by-slug/vote-happy")).andExpect(status().isOk()).andReturn();
     Cookie sessionCookie = seen.getResponse().getCookie("sp_voter");
+    assertThat(sessionCookie).as("sp_voter cookie must be set on first-touch GET").isNotNull();
     String voterToken = sessionCookie.getValue();
 
     String body =
@@ -88,8 +89,8 @@ class VoteSubmissionIT {
     // The body carries a UUID voteId and an ISO-8601 recordedAt; Jackson will serialise Instant
     // as either a numeric epoch seconds or ISO-8601 depending on config. Parse defensively.
     JsonNode ack = objectMapper.readTree(result.getResponse().getContentAsString());
-    assertThat(UUID.fromString(ack.get("voteId").asText())).isNotNull();
-    assertThat(ack.get("recordedAt").asText()).isNotBlank();
+    assertThat(UUID.fromString(ack.get("voteId").asString())).isNotNull();
+    assertThat(ack.get("recordedAt").asString()).isNotBlank();
 
     // @TS-022 — a row exists in votes for (activeQuestionId, sp_voter).
     assertThat(voteRepository.alreadyVoted(poll.activeQuestionId(), voterToken))
@@ -105,6 +106,7 @@ class VoteSubmissionIT {
     MvcResult seen =
         mvc.perform(get("/api/polls/by-slug/vote-dup")).andExpect(status().isOk()).andReturn();
     Cookie sessionCookie = seen.getResponse().getCookie("sp_voter");
+    assertThat(sessionCookie).as("sp_voter cookie must be set on first-touch GET").isNotNull();
 
     String body = String.format("{\"optionIds\":[\"%s\"]}", poll.optionAId());
     mvc.perform(
@@ -146,6 +148,7 @@ class VoteSubmissionIT {
     MvcResult seen =
         mvc.perform(get("/api/polls/by-slug/vote-closed")).andExpect(status().isOk()).andReturn();
     Cookie sessionCookie = seen.getResponse().getCookie("sp_voter");
+    assertThat(sessionCookie).as("sp_voter cookie must be set on first-touch GET").isNotNull();
 
     // After close the poll has no activeQuestionId — the active-question option id from the
     // fixture is therefore no longer on the board; the service short-circuits to
@@ -162,7 +165,10 @@ class VoteSubmissionIT {
             .andReturn();
 
     String message =
-        objectMapper.readTree(conflict.getResponse().getContentAsString()).get("message").asText();
+        objectMapper
+            .readTree(conflict.getResponse().getContentAsString())
+            .get("message")
+            .asString();
     // @TS-025 — the message is user-facing; no stack trace, no SQL fragment.
     assertThat(message.toLowerCase()).doesNotContain("sqlexception");
     assertThat(message.toLowerCase()).doesNotContain("stacktrace");
@@ -180,6 +186,7 @@ class VoteSubmissionIT {
     MvcResult seen =
         mvc.perform(get("/api/polls/by-slug/vote-extra")).andExpect(status().isOk()).andReturn();
     Cookie sessionCookie = seen.getResponse().getCookie("sp_voter");
+    assertThat(sessionCookie).as("sp_voter cookie must be set on first-touch GET").isNotNull();
 
     String body =
         String.format(
@@ -226,13 +233,13 @@ class VoteSubmissionIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
+    UUID pollId = UUID.fromString(poll.get("id").asString());
     JsonNode question = poll.get("questions").get(0);
-    UUID questionId = UUID.fromString(question.get("id").asText());
+    UUID questionId = UUID.fromString(question.get("id").asString());
     List<JsonNode> options =
         List.of(question.get("options").get(0), question.get("options").get(1));
-    UUID optionA = UUID.fromString(options.get(0).get("id").asText());
-    UUID optionB = UUID.fromString(options.get(1).get("id").asText());
+    UUID optionA = UUID.fromString(options.get(0).get("id").asString());
+    UUID optionB = UUID.fromString(options.get(1).get("id").asString());
 
     mvc.perform(
             post("/api/admin/polls/" + pollId + "/open")

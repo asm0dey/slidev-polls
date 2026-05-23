@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEvent;
@@ -52,7 +53,7 @@ class VoteServiceTest {
   @Test
   void records_vote_against_active_question_and_publishes_event() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
 
     Vote stored = service.recordVote(seeded.slug(), List.of(optionA), "v-123");
 
@@ -77,7 +78,7 @@ class VoteServiceTest {
   @Test
   void rejects_vote_when_poll_has_no_active_question() {
     Poll seeded = seedPollWithoutActiveQuestion();
-    UUID anyOption = seeded.questions().get(0).options().get(0).id();
+    UUID anyOption = seeded.questions().getFirst().options().getFirst().id();
 
     assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(anyOption), "v-999"))
         .isInstanceOf(QuestionNotActiveException.class);
@@ -100,7 +101,7 @@ class VoteServiceTest {
   @Test
   void retract_deletes_row_and_publishes_event_with_decremented_tally() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
     service.recordVote(seeded.slug(), List.of(optionA), "v-1");
 
     service.retractVote(seeded.slug(), "v-1");
@@ -127,7 +128,7 @@ class VoteServiceTest {
   @Test
   void retract_propagates_question_not_active_when_question_closes_mid_flight() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
     service.recordVote(seeded.slug(), List.of(optionA), "v-1");
     votes.simulateConcurrentClose(seeded.activeQuestionId());
 
@@ -147,7 +148,7 @@ class VoteServiceTest {
   void rejects_option_from_a_different_question() {
     Poll seeded = seedPollWithActiveQuestion();
     // Options of the non-active question are not valid submissions.
-    UUID otherQuestionOption = seeded.questions().get(1).options().get(0).id();
+    UUID otherQuestionOption = seeded.questions().get(1).options().getFirst().id();
 
     assertThatThrownBy(() -> service.recordVote(seeded.slug(), List.of(otherQuestionOption), "v-1"))
         .isInstanceOf(NotFoundException.class);
@@ -160,7 +161,7 @@ class VoteServiceTest {
   @Test
   void rejects_duplicate_vote_for_same_voter_token() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
 
     service.recordVote(seeded.slug(), List.of(optionA), "v-dup");
 
@@ -177,7 +178,7 @@ class VoteServiceTest {
   @Test
   void rejects_vote_when_question_closes_mid_flight() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
     // Simulate a concurrent ACTIVE -> CLOSED transition by flipping the fake repo's flag; the
     // real VoteRepositoryImpl sees this via the INSERT ... SELECT returning zero rows.
     votes.simulateConcurrentClose(seeded.activeQuestionId());
@@ -193,7 +194,7 @@ class VoteServiceTest {
   @Test
   void already_voted_reports_cookie_state() {
     Poll seeded = seedPollWithActiveQuestion();
-    UUID optionA = seeded.questions().get(0).options().get(0).id();
+    UUID optionA = seeded.questions().getFirst().options().getFirst().id();
     service.recordVote(seeded.slug(), List.of(optionA), "v-seen");
 
     assertThat(service.alreadyVoted(seeded.activeQuestionId(), "v-seen")).isTrue();
@@ -291,6 +292,16 @@ class VoteServiceTest {
 
     @Override
     public List<Poll> findByOwner(String ownerUsername) {
+      return List.copyOf(byId.values());
+    }
+
+    @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
       return List.copyOf(byId.values());
     }
 
@@ -432,12 +443,12 @@ class VoteServiceTest {
     private final List<Object> received = new ArrayList<>();
 
     @Override
-    public void publishEvent(Object event) {
+    public void publishEvent(@NonNull Object event) {
       received.add(event);
     }
 
     @Override
-    public void publishEvent(ApplicationEvent event) {
+    public void publishEvent(@NonNull ApplicationEvent event) {
       received.add(event);
     }
 

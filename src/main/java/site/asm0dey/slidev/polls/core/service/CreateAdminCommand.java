@@ -1,5 +1,7 @@
 package site.asm0dey.slidev.polls.core.service;
 
+import org.jspecify.annotations.NonNull;
+
 /**
  * Validated input for AdminUserService.createInitialAdmin / createAdmin. Validation runs in the
  * compact constructor so controllers can pass the user's body through without writing duplicate
@@ -32,7 +34,7 @@ public record CreateAdminCommand(String username, String password) {
    * exception messages built with concatenation, etc.). Override to mask.
    */
   @Override
-  public String toString() {
+  public @NonNull String toString() {
     return "CreateAdminCommand[username=" + username + ", password=***]";
   }
 }

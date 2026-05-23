@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -70,7 +71,7 @@ class GlobalExceptionHandlerTest {
     @Bean
     SecurityFilterChain permitAll(HttpSecurity http) throws Exception {
       http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
-          .csrf(csrf -> csrf.disable());
+          .csrf(CsrfConfigurer::disable);
       return http.build();
     }
   }

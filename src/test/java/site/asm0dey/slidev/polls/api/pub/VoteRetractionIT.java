@@ -166,13 +166,13 @@ class VoteRetractionIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
+    UUID pollId = UUID.fromString(poll.get("id").asString());
     JsonNode question = poll.get("questions").get(0);
-    UUID questionId = UUID.fromString(question.get("id").asText());
+    UUID questionId = UUID.fromString(question.get("id").asString());
     List<JsonNode> options =
         List.of(question.get("options").get(0), question.get("options").get(1));
-    UUID optionA = UUID.fromString(options.get(0).get("id").asText());
-    UUID optionB = UUID.fromString(options.get(1).get("id").asText());
+    UUID optionA = UUID.fromString(options.get(0).get("id").asString());
+    UUID optionB = UUID.fromString(options.get(1).get("id").asString());
 
     mvc.perform(
             post("/api/admin/polls/" + pollId + "/open")

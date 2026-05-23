@@ -109,7 +109,9 @@ class PublicPollViewIT {
     assertThat(setCookie).as("Set-Cookie header on first-touch GET").isNotNull();
     assertThat(setCookie).contains("SameSite=Lax");
     assertThat(setCookie).contains("HttpOnly");
-    String cookieValue = result.getResponse().getCookie("sp_voter").getValue();
+    jakarta.servlet.http.Cookie spVoter = result.getResponse().getCookie("sp_voter");
+    assertThat(spVoter).as("sp_voter cookie must be set on first-touch GET").isNotNull();
+    String cookieValue = spVoter.getValue();
     // @TS-046 — the value is a bare UUID; no device fingerprint, no personal-shaped data.
     assertThat(UUID.fromString(cookieValue)).isNotNull();
   }
@@ -201,8 +203,8 @@ class PublicPollViewIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    String pollId = poll.get("id").asText();
-    String questionId = poll.get("questions").get(0).get("id").asText();
+    String pollId = poll.get("id").asString();
+    String questionId = poll.get("questions").get(0).get("id").asString();
 
     mvc.perform(
             post("/api/admin/polls/" + pollId + "/open")

@@ -230,7 +230,7 @@ class SlugIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode detail = objectMapper.readTree(created.getResponse().getContentAsString());
-    String pollId = detail.get("id").asText();
+    String pollId = detail.get("id").asString();
 
     mvc.perform(
             patch("/api/admin/polls/" + pollId)

@@ -13,6 +13,14 @@ spring:
     # {vendor} is substituted by Spring Boot's Flyway autoconfig based on the
     # JDBC URL — "postgresql" for jdbc:postgresql://…, "h2" for jdbc:h2:…
     locations: classpath:db/migration/{vendor},classpath:db/migration/common
+  session:
+    # @EnableJdbcHttpSession (SessionConfig) is the actual activator on Spring Boot 4;
+    # store-type is kept for documentation. cleanup-cron is read by a SessionRepositoryCustomizer.
+    store-type: jdbc
+    timeout: 30m
+    jdbc:
+      initialize-schema: never
+      cleanup-cron: "0 * * * * *"
   jackson:
     deserialization:
       # TS-027 / TS-046: the vote endpoint must ignore unknown properties so a

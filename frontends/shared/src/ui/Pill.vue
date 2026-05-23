@@ -21,7 +21,7 @@ defineProps<{
   border-radius: 999px;
   font-size: 11px;
   font-weight: 500;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
 }
 .sp-pill[data-tone="neutral"] {
   background: var(--sp-bg-subtle);

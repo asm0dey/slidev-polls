@@ -17,7 +17,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * @TS-125 / @TS-126 — every backend route that mutates a poll's active-question pointer MUST reject
+ * TS-125 / TS-126 — every backend route that mutates a poll's active-question pointer MUST reject
  * anonymous callers with one of {@code AUTH_REQUIRED} / {@code DECK_TOKEN_INVALID} / {@code
  * FORBIDDEN}, and feature 002 MUST NOT introduce a new such route.
  *
@@ -59,7 +59,7 @@ class ActiveQuestionMutationRouteAuditTest {
 
       String responseBody = result.getResponse().getContentAsString();
       JsonNode problem = objectMapper.readTree(responseBody);
-      String code = problem.path("code").asText();
+      String code = problem.path("code").asString();
       assertThat(code)
           .as("problem code for anonymous %s %s", r.method, path)
           .isIn(r.acceptableCodes);

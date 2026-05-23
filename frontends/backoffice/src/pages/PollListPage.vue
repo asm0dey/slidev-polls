@@ -139,7 +139,16 @@ function statusLabel(s: string): string {
       </div>
       <div v-for="poll in filteredPolls" :key="poll.id" data-testid="poll-row" class="pl__row">
         <div class="pl__row-main">
-          <span class="pl__name">{{ poll.title }}</span>
+          <span class="pl__name">
+            {{ poll.title }}
+            <Pill
+              v-if="!poll.isOwner"
+              tone="neutral"
+              data-testid="poll-shared-badge"
+              aria-label="shared poll"
+              >Shared</Pill
+            >
+          </span>
           <span class="pl__slug">/{{ poll.slug }}</span>
         </div>
         <span class="pl__status-cell">
@@ -169,7 +178,13 @@ function statusLabel(s: string): string {
             <Button variant="secondary" size="sm" data-testid="poll-clone" @click="cloneRow(poll)">
               Clone
             </Button>
-            <Button variant="danger" size="sm" data-testid="poll-delete" @click="askDelete(poll)">
+            <Button
+              v-if="poll.isOwner"
+              variant="danger"
+              size="sm"
+              data-testid="poll-delete"
+              @click="askDelete(poll)"
+            >
               Delete
             </Button>
           </div>
@@ -291,7 +306,7 @@ function statusLabel(s: string): string {
   gap: 8px;
 }
 .pl__error {
-  background: var(--sp-danger-subtle, #fdecea);
+  background: var(--sp-danger-bg, #fdecea);
   color: var(--sp-danger, #b71c1c);
   padding: 0.5rem 0.75rem;
   border-radius: var(--sp-radius-lg, 4px);
