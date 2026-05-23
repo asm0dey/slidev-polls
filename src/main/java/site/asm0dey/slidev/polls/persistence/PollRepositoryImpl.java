@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
@@ -342,24 +343,40 @@ public class PollRepositoryImpl implements PollRepository {
 
   @Override
   public Poll closeActiveQuestion(UUID pollId) {
+    return closeActiveQuestion(pollId, null);
+  }
+
+  @Override
+  public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
     // Same serialisation reason as activateQuestion — keeps concurrent close + activate on
     // the same poll from interleaving their per-row locks on poll_questions.
+    //
+    // The expectedQuestionId guard is evaluated INSIDE the poll-row lock: the deck fires a
+    // slide-leave close scoped to the question that slide opened, and the next slide's activate
+    // serialises behind the same lock. Folding the guard into the UPDATE's WHERE (rather than a
+    // prior unlocked read in the service) makes the close a true no-op when the active question
+    // has already moved on, so it can never clobber the newer activation (the source of the
+    // deck slide-switch flake / a real presenter-facing race on rapid navigation).
     return dsl.transactionResult(
         cfg -> {
           DSLContext tx = cfg.dsl();
           lockPollRow(tx, pollId);
           OffsetDateTime now = OffsetDateTime.now();
+          Condition where =
+              POLL_QUESTIONS
+                  .POLL_ID
+                  .eq(pollId)
+                  .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()));
+          if (expectedQuestionId != null) {
+            where = where.and(POLL_QUESTIONS.ID.eq(expectedQuestionId));
+          }
           // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not
           // ACTIVE.
           tx.update(POLL_QUESTIONS)
               .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
               .setNull(POLL_QUESTIONS.ACTIVATED_AT)
               .set(POLL_QUESTIONS.CLOSED_AT, now)
-              .where(
-                  POLL_QUESTIONS
-                      .POLL_ID
-                      .eq(pollId)
-                      .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name())))
+              .where(where)
               .execute();
           return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
         });

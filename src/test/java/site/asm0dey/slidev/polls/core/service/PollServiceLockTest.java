@@ -303,6 +303,11 @@ class PollServiceLockTest {
     }
 
     @Override
+    public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
       Poll existing = require(pollId);
       Poll updated =

@@ -59,6 +59,15 @@ public interface PollRepository {
   Poll closeActiveQuestion(UUID pollId);
 
   /**
+   * Conditional close: close the currently-ACTIVE question on {@code pollId} only when {@code
+   * expectedQuestionId} is null, or matches the question that is active. The guard is applied
+   * atomically under the poll-row lock, so a slide-leave close scoped to the question its slide
+   * opened cannot clobber a concurrent next-slide activate that already moved the active question
+   * on. No-op when none is active or the active question differs from {@code expectedQuestionId}.
+   */
+  Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId);
+
+  /**
    * Replace the allowed-origins list for {@code pollId}. A non-null (even empty) list replaces the
    * current value. Throws {@link site.asm0dey.slidev.polls.core.error.NotFoundException} when the
    * poll does not exist.

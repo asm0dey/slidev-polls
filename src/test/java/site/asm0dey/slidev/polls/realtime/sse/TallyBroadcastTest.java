@@ -396,6 +396,11 @@ class TallyBroadcastTest {
     }
 
     @Override
+    public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
       throw new UnsupportedOperationException();
     }
