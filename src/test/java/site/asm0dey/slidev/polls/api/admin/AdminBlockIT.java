@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.DECK_TOKENS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 
@@ -44,7 +43,7 @@ class AdminBlockIT {
   void setUp() {
     dsl.deleteFrom(DECK_TOKENS).execute();
     dsl.deleteFrom(POLLS).execute();
-    dsl.deleteFrom(ADMIN_USER).execute();
+    AdminUserTestFixtures.wipeAdminUsers(dsl);
     AdminUserTestFixtures.seedAdmin(dsl, encoder, "alice", "alice-password-12"); // bootstrap admin
     AdminUserTestFixtures.seedAdmin(dsl, encoder, "bob", "bob-password-1234"); // target
   }

@@ -34,12 +34,18 @@ public abstract class AbstractPostgresTest {
 
   @BeforeAll
   static void migrate() {
-    Flyway.configure()
-        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-        .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-        .cleanDisabled(false)
-        .load()
-        .migrate();
+    Flyway flyway =
+        Flyway.configure()
+            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
+            .cleanDisabled(false)
+            .load();
+    // Wipe the reused container before re-applying migrations so each test class starts from a
+    // clean schema (see class doc). Without the clean, rows owned across classes — e.g. a poll
+    // referencing admin_user via polls_owner_username_fk — leak forward and break delete-based
+    // setups such as BootstrapAdminIT.
+    flyway.clean();
+    flyway.migrate();
   }
 
   protected static DataSource dataSource() {

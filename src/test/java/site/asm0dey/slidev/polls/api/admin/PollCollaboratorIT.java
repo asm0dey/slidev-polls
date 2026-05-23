@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_COLLABORATORS;
 
@@ -41,7 +40,7 @@ class PollCollaboratorIT {
   void setUp() {
     dsl.deleteFrom(POLL_COLLABORATORS).execute();
     dsl.deleteFrom(POLLS).execute();
-    dsl.deleteFrom(ADMIN_USER).execute();
+    AdminUserTestFixtures.wipeAdminUsers(dsl);
     mvc =
         MockMvcBuilders.webAppContextSetup(wac)
             .apply(SecurityMockMvcConfigurers.springSecurity())

@@ -5,7 +5,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +32,7 @@ class AdminAccountIT {
 
   @BeforeEach
   void setUp() {
-    dsl.deleteFrom(ADMIN_USER).execute();
+    AdminUserTestFixtures.wipeAdminUsers(dsl);
     mvc =
         MockMvcBuilders.webAppContextSetup(wac)
             .apply(SecurityMockMvcConfigurers.springSecurity())

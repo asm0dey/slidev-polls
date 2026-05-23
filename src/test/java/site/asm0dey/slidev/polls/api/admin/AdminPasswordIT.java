@@ -5,7 +5,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -35,7 +34,7 @@ class AdminPasswordIT {
 
   @BeforeEach
   void setUp() {
-    dsl.deleteFrom(ADMIN_USER).execute();
+    AdminUserTestFixtures.wipeAdminUsers(dsl);
     AdminUserTestFixtures.seedAdmin(dsl, encoder, "alice", "correct-horse-battery"); // bootstrap
     AdminUserTestFixtures.seedAdmin(dsl, encoder, "bob", "bobs-old-password-12");
   }
