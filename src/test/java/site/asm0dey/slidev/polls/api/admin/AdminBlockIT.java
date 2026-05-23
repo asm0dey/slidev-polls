@@ -76,7 +76,7 @@ class AdminBlockIT {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode body = mapper.readTree(res.getResponse().getContentAsString());
-    return body.get("id").asText();
+    return body.get("id").asString();
   }
 
   @Test

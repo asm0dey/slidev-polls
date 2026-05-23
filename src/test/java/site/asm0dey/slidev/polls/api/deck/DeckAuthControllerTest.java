@@ -56,8 +56,8 @@ class DeckAuthControllerTest {
   void returns200WithScope_whenDeckTokenValid() throws Exception {
     PollFixture poll = createPoll("deck-auth-valid");
     JsonNode minted = mintTokenRaw(poll, "Laptop");
-    String plaintext = minted.get("plaintext").asText();
-    UUID tokenId = UUID.fromString(minted.get("id").asText());
+    String plaintext = minted.get("plaintext").asString();
+    UUID tokenId = UUID.fromString(minted.get("id").asString());
 
     mvc.perform(get("/api/deck/auth/me").header("X-Deck-Token", plaintext))
         .andExpect(status().isOk())
@@ -89,8 +89,8 @@ class DeckAuthControllerTest {
   void returns401DeckTokenInvalid_whenBearerRevoked() throws Exception {
     PollFixture poll = createPoll("deck-auth-revoked");
     JsonNode minted = mintTokenRaw(poll, null);
-    UUID tokenId = UUID.fromString(minted.get("id").asText());
-    String plaintext = minted.get("plaintext").asText();
+    UUID tokenId = UUID.fromString(minted.get("id").asString());
+    String plaintext = minted.get("plaintext").asString();
 
     MockHttpSession session = loginAsAlice();
     mvc.perform(
@@ -124,7 +124,7 @@ class DeckAuthControllerTest {
             .andReturn();
 
     JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-    String plaintext = body.get("token").asText();
+    String plaintext = body.get("token").asString();
 
     // The returned plaintext must actually authenticate the follow-up /me probe — otherwise the
     // frontend would get stuck in signed-in-pending on the very next reload.
@@ -186,8 +186,8 @@ class DeckAuthControllerTest {
             .andExpect(status().isCreated())
             .andReturn();
     JsonNode poll = objectMapper.readTree(created.getResponse().getContentAsString());
-    UUID pollId = UUID.fromString(poll.get("id").asText());
-    UUID q1 = UUID.fromString(poll.get("questions").get(0).get("id").asText());
+    UUID pollId = UUID.fromString(poll.get("id").asString());
+    UUID q1 = UUID.fromString(poll.get("questions").get(0).get("id").asString());
     return new PollFixture(pollId, q1);
   }
 

@@ -48,18 +48,20 @@ class H2BootIT {
   // A 500 would indicate a multiset or generated-column regression.
   @Test
   void public_poll_endpoint_returns_not_found_for_unknown_slug_on_h2() throws Exception {
-    HttpClient client = HttpClient.newHttpClient();
-    HttpRequest request =
-        HttpRequest.newBuilder()
-            .uri(URI.create("http://localhost:" + port + "/api/polls/by-slug/no-such-slug"))
-            .GET()
-            .build();
-    HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> resp;
+    try (HttpClient client = HttpClient.newHttpClient()) {
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create("http://localhost:" + port + "/api/polls/by-slug/no-such-slug"))
+              .GET()
+              .build();
+      resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
 
     assertThat(resp.statusCode()).as("response status").isEqualTo(404);
 
     JsonNode body = objectMapper.readTree(resp.body());
-    assertThat(body.get("code").asText())
+    assertThat(body.get("code").asString())
         .as("problem code matches PublicPollViewIT contract")
         .isEqualTo("NOT_FOUND");
   }

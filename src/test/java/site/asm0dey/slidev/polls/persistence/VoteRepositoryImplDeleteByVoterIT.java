@@ -37,7 +37,7 @@ import site.asm0dey.slidev.polls.core.error.QuestionNotActiveException;
  */
 class VoteRepositoryImplDeleteByVoterIT extends AbstractPostgresTest {
 
-  abstract class CommonRetract {
+  abstract static class CommonRetract {
     protected DSLContext dsl;
     protected PollRepositoryImpl pollRepository;
     protected VoteRepositoryImpl voteRepository;

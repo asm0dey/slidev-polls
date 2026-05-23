@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -26,10 +27,9 @@ class SseHubConcurrencyTest {
     UUID pollId = UUID.randomUUID();
     int workers = 32;
     int churns = 200;
-    ExecutorService pool = Executors.newFixedThreadPool(workers);
     CountDownLatch gate = new CountDownLatch(1);
     CountDownLatch done = new CountDownLatch(workers);
-    try {
+    try (ExecutorService pool = Executors.newFixedThreadPool(workers)) {
       for (int i = 0; i < workers; i++) {
         pool.submit(
             () -> {
@@ -52,8 +52,6 @@ class SseHubConcurrencyTest {
       // After the churn completes the hub MUST be back to empty for that pollId.
       assertThat(hub.subscriberCount(pollId)).as("no leaked subscribers").isZero();
       assertThat(hub.pollCount()).as("empty pollId keys pruned").isZero();
-    } finally {
-      pool.shutdownNow();
     }
   }
 
@@ -112,11 +110,10 @@ class SseHubConcurrencyTest {
 
     int threads = 16;
     int iterations = 500;
-    ExecutorService pool = Executors.newFixedThreadPool(threads);
     CountDownLatch gate = new CountDownLatch(1);
     CountDownLatch done = new CountDownLatch(threads);
     AtomicInteger errors = new AtomicInteger();
-    try {
+    try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
       for (int i = 0; i < threads; i++) {
         boolean broadcasts = i % 2 == 0;
         pool.submit(
@@ -146,8 +143,6 @@ class SseHubConcurrencyTest {
       gate.countDown();
       assertThat(done.await(30, TimeUnit.SECONDS)).as("workers finished").isTrue();
       assertThat(errors.get()).as("no exceptions surfaced to callers").isZero();
-    } finally {
-      pool.shutdownNow();
     }
   }
 
@@ -162,7 +157,7 @@ class SseHubConcurrencyTest {
     }
 
     @Override
-    public void send(SseEventBuilder builder) {
+    public void send(@NonNull SseEventBuilder builder) {
       delivered.incrementAndGet();
     }
   }
@@ -170,7 +165,7 @@ class SseHubConcurrencyTest {
   /** SseEmitter that fails every send — models a dead browser connection. */
   private static final class FailingEmitter extends SseEmitter {
     @Override
-    public void send(SseEventBuilder builder) throws IOException {
+    public void send(@NonNull SseEventBuilder builder) throws IOException {
       throw new IOException("broken pipe");
     }
   }

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import site.asm0dey.slidev.polls.core.domain.Option;
@@ -66,7 +67,7 @@ class PollServiceLockTest {
     ObjectProvider<PollService> provider =
         new ObjectProvider<>() {
           @Override
-          public PollService getObject() {
+          public @NonNull PollService getObject() {
             return holder[0];
           }
         };
@@ -96,8 +97,8 @@ class PollServiceLockTest {
                             new CreatePollCommand.OptionDraft("A"),
                             new CreatePollCommand.OptionDraft("B")))),
                 null));
-    UUID qid = created.questions().get(0).id();
-    UUID oid = created.questions().get(0).options().get(0).id();
+    UUID qid = created.questions().getFirst().id();
+    UUID oid = created.questions().getFirst().options().getFirst().id();
     votes.insert(
         new Vote(UUID.randomUUID(), created.id(), qid, List.of(oid), "voter-1", Instant.now()));
     // Mirror the vote into the poll-side count cache; the production
@@ -124,7 +125,7 @@ class PollServiceLockTest {
     }
 
     UpdatePollCommand removeFirstOption() {
-      Question q = poll.questions().get(0);
+      Question q = poll.questions().getFirst();
       // Drop the first option (the voted one). The two remaining option slots are required for
       // QuestionUpdate's @Size(min=2), so insert a new option to keep arity valid.
       List<CreatePollCommand.OptionUpdate> opts = new ArrayList<>();
@@ -145,7 +146,7 @@ class PollServiceLockTest {
     }
 
     UpdatePollCommand flipArityOnActiveQuestion(int min, int max) {
-      Question q = poll.questions().get(0);
+      Question q = poll.questions().getFirst();
       List<CreatePollCommand.OptionUpdate> opts = new ArrayList<>();
       for (Option o : q.options()) {
         opts.add(new CreatePollCommand.OptionUpdate(o.id(), o.label()));
@@ -158,7 +159,7 @@ class PollServiceLockTest {
     }
 
     UpdatePollCommand rewordPromptAndLabels() {
-      Question q = poll.questions().get(0);
+      Question q = poll.questions().getFirst();
       List<CreatePollCommand.OptionUpdate> opts = new ArrayList<>();
       for (Option o : q.options()) {
         opts.add(new CreatePollCommand.OptionUpdate(o.id(), o.label() + " (renamed)"));
@@ -212,10 +213,7 @@ class PollServiceLockTest {
     @Override
     public boolean slugTaken(String slug, UUID excludingPollId) {
       return byId.values().stream()
-          .anyMatch(
-              p ->
-                  p.slug().equalsIgnoreCase(slug)
-                      && (excludingPollId == null || !p.id().equals(excludingPollId)));
+          .anyMatch(p -> p.slug().equalsIgnoreCase(slug) && !p.id().equals(excludingPollId));
     }
 
     @Override

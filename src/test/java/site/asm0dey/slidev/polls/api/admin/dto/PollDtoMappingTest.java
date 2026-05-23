@@ -51,7 +51,7 @@ class PollDtoMappingTest {
     PollDetailDto detail = PollDetailDto.from(poll, "http://example.test", true);
 
     assertThat(detail.questions()).hasSize(1);
-    assertThat(detail.questions().get(0).options()).hasSize(2);
+    assertThat(detail.questions().getFirst().options()).hasSize(2);
   }
 
   private static Poll fixturePoll(String slug) {

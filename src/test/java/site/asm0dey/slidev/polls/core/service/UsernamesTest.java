@@ -27,7 +27,10 @@ class UsernamesTest {
 
   @Test
   void normalize_rejectsNull() {
-    assertThatThrownBy(() -> Usernames.normalize(null))
+    // Pass via a variable so static-analysis does not flag a known-null call;
+    // the test intent is to verify that null input is rejected at runtime.
+    String nullValue = null;
+    assertThatThrownBy(() -> Usernames.normalize(nullValue))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

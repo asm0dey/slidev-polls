@@ -77,7 +77,7 @@ class QrEndpointIT {
             .andExpect(status().isCreated())
             .andReturn();
     String pollId =
-        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asString();
 
     MvcResult qr =
         mvc.perform(get("/api/admin/polls/" + pollId + "/qr.png").session(session))

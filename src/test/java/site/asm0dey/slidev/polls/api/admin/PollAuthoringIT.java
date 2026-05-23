@@ -100,7 +100,7 @@ class PollAuthoringIT {
             .andReturn();
 
     JsonNode detail = objectMapper.readTree(createResult.getResponse().getContentAsString());
-    String pollId = detail.get("id").asText();
+    String pollId = detail.get("id").asString();
 
     // @TS-002 — the poll shows up in alice's list with the same publicUrl shape.
     mvc.perform(get("/api/admin/polls").session(session))
@@ -116,7 +116,7 @@ class PollAuthoringIT {
             .andExpect(header().string("Content-Type", MediaType.IMAGE_PNG_VALUE))
             .andReturn();
     String decoded = decodeQr(qr.getResponse().getContentAsByteArray());
-    assertThat(decoded).isEqualTo(detail.get("publicUrl").asText());
+    assertThat(decoded).isEqualTo(detail.get("publicUrl").asString());
   }
 
   // @TS-A5-001 — allowedOrigins is accepted in the request body and echoed in the response.
@@ -145,7 +145,7 @@ class PollAuthoringIT {
             .andReturn();
     // Clean up so other tests that assert exact list sizes aren't polluted.
     String pollId =
-        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asString();
     mvc.perform(delete("/api/admin/polls/" + pollId).session(session).with(csrf()))
         .andExpect(status().isNoContent());
   }
@@ -198,7 +198,7 @@ class PollAuthoringIT {
             .andExpect(status().isCreated())
             .andReturn();
     String pollId =
-        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asString();
 
     mvc.perform(delete("/api/admin/polls/" + pollId).session(session).with(csrf()))
         .andExpect(status().isNoContent());
@@ -234,10 +234,10 @@ class PollAuthoringIT {
             .andReturn();
 
     JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
-    String pollId = createdJson.get("id").asText();
-    String qId = createdJson.get("questions").get(0).get("id").asText();
-    String oAId = createdJson.get("questions").get(0).get("options").get(0).get("id").asText();
-    String oBId = createdJson.get("questions").get(0).get("options").get(1).get("id").asText();
+    String pollId = createdJson.get("id").asString();
+    String qId = createdJson.get("questions").get(0).get("id").asString();
+    String oAId = createdJson.get("questions").get(0).get("options").get(0).get("id").asString();
+    String oBId = createdJson.get("questions").get(0).get("options").get(1).get("id").asString();
 
     String patchBody =
         String.format(
@@ -278,8 +278,8 @@ class PollAuthoringIT {
             .getContentAsString();
 
     JsonNode srcJson = objectMapper.readTree(src);
-    String srcId = srcJson.get("id").asText();
-    String srcQId = srcJson.get("questions").get(0).get("id").asText();
+    String srcId = srcJson.get("id").asString();
+    String srcQId = srcJson.get("questions").get(0).get("id").asString();
 
     mvc.perform(post("/api/admin/polls/" + srcId + "/clone").session(session).with(csrf()))
         .andExpect(status().isCreated())
@@ -305,8 +305,8 @@ class PollAuthoringIT {
             .andReturn();
 
     JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
-    String pollId = createdJson.get("id").asText();
-    String qId = createdJson.get("questions").get(0).get("id").asText();
+    String pollId = createdJson.get("id").asString();
+    String qId = createdJson.get("questions").get(0).get("id").asString();
 
     // open the question
     mvc.perform(

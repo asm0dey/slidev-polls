@@ -9,6 +9,7 @@ import org.jooq.impl.DefaultConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Base class for every {@code poll-persistence} integration test that needs a real Postgres. A
@@ -25,7 +26,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class AbstractPostgresTest {
 
   protected static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:16-alpine");
+      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
 
   static {
     POSTGRES.start();

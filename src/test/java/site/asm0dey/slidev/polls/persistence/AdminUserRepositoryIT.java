@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 // pollute the state.
 class AdminUserRepositoryIT extends AbstractPostgresTest {
 
-  abstract class CommonAdminUser {
+  abstract static class CommonAdminUser {
     protected abstract DSLContext dsl();
 
     @BeforeEach

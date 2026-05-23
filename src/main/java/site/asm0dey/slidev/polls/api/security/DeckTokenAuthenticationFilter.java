@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -39,7 +40,9 @@ public class DeckTokenAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
-      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull FilterChain chain)
       throws ServletException, IOException {
     String header = request.getHeader(HEADER);
     if (header != null && !header.isBlank()) {
@@ -60,7 +63,7 @@ public class DeckTokenAuthenticationFilter extends OncePerRequestFilter {
   }
 
   @Override
-  protected boolean shouldNotFilter(HttpServletRequest request) {
+  protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
     String path = request.getRequestURI();
     return path == null || !path.startsWith("/api/deck/");
   }
