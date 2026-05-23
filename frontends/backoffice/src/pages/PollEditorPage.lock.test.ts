@@ -26,6 +26,7 @@ function lockedDetail(): PollDetail {
     status: "OPEN",
     publicUrl: "http://localhost:8080/locked",
     activeQuestionId: null,
+    isOwner: true,
     questions: [
       {
         id: "q1",
@@ -51,6 +52,10 @@ function makeFake(detail: PollDetail): AdminApiClient {
     createPoll: vi.fn(),
     updatePoll: vi.fn(async () => detail),
     deletePoll: vi.fn(),
+    listCollaborators: vi.fn().mockResolvedValue([]),
+    addCollaborator: vi.fn().mockResolvedValue(undefined),
+    removeCollaborator: vi.fn().mockResolvedValue(undefined),
+    transferPoll: vi.fn().mockResolvedValue(undefined),
     qrUrl: (id: string) => `/api/admin/polls/${id}/qr.png`
   } as unknown as AdminApiClient;
 }

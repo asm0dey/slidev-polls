@@ -26,6 +26,7 @@ function pollDetail(over: Partial<PollDetail> = {}): PollDetail {
     status: "DRAFT",
     publicUrl: "http://localhost:8080/created",
     activeQuestionId: null,
+    isOwner: true,
     questions: [
       {
         id: "q1",
@@ -51,6 +52,10 @@ function makeFake(overrides: Partial<AdminApiClient> = {}): AdminApiClient {
     createPoll: vi.fn(async (req: CreatePollRequest) => pollDetail({ title: req.title })),
     updatePoll: vi.fn(async (_id: string, _req) => pollDetail()),
     deletePoll: vi.fn().mockResolvedValue(undefined),
+    listCollaborators: vi.fn().mockResolvedValue([]),
+    addCollaborator: vi.fn().mockResolvedValue(undefined),
+    removeCollaborator: vi.fn().mockResolvedValue(undefined),
+    transferPoll: vi.fn().mockResolvedValue(undefined),
     qrUrl: (id: string) => `/api/admin/polls/${id}/qr.png`,
     ...overrides
   } as unknown as AdminApiClient;

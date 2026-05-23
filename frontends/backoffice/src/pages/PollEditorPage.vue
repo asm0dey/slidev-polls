@@ -12,6 +12,7 @@ import type {
 } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
 import SlugField from "../components/SlugField.vue";
+import PollCollaborators from "../components/PollCollaborators.vue";
 import { checkSlug } from "../lib/slug-rules";
 import {
   AllowedOriginsField,
@@ -346,6 +347,31 @@ async function copySnippet(q: DraftQuestion) {
   }
 }
 
+const transferUsername = ref("");
+const transferError = ref<string | null>(null);
+const transferring = ref(false);
+const showTransferDialog = ref(false);
+
+function openTransferDialog() {
+  if (!props.pollId || !transferUsername.value.trim()) return;
+  showTransferDialog.value = true;
+}
+
+async function confirmTransfer() {
+  showTransferDialog.value = false;
+  if (!props.pollId || !transferUsername.value.trim()) return;
+  transferring.value = true;
+  transferError.value = null;
+  try {
+    await client.transferPoll(props.pollId, transferUsername.value.trim());
+    await router.push("/polls");
+  } catch (err) {
+    transferError.value = describeError(err);
+  } finally {
+    transferring.value = false;
+  }
+}
+
 const showDeleteDialog = ref(false);
 
 function openDeleteDialog() {
@@ -430,7 +456,7 @@ onMounted(() => {
               {{ submitting ? "Saving…" : mode === "create" ? "Create" : "Save changes" }}
             </Button>
             <Menu
-              v-if="mode === 'edit'"
+              v-if="mode === 'edit' && detail?.isOwner"
               label="⋯"
               :items="[
                 { key: 'clear-votes', label: 'Clear votes' },
@@ -660,6 +686,45 @@ onMounted(() => {
             </template>
           </div>
         </div>
+
+        <template v-if="mode === 'edit' && detail?.isOwner && pollId">
+          <PollCollaborators
+            :poll-id="pollId"
+            :api-client="apiClient"
+            data-testid="poll-collaborators"
+          />
+
+          <section class="pe__transfer">
+            <h3 class="pe__transfer-heading">Transfer ownership</h3>
+            <p class="pe__hint">
+              The new owner will gain full access; you will lose yours. This cannot be undone.
+            </p>
+            <form
+              class="pe__transfer-form"
+              @submit.prevent="openTransferDialog"
+              data-testid="transfer-form"
+            >
+              <input
+                name="transferUsername"
+                v-model="transferUsername"
+                placeholder="new owner username"
+                class="pe__transfer-input"
+                data-testid="transfer-username"
+              />
+              <button
+                type="submit"
+                class="pe__transfer-btn"
+                :disabled="transferring || !transferUsername.trim()"
+                data-testid="transfer-confirm"
+              >
+                {{ transferring ? "Transferring…" : "Transfer" }}
+              </button>
+            </form>
+            <p v-if="transferError" role="alert" class="pe__error" data-testid="transfer-error">
+              {{ transferError }}
+            </p>
+          </section>
+        </template>
       </template>
     </section>
 
@@ -684,6 +749,19 @@ onMounted(() => {
       tone="danger"
       @confirm="confirmDelete"
       @cancel="showDeleteDialog = false"
+    />
+
+    <ConfirmDialog
+      :open="showTransferDialog"
+      title="Transfer ownership?"
+      :body="`You will lose access to this poll immediately. The new owner will be &quot;${transferUsername}&quot;. This cannot be undone.`"
+      :require-typed="transferUsername.trim()"
+      confirm-label="Transfer"
+      cancel-label="Cancel"
+      tone="danger"
+      data-testid="transfer-dialog"
+      @confirm="confirmTransfer"
+      @cancel="showTransferDialog = false"
     />
   </div>
 </template>
@@ -966,5 +1044,63 @@ onMounted(() => {
 .pe__submit-hint {
   font-size: 12px;
   color: var(--sp-fg-subtle);
+}
+
+.pe__transfer {
+  margin-top: 24px;
+  border: 1px solid var(--sp-border, #ddd);
+  border-radius: var(--sp-radius-lg, 8px);
+  padding: 16px;
+}
+
+.pe__transfer-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--sp-fg);
+  margin: 0 0 8px;
+}
+
+.pe__transfer-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pe__transfer-input {
+  flex: 1;
+  padding: 6px 8px;
+  font-family: var(--sp-font-sans);
+  font-size: 13px;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius, 6px);
+  background: var(--sp-bg);
+  color: var(--sp-fg);
+}
+
+.pe__transfer-input::placeholder {
+  color: var(--sp-fg-faint);
+}
+
+.pe__transfer-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--sp-font-sans);
+  border: 1px solid var(--sp-danger, #f5c6cb);
+  border-radius: var(--sp-radius, 6px);
+  background: var(--sp-bg);
+  color: var(--sp-danger-fg, #b71c1c);
+  cursor: pointer;
+}
+
+.pe__transfer-btn:hover:not(:disabled) {
+  background: var(--sp-danger-bg, #fdecea);
+}
+
+.pe__transfer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
