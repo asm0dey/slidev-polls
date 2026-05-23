@@ -211,51 +211,38 @@ test.describe("slidev deck question switching", () => {
       timeout: 20_000
     });
 
-    // Nudge the slide-display mutation observer: navigate away from slide 3 and
-    // back. PollPanel's slide-display branch only fires activateFromDeck on a
-    // display: none → display: "" transition, which the post-sign-in auth-watcher
-    // cannot trigger on its own (the slide is already visible at sign-in time).
-    await page.locator(".slidev-page:visible").first().click();
-    await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
-    await page.keyboard.press("ArrowLeft");
+    // After sign-in the Q1 slide is already visible, so PollPanel's slide-display branch never
+    // fired Q1's activate (it only activates on a display:none → "" transition). Drive real slide
+    // changes, gating each step on (a) the route actually changing — proves the keypress was
+    // captured by Slidev, not the addon UI — and (b) the backend reflecting the new active
+    // question. A blind nudge + fixed sleep raced the slide-display observer and could leave the
+    // active question stale; the explicit gates make every transition deterministic.
+    const navTo = async (key: "ArrowRight" | "ArrowLeft", slide: number, expectedQ: string) => {
+      await page.locator(".slidev-page:visible").first().click();
+      await page.keyboard.press(key);
+      await page.waitForURL(`**/${slide}`, { timeout: 10_000 });
+      await expect(async () => {
+        expect(await fetchActiveQuestionId(admin, baseURL!, seededData.pollId)).toBe(expectedQ);
+      }).toPass({ timeout: 15_000 });
+    };
 
-    await expect(async () => {
-      const active = await fetchActiveQuestionId(admin, baseURL!, seededData.pollId);
-      expect(active).toBe(seededData.q1Id);
-    }).toPass({ timeout: 10_000 });
+    // Go to Q2 (slide 4) then back to Q1 (slide 3) to fire the activate transitions.
+    await navTo("ArrowRight", 4, seededData.q2Id);
+    await navTo("ArrowLeft", 3, seededData.q1Id);
 
-    // Q1 panel renders its prompt via the historical snapshot fetch plus the SSE
-    // activation event that follows the deck's activate POST.
+    // Q1 panel renders its prompt via the historical snapshot fetch plus the SSE activation event.
     await expect(
       page.locator('[data-testid="poll-results"]', { hasText: "Which JVM for the workshop?" })
     ).toBeVisible({ timeout: 15_000 });
 
-    // Forward to slide 4 (Q2). Focus the slidev page so ArrowRight is captured by
-    // the Slidev shortcut handler rather than wandering off into the addon UI.
-    await page.locator(".slidev-page:visible").first().click();
-    await page.keyboard.press("ArrowRight");
-
-    await expect(async () => {
-      const active = await fetchActiveQuestionId(admin, baseURL!, seededData.pollId);
-      expect(active).toBe(seededData.q2Id);
-    }).toPass({ timeout: 10_000 });
-
-    // Q2 panel renders its prompt. Slidev v52 keeps all slides in the DOM at once
-    // so we can't scope by panel index — assert the text appears anywhere within
-    // any rendered poll-results container.
+    // Forward to Q2 again, asserting the prompt renders.
+    await navTo("ArrowRight", 4, seededData.q2Id);
     await expect(
       page.locator('[data-testid="poll-results"]', { hasText: "Favourite build tool?" })
     ).toBeVisible({ timeout: 10_000 });
 
-    // Back to slide 3 (Q1).
-    await page.keyboard.press("ArrowLeft");
-
-    await expect(async () => {
-      const active = await fetchActiveQuestionId(admin, baseURL!, seededData.pollId);
-      expect(active).toBe(seededData.q1Id);
-    }).toPass({ timeout: 10_000 });
-
+    // Back to Q1.
+    await navTo("ArrowLeft", 3, seededData.q1Id);
     await expect(
       page.locator('[data-testid="poll-results"]', { hasText: "Which JVM for the workshop?" })
     ).toBeVisible({ timeout: 10_000 });
