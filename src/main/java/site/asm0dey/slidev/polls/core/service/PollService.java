@@ -384,11 +384,15 @@ public class PollService {
     Poll before =
         repository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
     UUID wasActive = before.activeQuestionId();
-    if (expectedQuestionId != null && !expectedQuestionId.equals(wasActive)) {
-      return before;
-    }
-    Poll after = repository.closeActiveQuestion(pollId);
-    if (wasActive != null) {
+    // The expectedQuestionId guard is applied atomically inside the repository under the poll-row
+    // lock, so this unlocked pre-read cannot let a slide-leave close clobber a concurrent
+    // next-slide activate: if the active question has moved on, the conditional UPDATE matches no
+    // row and `after` still reports the newer active question.
+    Poll after = repository.closeActiveQuestion(pollId, expectedQuestionId);
+    // Emit the closed event only when a question actually transitioned ACTIVE -> none. When the
+    // guard no-ops, `after` keeps its active question, so a stale `wasActive` cannot produce a
+    // spurious event.
+    if (wasActive != null && after.activeQuestionId() == null) {
       events.publishEvent(new PollQuestionClosedEvent(pollId, wasActive, Instant.now()));
     }
     return after;

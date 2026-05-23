@@ -622,6 +622,15 @@ class PollServiceTest {
     }
 
     @Override
+    public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
+      Poll existing = requirePresent(pollId);
+      if (expectedQuestionId != null && !expectedQuestionId.equals(existing.activeQuestionId())) {
+        return existing;
+      }
+      return closeActiveQuestion(pollId);
+    }
+
+    @Override
     public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
       Poll existing = requirePresent(pollId);
       Poll updated =

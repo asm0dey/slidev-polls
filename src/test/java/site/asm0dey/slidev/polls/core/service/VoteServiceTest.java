@@ -336,6 +336,11 @@ class VoteServiceTest {
     }
 
     @Override
+    public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
+      throw new UnsupportedOperationException("not needed for VoteServiceTest");
+    }
+
+    @Override
     public Poll updateAllowedOrigins(UUID pollId, java.util.List<String> origins) {
       throw new UnsupportedOperationException("not needed for VoteServiceTest");
     }

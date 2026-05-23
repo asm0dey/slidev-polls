@@ -216,6 +216,26 @@ class PollRepositoryImplTest extends AbstractPostgresTest {
       assertThat(repo.findById(inserted.id())).isEmpty();
     }
 
+    @Test
+    void closeActiveQuestion_withExpectedMismatch_isNoOpAndKeepsActive() {
+      Poll poll =
+          insertPollWithQuestions(
+              "close-guard",
+              new QuestionSeed("Q1?", List.of("A", "B")),
+              new QuestionSeed("Q2?", List.of("A", "B")));
+      UUID q1 = poll.questions().getFirst().id();
+      UUID q2 = poll.questions().getLast().id();
+
+      assertThat(repo.activateQuestion(poll.id(), q2).activeQuestionId()).isEqualTo(q2);
+
+      // A slide-leave close scoped to Q1 must NOT clobber the active Q2 — this is the atomic
+      // guard that fixes the deck slide-switch race (close racing past the next slide's activate).
+      assertThat(repo.closeActiveQuestion(poll.id(), q1).activeQuestionId()).isEqualTo(q2);
+
+      // A close scoped to the actually-active Q2 closes it.
+      assertThat(repo.closeActiveQuestion(poll.id(), q2).activeQuestionId()).isNull();
+    }
+
     private record QuestionSeed(String prompt, List<String> optionLabels) {}
 
     private Poll insertPollWithQuestions(String slugSuffix, QuestionSeed... seeds) {
