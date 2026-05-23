@@ -145,6 +145,38 @@ class DeckAuthControllerTest {
         .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
   }
 
+  // Regression: a collaborator who owns no poll (only collaborates on alice's) must be able to
+  // sign into the deck and receive a token for the collaborated poll. The login previously
+  // selected from owner-only polls, so a pure collaborator got AUTH_REQUIRED.
+  @Test
+  void returns200WithMintedToken_whenCollaboratorCredentialsValid() throws Exception {
+    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "bob", "bobs-strong-password-12");
+    PollFixture poll = createPoll("deck-login-collab");
+
+    MockHttpSession aliceSession = loginAsAlice();
+    mvc.perform(
+            post("/api/admin/polls/" + poll.pollId() + "/collaborators")
+                .session(aliceSession)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"bob\"}"))
+        .andExpect(status().isCreated());
+
+    MvcResult result =
+        mvc.perform(
+                post("/api/deck/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"bob\",\"password\":\"bobs-strong-password-12\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()))
+            .andReturn();
+
+    JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+    mvc.perform(get("/api/deck/auth/me").header("X-Deck-Token", body.get("token").asString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pollId").value(poll.pollId().toString()));
+  }
+
   // ---------- fixtures (mirrored from DeckActivationIT) --------------------
 
   private JsonNode mintTokenRaw(PollFixture poll, String label) throws Exception {
