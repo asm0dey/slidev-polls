@@ -11,6 +11,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
+import site.asm0dey.slidev.polls.core.error.CannotBlockException;
 import site.asm0dey.slidev.polls.core.error.CurrentPasswordMismatchException;
 import site.asm0dey.slidev.polls.core.error.NotFoundException;
 import site.asm0dey.slidev.polls.core.error.SetupLockedException;
@@ -27,15 +28,18 @@ public class AdminUserService {
   private final AdminUserRepository repository;
   private final PasswordEncoder passwordEncoder;
   private final TransactionTemplate serializableTx;
+  private final DeckTokenRepository deckTokenRepository;
 
   public AdminUserService(
       AdminUserRepository repository,
       PasswordEncoder passwordEncoder,
-      PlatformTransactionManager transactionManager) {
+      PlatformTransactionManager transactionManager,
+      DeckTokenRepository deckTokenRepository) {
     this.repository = repository;
     this.passwordEncoder = passwordEncoder;
     this.serializableTx = new TransactionTemplate(transactionManager);
     this.serializableTx.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+    this.deckTokenRepository = deckTokenRepository;
   }
 
   public boolean isSetupRequired() {
@@ -142,5 +146,36 @@ public class AdminUserService {
 
   public List<AdminUser> listAdmins() {
     return repository.listAll();
+  }
+
+  /**
+   * Block {@code rawTarget}. Guards: the caller cannot block themselves, and the bootstrap admin
+   * cannot be blocked (lockout protection). Sets {@code blocked_at} and revokes every deck token
+   * the target minted. The controller separately expires the target's sessions.
+   */
+  @Transactional
+  public void block(String caller, String rawTarget) {
+    String target = Usernames.normalize(rawTarget);
+    if (target.equals(caller)) {
+      throw new CannotBlockException("cannot block yourself");
+    }
+    if (repository.findBootstrapAdminUsername().map(target::equals).orElse(false)) {
+      throw new CannotBlockException("cannot block the administrator");
+    }
+    if (repository.findPasswordHash(target).isEmpty()) {
+      throw new NotFoundException(target);
+    }
+    repository.setBlockedAt(target, Instant.now());
+    deckTokenRepository.revokeAllByMinter(target);
+  }
+
+  /** Unblock {@code rawTarget}. Restores login only; revoked tokens stay revoked. */
+  @Transactional
+  public void unblock(String rawTarget) {
+    String target = Usernames.normalize(rawTarget);
+    if (repository.findPasswordHash(target).isEmpty()) {
+      throw new NotFoundException(target);
+    }
+    repository.setBlockedAt(target, null);
   }
 }
