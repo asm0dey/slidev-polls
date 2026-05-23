@@ -148,6 +148,10 @@ public class AdminUserService {
     return repository.listAll();
   }
 
+  public java.util.Set<String> listBlockedUsernames() {
+    return repository.listBlockedUsernames();
+  }
+
   /**
    * Block {@code rawTarget}. Guards: the caller cannot block themselves, and the bootstrap admin
    * cannot be blocked (lockout protection). Sets {@code blocked_at} and revokes every deck token

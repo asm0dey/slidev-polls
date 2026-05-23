@@ -39,6 +39,6 @@ public class AdminSetupController {
     var created =
         service.createInitialAdmin(new CreateAdminCommand(body.username(), body.password()));
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.createdAt()));
+        .body(new UserResponse(created.username(), created.createdAt(), false));
   }
 }

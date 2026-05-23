@@ -35,8 +35,9 @@ public class AdminUserController {
 
   @GetMapping
   public List<UserResponse> list() {
+    java.util.Set<String> blocked = service.listBlockedUsernames();
     return service.listAdmins().stream()
-        .map(u -> new UserResponse(u.username(), u.createdAt()))
+        .map(u -> new UserResponse(u.username(), u.createdAt(), blocked.contains(u.username())))
         .toList();
   }
 
@@ -46,7 +47,24 @@ public class AdminUserController {
     requireAdmin(principal);
     var created = service.createAdmin(new CreateAdminCommand(body.username(), body.password()));
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.createdAt()));
+        .body(new UserResponse(created.username(), created.createdAt(), false));
+  }
+
+  @PostMapping("/{username}/block")
+  public ResponseEntity<Void> block(
+      @PathVariable String username, @AuthenticationPrincipal UserDetails principal) {
+    requireAdmin(principal);
+    service.block(principal.getUsername(), username);
+    sessionRevoker.expireAll(Usernames.normalize(username));
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{username}/unblock")
+  public ResponseEntity<Void> unblock(
+      @PathVariable String username, @AuthenticationPrincipal UserDetails principal) {
+    requireAdmin(principal);
+    service.unblock(username);
+    return ResponseEntity.noContent().build();
   }
 
   @PostMapping("/{username}/password-reset")
