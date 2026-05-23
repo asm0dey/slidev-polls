@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import {
-  AdminApiClient,
-  AdminApiError,
-  defaultAdminClient,
-  type AdminUserView
-} from "../lib/admin-api";
+import { AdminApiClient, defaultAdminClient, type AdminUserView } from "../lib/admin-api";
+import { describeError } from "../lib/describe-error";
 import { Button, ConfirmDialog, Input, formatRelative } from "@slidev-polls/shared/ui";
 
 const props = withDefaults(defineProps<{ apiClient?: AdminApiClient }>(), { apiClient: undefined });
@@ -33,12 +29,15 @@ async function refresh() {
 }
 
 onMounted(async () => {
-  const [accountResult] = await Promise.allSettled([client.getAccount(), refresh()]);
+  const [accountResult, refreshResult] = await Promise.allSettled([client.getAccount(), refresh()]);
   if (accountResult.status === "fulfilled") {
     currentUsername.value = accountResult.value.username;
     isAdmin.value = accountResult.value.isAdmin;
   } else {
     errorMessage.value = describeError(accountResult.reason, "Failed to load account.");
+  }
+  if (refreshResult.status === "rejected") {
+    errorMessage.value = describeError(refreshResult.reason, "Failed to load users.");
   }
 });
 
@@ -58,20 +57,6 @@ async function onSubmit() {
   } finally {
     submitting.value = false;
   }
-}
-
-function describeError(err: unknown, fallback = "Operation failed."): string {
-  if (err instanceof AdminApiError) {
-    const fieldErrors = err.problem?.errors;
-    if (fieldErrors && Object.keys(fieldErrors).length > 0) {
-      return Object.entries(fieldErrors)
-        .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
-        .join("; ");
-    }
-    return err.problem?.message ?? `Request failed (HTTP ${err.status}).`;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
 }
 
 function showResetForm(u: string) {

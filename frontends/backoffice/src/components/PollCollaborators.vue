@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import type { CollaboratorView } from "@slidev-polls/shared";
 import { defaultAdminClient, type AdminApiClient } from "../lib/admin-api";
+import { describeError } from "../lib/describe-error";
 
 const props = defineProps<{
   pollId: string;
@@ -17,7 +18,7 @@ async function refresh() {
   try {
     collaborators.value = await api.listCollaborators(props.pollId);
   } catch (e: unknown) {
-    error.value = (e as { message?: string })?.message ?? "could not load collaborators";
+    error.value = describeError(e, "could not load collaborators");
   }
 }
 
@@ -27,7 +28,7 @@ async function add() {
     await api.addCollaborator(props.pollId, newCollaborator.value.trim());
     newCollaborator.value = "";
   } catch (e: unknown) {
-    error.value = (e as { message?: string })?.message ?? "could not add collaborator";
+    error.value = describeError(e, "could not add collaborator");
     return;
   }
   try {
@@ -42,7 +43,7 @@ async function remove(username: string) {
   try {
     await api.removeCollaborator(props.pollId, username);
   } catch (e: unknown) {
-    error.value = (e as { message?: string })?.message ?? "could not remove collaborator";
+    error.value = describeError(e, "could not remove collaborator");
     return;
   }
   try {

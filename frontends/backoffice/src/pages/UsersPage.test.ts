@@ -264,6 +264,18 @@ describe("UsersPage", () => {
     expect(wrapper.find('[data-testid="users-error"]').text()).toContain("network error");
   });
 
+  it("listUsers rejection on mount shows an error banner", async () => {
+    const apiClient = makeClient({
+      listUsers: vi.fn().mockRejectedValue(new Error("network timeout")),
+      getAccount: vi.fn().mockResolvedValue({ username: "admin", isAdmin: true })
+    });
+    const wrapper = mount(UsersPage, { props: { apiClient } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="users-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="users-error"]').text()).toContain("network timeout");
+  });
+
   it("blockUser rejection displays an error message", async () => {
     const apiClient = makeClient({
       listUsers: vi.fn().mockResolvedValue([BOB]),

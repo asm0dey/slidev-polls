@@ -11,6 +11,7 @@ import type {
   UpdateQuestionRequest
 } from "@slidev-polls/shared";
 import { AdminApiClient, AdminApiError, defaultAdminClient } from "../lib/admin-api";
+import { describeError as _describeError } from "../lib/describe-error";
 import SlugField from "../components/SlugField.vue";
 import PollCollaborators from "../components/PollCollaborators.vue";
 import { checkSlug } from "../lib/slug-rules";
@@ -144,12 +145,8 @@ function describeError(err: unknown): string {
     if (err.code === "NOT_FOUND") {
       return "Poll not found.";
     }
-    return err.problem?.message ?? `Request failed (HTTP ${err.status}).`;
   }
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return "Request failed.";
+  return _describeError(err, "Request failed.");
 }
 
 const slugIsAcceptable = computed(() => {

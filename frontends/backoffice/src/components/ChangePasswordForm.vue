@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { defaultAdminClient, type AdminApiClient } from "../lib/admin-api";
+import { describeError } from "../lib/describe-error";
 
 const props = defineProps<{ apiClient?: Pick<AdminApiClient, "changePassword"> }>();
 const api = props.apiClient ?? defaultAdminClient;
@@ -19,8 +20,7 @@ async function submit() {
     currentPassword.value = "";
     newPassword.value = "";
   } catch (e: unknown) {
-    const message = (e as { message?: string })?.message ?? "could not change password";
-    error.value = message;
+    error.value = describeError(e, "could not change password");
   }
 }
 </script>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import { ThemeToggle } from "@slidev-polls/shared/ui";
 import { defaultAdminClient } from "./lib/admin-api";
@@ -11,10 +11,16 @@ const route = useRoute();
 // 401 (no session yet) or fight the centered form layout.
 const isFullBleed = computed(() => route.name === "login" || route.name === "setup");
 
-// No /whoami endpoint exists on /api/admin yet (only login/logout). Until the
-// backend exposes the current principal, label the menu with a generic role.
-// The plan acknowledges this fallback.
-const currentUser = "presenter";
+const currentUser = ref("presenter");
+
+onMounted(async () => {
+  try {
+    const account = await defaultAdminClient.getAccount();
+    currentUser.value = account.username;
+  } catch {
+    // Keep the placeholder if the call fails (e.g. not yet authenticated).
+  }
+});
 </script>
 
 <template>
