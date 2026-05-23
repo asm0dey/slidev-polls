@@ -15,8 +15,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.CannotSerializeTransactionException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -140,7 +140,7 @@ class AdminUserServiceTest {
     when(repo.count()).thenReturn(0L);
     // Postgres reports SERIALIZABLE conflicts at COMMIT, not during the insert; the service's
     // try/catch wraps the whole TransactionTemplate so the translation still fires.
-    doThrow(new CannotSerializeTransactionException("could not serialize access"))
+    doThrow(new PessimisticLockingFailureException("could not serialize access"))
         .when(txManager)
         .commit(any(TransactionStatus.class));
 
