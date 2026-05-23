@@ -44,6 +44,13 @@ public class CachingSessionRepository<S extends Session>
 
   @Override
   public S findById(String id) {
+    if (isMalformedId(id)) {
+      // A NUL byte never appears in a session id we issued; it arrives only from a foreign or
+      // stale SP_SESSION cookie that Spring Session's serializer base64-decoded into garbage.
+      // Passing it into the Postgres text lookup throws "invalid byte sequence for encoding UTF8:
+      // 0x00" and 500s the request, so treat it as no session — a fresh one is then issued.
+      return null;
+    }
     S cached = cache.getIfPresent(id);
     if (cached != null) {
       return cached;
@@ -57,8 +64,20 @@ public class CachingSessionRepository<S extends Session>
 
   @Override
   public void deleteById(String id) {
+    if (isMalformedId(id)) {
+      return;
+    }
     delegate.deleteById(id);
     cache.invalidate(id);
+  }
+
+  /**
+   * A session id carrying a NUL is not one we minted — it is a base64-decoded foreign/stale cookie.
+   * Such an id cannot exist in the store and would crash the Postgres text lookup, so callers treat
+   * it as "no session".
+   */
+  private static boolean isMalformedId(String id) {
+    return id == null || id.indexOf('\u0000') >= 0;
   }
 
   @Override
