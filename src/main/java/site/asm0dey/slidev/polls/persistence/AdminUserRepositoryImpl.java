@@ -2,9 +2,12 @@ package site.asm0dey.slidev.polls.persistence;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 import site.asm0dey.slidev.polls.core.domain.AdminUser;
@@ -74,5 +77,28 @@ public class AdminUserRepositoryImpl implements AdminUserRepository {
         .set(ADMIN_USER.PASSWORD_HASH, passwordHash)
         .where(ADMIN_USER.USERNAME.eq(username))
         .execute();
+  }
+
+  @Override
+  public void setBlockedAt(String username, Instant blockedAt) {
+    if (blockedAt == null) {
+      dsl.update(ADMIN_USER)
+          .setNull(ADMIN_USER.BLOCKED_AT)
+          .where(ADMIN_USER.USERNAME.eq(username))
+          .execute();
+    } else {
+      dsl.update(ADMIN_USER)
+          .set(ADMIN_USER.BLOCKED_AT, OffsetDateTime.ofInstant(blockedAt, ZoneOffset.UTC))
+          .where(ADMIN_USER.USERNAME.eq(username))
+          .execute();
+    }
+  }
+
+  @Override
+  public Set<String> listBlockedUsernames() {
+    return dsl.select(ADMIN_USER.USERNAME)
+        .from(ADMIN_USER)
+        .where(ADMIN_USER.BLOCKED_AT.isNotNull())
+        .fetchSet(ADMIN_USER.USERNAME);
   }
 }
