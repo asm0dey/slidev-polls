@@ -30,14 +30,18 @@ async function refresh() {
 
 onMounted(async () => {
   const [accountResult, refreshResult] = await Promise.allSettled([client.getAccount(), refresh()]);
+  const errors: string[] = [];
   if (accountResult.status === "fulfilled") {
     currentUsername.value = accountResult.value.username;
     isAdmin.value = accountResult.value.isAdmin;
   } else {
-    errorMessage.value = describeError(accountResult.reason, "Failed to load account.");
+    errors.push(describeError(accountResult.reason, "Failed to load account."));
   }
   if (refreshResult.status === "rejected") {
-    errorMessage.value = describeError(refreshResult.reason, "Failed to load users.");
+    errors.push(describeError(refreshResult.reason, "Failed to load users."));
+  }
+  if (errors.length > 0) {
+    errorMessage.value = errors.join(" ");
   }
 });
 

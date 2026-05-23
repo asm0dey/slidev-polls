@@ -10,8 +10,11 @@ const currentPassword = ref("");
 const newPassword = ref("");
 const error = ref<string | null>(null);
 const done = ref(false);
+const submitting = ref(false);
 
 async function submit() {
+  if (submitting.value) return;
+  submitting.value = true;
   error.value = null;
   done.value = false;
   try {
@@ -21,6 +24,8 @@ async function submit() {
     newPassword.value = "";
   } catch (e: unknown) {
     error.value = describeError(e, "could not change password");
+  } finally {
+    submitting.value = false;
   }
 }
 </script>
@@ -48,7 +53,9 @@ async function submit() {
         minlength="12"
       />
     </label>
-    <button type="submit" class="cpf__submit">Change password</button>
+    <button type="submit" class="cpf__submit" :disabled="submitting">
+      {{ submitting ? "Changing…" : "Change password" }}
+    </button>
     <p v-if="error" role="alert" class="cpf__error">{{ error }}</p>
     <p v-else-if="done" role="status" class="cpf__success">Password changed.</p>
   </form>
