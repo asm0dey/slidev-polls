@@ -322,16 +322,17 @@ let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 async function copySnippet(q: DraftQuestion) {
   if (!props.pollId || !q.id) return;
   formError.value = null;
+  // The deck token does NOT belong in the markup — PollPanel reads it from
+  // the in-deck auth control via useDeckAuth() and warns in dev if a
+  // deckToken prop is present. Operators mint the token separately on the
+  // Deck tokens page and paste it into the deck's sign-in bar; anonymous
+  // viewers skip that step and still see live tallies (read-only).
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+    formError.value = "Clipboard API is not available in this browser.";
+    return;
+  }
+  const snippet = `<PollResults\n  slug="${slug.value}"\n  pollId="${props.pollId}"\n  questionId="${q.id}"\n/>`;
   try {
-    // The deck token does NOT belong in the markup — PollPanel reads it from
-    // the in-deck auth control via useDeckAuth() and warns in dev if a
-    // deckToken prop is present. Operators mint the token separately on the
-    // Deck tokens page and paste it into the deck's sign-in bar; anonymous
-    // viewers skip that step and still see live tallies (read-only).
-    const snippet = `<PollResults\n  slug="${slug.value}"\n  pollId="${props.pollId}"\n  questionId="${q.id}"\n/>`;
-    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-      throw new Error("Clipboard API is not available in this browser.");
-    }
     await navigator.clipboard.writeText(snippet);
     copiedQuestionId.value = q.id;
     if (copiedTimer) clearTimeout(copiedTimer);
@@ -791,7 +792,7 @@ onMounted(() => {
   margin: 4px 0 0;
 }
 .pe__code {
-  font-family: var(--sp-font-mono);
+  font-family: var(--sp-font-mono), monospace;
   font-size: 11px;
   background: var(--sp-bg-muted);
   padding: 1px 6px;
@@ -945,7 +946,7 @@ onMounted(() => {
   border-radius: var(--sp-radius-sm, 4px);
   font-size: 12px;
   color: var(--sp-fg-subtle);
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   cursor: pointer;
 }
 .pe__add-opt:hover {
@@ -991,7 +992,7 @@ onMounted(() => {
 .pe__arity-field input {
   width: 64px;
   padding: 6px 8px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-size: 13px;
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius);
@@ -1068,7 +1069,7 @@ onMounted(() => {
 .pe__transfer-input {
   flex: 1;
   padding: 6px 8px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-size: 13px;
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius, 6px);
@@ -1084,7 +1085,7 @@ onMounted(() => {
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 500;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   border: 1px solid var(--sp-danger, #f5c6cb);
   border-radius: var(--sp-radius, 6px);
   background: var(--sp-bg);

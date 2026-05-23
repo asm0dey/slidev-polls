@@ -98,7 +98,7 @@ function remove(idx: number) {
   outline: 0;
   background: transparent;
   font-size: 13px;
-  font-family: var(--sp-font-mono);
+  font-family: var(--sp-font-mono), monospace;
   padding: 4px 6px;
   color: var(--sp-fg);
 }

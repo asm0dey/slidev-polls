@@ -17,7 +17,7 @@ withDefaults(
 
 <style scoped>
 .sp-btn {
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-weight: 500;
   border-radius: var(--sp-radius);
   border: 1px solid transparent;

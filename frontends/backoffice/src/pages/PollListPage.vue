@@ -306,7 +306,7 @@ function statusLabel(s: string): string {
   gap: 8px;
 }
 .pl__error {
-  background: var(--sp-danger-subtle, #fdecea);
+  background: var(--sp-danger-bg, #fdecea);
   color: var(--sp-danger, #b71c1c);
   padding: 0.5rem 0.75rem;
   border-radius: var(--sp-radius-lg, 4px);

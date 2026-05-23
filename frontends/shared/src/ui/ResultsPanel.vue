@@ -78,6 +78,9 @@ function pctOf(id: string): number {
   if (d === 0) return 0;
   return Math.round((countOf(id) / d) * 100);
 }
+
+/** Explicitly typed alias so the template v-for variable `opt` resolves to OptionLite. */
+const options = computed<OptionLite[]>(() => props.question.options);
 </script>
 
 <template>
@@ -91,7 +94,7 @@ function pctOf(id: string): number {
     </header>
     <ol class="sp-rp__rows" :aria-live="showLive ? 'polite' : 'off'">
       <li
-        v-for="opt in question.options"
+        v-for="opt in options"
         :key="opt.id"
         class="sp-rp__row"
         :data-leader="leaderId === opt.id ? '' : undefined"
@@ -114,7 +117,7 @@ function pctOf(id: string): number {
 
 <style scoped>
 .sp-rp {
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   background: var(--sp-bg);
   color: var(--sp-fg);
   border-radius: var(--sp-radius-xl);

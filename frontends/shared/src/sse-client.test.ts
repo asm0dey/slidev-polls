@@ -150,7 +150,6 @@ describe("openPollStream bounded-backoff reconnect", () => {
 
   it("dispatches snapshot and question-closed events to their handlers", () => {
     const stubs: StubEventSource[] = [];
-    const scheduled: ScheduledTask[] = [];
     const seen: string[] = [];
     const unsubscribe = openPollStream(
       "http://localhost:8080",
@@ -165,10 +164,7 @@ describe("openPollStream bounded-backoff reconnect", () => {
           stubs.push(s);
           return s as unknown as EventSource;
         },
-        scheduler: (fn, ms) => {
-          scheduled.push({ fn, ms, cancelled: false });
-          return () => {};
-        }
+        scheduler: () => () => {}
       }
     );
 

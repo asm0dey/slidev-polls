@@ -27,11 +27,11 @@ defineEmits<{ remove: [] }>();
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius-sm);
   font-size: 12px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   color: var(--sp-fg);
 }
 .sp-chip[data-mono] {
-  font-family: var(--sp-font-mono);
+  font-family: var(--sp-font-mono), monospace;
 }
 .sp-chip[data-invalid] {
   background: var(--sp-danger-bg);

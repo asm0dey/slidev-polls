@@ -30,7 +30,7 @@ defineEmits<{ "update:modelValue": [v: string] }>();
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-size: 13px;
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius);

@@ -105,7 +105,7 @@ function onSubmit() {
   background: var(--sp-bg);
   color: var(--sp-fg);
   font-variant-numeric: tabular-nums;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
 }
 .landing__input:focus {
   outline: 2px solid var(--sp-accent-ring);

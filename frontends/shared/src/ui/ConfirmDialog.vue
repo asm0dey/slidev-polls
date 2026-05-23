@@ -129,7 +129,7 @@ function onConfirm() {
   margin: 0 0 12px;
 }
 .cd__typed code {
-  font-family: var(--sp-font-mono);
+  font-family: var(--sp-font-mono), monospace;
   font-size: 12px;
   background: var(--sp-bg-muted);
   padding: 1px 6px;
@@ -142,7 +142,7 @@ function onConfirm() {
   box-sizing: border-box;
   margin-top: 6px;
   padding: 8px 10px;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-sans), sans-serif;
   font-size: 13px;
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius);
