@@ -1,12 +1,29 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import QRCodeStyling from "qr-code-styling";
+import { useQrBroadcast } from "../composables/useQrBroadcast";
 
-const props = defineProps<{
-  voterUrl: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    voterUrl: string;
+    // Only the signed-in presenter window shows the trigger button. The
+    // audience window still mounts this component (so it can receive the
+    // synced overlay) but passes canTrigger=false to hide the button.
+    canTrigger?: boolean;
+    // Scopes the cross-window sync. Slidev keeps every slide mounted, so all
+    // QR buttons of one deck are live at once; keying by something unique per
+    // panel (the question) stops a toggle on the on-screen question from also
+    // popping the overlay on the off-screen ones. Defaults to the voter URL so
+    // the component works standalone.
+    syncKey?: string;
+  }>(),
+  { canTrigger: true }
+);
 
-const open = ref(false);
+// Overlay visibility is shared across the presenter and audience windows over
+// a BroadcastChannel — toggling in one window opens it in the other. See
+// useQrBroadcast for why this rather than Slidev sync.
+const { open, set, stop } = useQrBroadcast(props.syncKey ?? props.voterUrl);
 const qrHost = ref<HTMLDivElement | null>(null);
 let qr: QRCodeStyling | null = null;
 
@@ -25,26 +42,27 @@ function buildOptions(url: string) {
   };
 }
 
-async function openOverlay(): Promise<void> {
-  open.value = true;
+// Build (or tear down) the QR whenever the shared overlay state flips. This
+// covers both a local toggle and a remote broadcast from the other window, so
+// the audience screen renders the QR even though it never clicked anything.
+watch(open, async (isOpen) => {
+  if (!isOpen) {
+    qr = null;
+    return;
+  }
   await nextTick();
   if (!qrHost.value) return;
   qrHost.value.replaceChildren();
   qr = new QRCodeStyling(buildOptions(props.voterUrl));
   qr.append(qrHost.value);
-}
+});
 
 function close(): void {
-  open.value = false;
-  qr = null;
+  set(false);
 }
 
 function toggle(): void {
-  if (open.value) {
-    close();
-    return;
-  }
-  void openOverlay();
+  set(!open.value);
 }
 
 watch(
@@ -62,10 +80,13 @@ if (typeof document !== "undefined") {
   document.addEventListener("keydown", onKey);
   onBeforeUnmount(() => document.removeEventListener("keydown", onKey));
 }
+
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
   <button
+    v-if="canTrigger"
     type="button"
     class="sp-qr-toggle"
     data-testid="poll-qr-toggle"
