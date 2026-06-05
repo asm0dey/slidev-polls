@@ -1,4 +1,4 @@
-import { computed, unref, type ComputedRef } from "vue";
+import { computed, type ComputedRef } from "vue";
 import { useSlideContext } from "@slidev/client";
 
 // Resolves the public voter URL for a poll slug, encoded into a QR code by
@@ -14,6 +14,7 @@ export function useVoterUrl(slug: string | (() => string)): ComputedRef<string> 
     }
   })();
 
+  // $frontmatter and $slidev.configs are static per slide (plain objects, not refs), so snapshotting the host once at setup is intentional — matches PollPanel.vue.
   const host = (() => {
     const fm = (ctx?.$frontmatter ?? {}) as Record<string, unknown>;
     if (typeof fm.pollServer === "string" && fm.pollServer.length > 0) {
@@ -27,7 +28,7 @@ export function useVoterUrl(slug: string | (() => string)): ComputedRef<string> 
   })();
 
   return computed(() => {
-    const s = typeof slug === "function" ? slug() : unref(slug);
+    const s = typeof slug === "function" ? slug() : slug;
     return `${host.replace(/\/$/, "")}/${s}`;
   });
 }
