@@ -37,12 +37,18 @@ watch(voterUrl, (v) => {
 </template>
 
 <style scoped>
+/* Mirrors PollQrButton's overlay card: white rounded card, QR, URL underneath
+   — so the inline QR reads the same as the on-demand overlay. */
 .sp-pollqr {
   width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  padding: 32px 32px 24px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 .sp-pollqr__svg {
   width: 100%;
@@ -57,7 +63,7 @@ watch(voterUrl, (v) => {
   margin: 0;
   font-family: var(--sp-font-mono, ui-monospace, monospace);
   font-size: 16px;
-  color: var(--sp-fg, #111);
+  color: #111;
   word-break: break-all;
   text-align: center;
 }
