@@ -55,6 +55,22 @@ Point your phone at the code — it opens the voter page for this poll
 <PollQr slug="my-first-poll" />
 
 ---
+layout: two-cols
+---
+
+## Join while you watch
+
+The QR sits beside the slide content — voters scan from the right column
+while the point stays on the left.
+
+- Same voter URL as the centered slide
+- No sign-in; nothing leaves the browser
+
+::right::
+
+<PollQr slug="my-first-poll" />
+
+---
 layout: center
 ---
 
@@ -98,22 +114,6 @@ layout: center
   pollId="b5d7771d-e50a-460a-b488-a920c3967a95"
   questionId="cd390cf9-492b-44b4-9931-595d0975a9bc"
 />
-
----
-layout: two-cols
----
-
-## Join while you watch
-
-The QR sits beside the slide content — voters scan from the right column
-while the point stays on the left.
-
-- Same voter URL as the centered slide
-- No sign-in; nothing leaves the browser
-
-::right::
-
-<PollQr slug="my-first-poll" />
 
 ---
 
