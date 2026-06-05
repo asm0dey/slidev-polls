@@ -47,6 +47,17 @@ To run this deck:
 layout: center
 ---
 
+## Scan to join
+
+Point your phone at the code — it opens the voter page for this poll
+(`pollServer/<slug>`). Always visible, no sign-in needed.
+
+<PollQr slug="my-first-poll" />
+
+---
+layout: center
+---
+
 ## Q1 — paste your snippet here
 
 <!--
@@ -89,13 +100,18 @@ layout: center
 />
 
 ---
-layout: center
+layout: two-cols
 ---
 
-## Scan to join
+## Join while you watch
 
-Point your phone at the code — it opens the voter page for this poll
-(`pollServer/<slug>`). Always visible, no sign-in needed.
+The QR sits beside the slide content — voters scan from the right column
+while the point stays on the left.
+
+- Same voter URL as the centered slide
+- No sign-in; nothing leaves the browser
+
+::right::
 
 <PollQr slug="my-first-poll" />
 
