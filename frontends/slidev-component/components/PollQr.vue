@@ -40,7 +40,12 @@ watch(voterUrl, (v) => {
 /* Mirrors PollQrButton's overlay card: white rounded card, QR, URL underneath
    — so the inline QR reads the same as the on-demand overlay. */
 .sp-pollqr {
+  /* Self-bounding: fill the container but never grow past a sane size, so the
+     QR fits the slide even when dropped in bare (no wrapper). Capped by both an
+     absolute px and a share of the smaller viewport dimension; centered. */
   width: 100%;
+  max-width: min(360px, 60vmin);
+  margin-inline: auto;
   box-sizing: border-box;
   background: #fff;
   padding: 32px 32px 24px;
