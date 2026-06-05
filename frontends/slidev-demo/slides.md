@@ -89,14 +89,17 @@ layout: center
 />
 
 ---
+layout: center
+---
 
-## Vote against either question
+## Scan to join
 
-| URL                                      | What it is           |
-| ---------------------------------------- | -------------------- |
-| `http://localhost:8080/<slug>`           | voter SPA slug route |
-| network panel → `/api/polls/…/stream`    | live SSE feed        |
-| network panel → `/api/deck/.../activate` | presenter-only POST  |
+Point your phone at the code — it opens the voter page for this poll
+(`pollServer/<slug>`). Always visible, no sign-in needed.
+
+<div style="width: 320px; margin: 0 auto">
+  <PollQr slug="my-first-poll" />
+</div>
 
 ---
 
