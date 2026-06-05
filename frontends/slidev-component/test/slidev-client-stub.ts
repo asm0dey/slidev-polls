@@ -14,12 +14,24 @@ export const configs: Record<string, unknown> = {};
 // the deck would.
 export const slideWidth = ref(980);
 
+// Render context the stubbed useSlideContext() reports. Tests flip this to
+// 'previewNext' / 'overview' to exercise PollPanel's render-context gate
+// (the real @slidev/client exposes $renderContext as a Ref). Defaults to
+// 'slide' so existing tests see the normal main-view activate behaviour.
+export type StubRenderContext = "slide" | "presenter" | "previewNext" | "overview";
+let renderContext: StubRenderContext = "slide";
+export function __setRenderContext(ctx: StubRenderContext): void {
+  renderContext = ctx;
+}
+
 export function useSlideContext(): {
   $slidev: { configs: Record<string, unknown> };
   $frontmatter: Record<string, unknown>;
+  $renderContext: { value: StubRenderContext };
 } {
   return {
     $slidev: { configs },
-    $frontmatter: {}
+    $frontmatter: {},
+    $renderContext: ref(renderContext)
   };
 }

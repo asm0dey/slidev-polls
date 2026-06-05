@@ -451,6 +451,55 @@ describe("PollPanel", () => {
 
   it.todo("POSTs /close when the slide scrolls below the hysteresis threshold (intersect-leave)");
 
+  describe("render context gate", () => {
+    // In presenter mode Slidev mounts the next-slide preview (the
+    // `previewNext` render context) and the overview as fully-live component
+    // copies. Those copies must render results read-only and never POST
+    // activate/close — otherwise the preview panel for the *next* question
+    // fights the on-screen panel for the active question and the deck flaps.
+    afterEach(async () => {
+      const { __setRenderContext } = (await import("@slidev/client")) as unknown as {
+        __setRenderContext: (c: string) => void;
+      };
+      __setRenderContext("slide");
+    });
+
+    it("does NOT POST /activate when rendered in the previewNext context", async () => {
+      authState.value = "signed-in";
+      const { __setRenderContext } = (await import("@slidev/client")) as unknown as {
+        __setRenderContext: (c: string) => void;
+      };
+      __setRenderContext("previewNext");
+
+      const slidePage = document.createElement("div");
+      slidePage.className = "slidev-page";
+      document.body.appendChild(slidePage);
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
+
+      const w = mount(PollPanel, {
+        props: {
+          slug: "s",
+          pollId: "poll-preview-ctx",
+          questionId: "q-preview-ctx",
+          server: "https://api.test"
+        },
+        attachTo: slidePage
+      });
+      await flushPromises();
+
+      const activates = fetchSpy.mock.calls.filter(([url]) =>
+        String(url).endsWith("/api/deck/polls/poll-preview-ctx/activate")
+      );
+      expect(activates.length).toBe(0);
+
+      w.unmount();
+      slidePage.remove();
+      fetchSpy.mockRestore();
+    });
+  });
+
   describe("CORS hint", () => {
     // Replace the default openPollStream mock with one that captures handlers
     // so each test can drive paused / snapshot edges manually.

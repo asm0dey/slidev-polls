@@ -49,8 +49,27 @@ export default defineConfig({
     {
       name: "slidev-chromium",
       testDir: "./slidev-component/e2e",
+      // The deck question-switch spec runs as its own project (below) that
+      // depends on this one, so the two slidev specs never run concurrently —
+      // see that project's comment.
+      testIgnore: "**/slidev-question-switch.spec.ts",
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["voter-chromium"]
+    },
+    {
+      // Both slidev specs drive the SAME Slidev dev server and the same
+      // checked-in slidev-demo/data.ts (each beforeAll rewrites it with its own
+      // seeded slug/pollId, and deck sign-in mints a token for the user's
+      // most-recently-created poll). Run in parallel they raced: one spec's
+      // data.ts write and deck token leaked into the other → wrong slug in the
+      // QR overlay and 403 (token poll mismatch) on activate. Depending on
+      // slidev-chromium serializes them onto a single timeline while leaving
+      // the voter specs free to parallelize.
+      name: "slidev-deck-switch",
+      testDir: "./slidev-component/e2e",
+      testMatch: "**/slidev-question-switch.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["slidev-chromium"]
     }
   ]
 });

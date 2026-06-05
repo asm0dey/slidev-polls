@@ -48,6 +48,21 @@ const slideCtx = (() => {
     return null; // outside slidev (unit tests) — fall back to other sources.
   }
 })();
+// Slidev renders the current slide (`slide` in play mode, `presenter` in the
+// presenter window), the next-slide preview (`previewNext`) and the overview
+// (`overview`) as separate live copies of every component. Only the main
+// views may drive the active question: a `previewNext` copy holds the *next*
+// slide's panel, and on every SSE snapshot it would "reclaim" activation for
+// that not-yet-presented question, fighting the on-screen panel — the deck
+// flaps and the presenter sees the active question stick until a refresh.
+// Gate every activate/close POST on the render context, mirroring
+// @slidev/client's own `['slide','presenter']` checks. An undefined context
+// (non-slidev embed, or the unit-test harness) counts as main.
+const renderContext = (slideCtx as { $renderContext?: { value?: string } } | null)?.$renderContext
+  ?.value;
+const isMainRenderContext =
+  renderContext === undefined || renderContext === "slide" || renderContext === "presenter";
+
 const headmatterServer = (() => {
   const fm = (slideCtx?.$frontmatter ?? {}) as Record<string, unknown>;
   if (typeof fm.pollServer === "string" && fm.pollServer.length > 0) return fm.pollServer;
@@ -168,6 +183,7 @@ function isElementVisible(el: HTMLElement): boolean {
 }
 
 async function activateFromDeck(base: string) {
+  if (!isMainRenderContext) return;
   if (auth.status.value !== "signed-in") return;
   if (!props.questionId || !props.pollId) return;
   if (lastSentIntent === "open") return;
@@ -199,6 +215,7 @@ async function activateFromDeck(base: string) {
 }
 
 async function closeFromDeck(base: string) {
+  if (!isMainRenderContext) return;
   if (auth.status.value !== "signed-in") return;
   if (!props.pollId) return;
   // Only close what this panel opened. A panel that never activated has nothing
@@ -391,7 +408,16 @@ onUnmounted(() => {
     :data-theme="theme.mode"
     :style="{ width: panelWidth }"
   >
-    <PollQrButton v-if="auth.status.value === 'signed-in'" :voter-url="voterUrl" />
+    <!-- Mount the QR in any main view so the audience window (not signed in)
+         can receive the presenter's synced overlay; only show the trigger
+         button to the signed-in presenter. Skip preview/overview copies so
+         their fixed full-screen overlay can't cover the real view. -->
+    <PollQrButton
+      v-if="isMainRenderContext"
+      :voter-url="voterUrl"
+      :can-trigger="auth.status.value === 'signed-in'"
+      :sync-key="resultsKey"
+    />
     <div v-if="paused" class="sp-pollpanel__paused" data-testid="poll-paused">
       live updates paused
     </div>

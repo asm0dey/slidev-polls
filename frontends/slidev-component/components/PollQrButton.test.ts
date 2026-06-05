@@ -27,6 +27,12 @@ vi.mock("qr-code-styling", () => {
 });
 
 import PollQrButton from "./PollQrButton.vue";
+import { useQrBroadcast } from "../composables/useQrBroadcast";
+
+// BroadcastChannel delivers to other instances asynchronously.
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 beforeEach(() => {
   ctorSpy.mockClear();
@@ -112,6 +118,42 @@ describe("PollQrButton", () => {
     await flushPromises();
     expect(document.querySelector("[data-testid='poll-qr-overlay']")).toBeNull();
     w.unmount();
+  });
+
+  it("hides the trigger button when canTrigger is false", async () => {
+    const w = mount(PollQrButton, {
+      props: { voterUrl: "https://example.test/no-trigger", canTrigger: false },
+      attachTo: document.body
+    });
+    await flushPromises();
+    expect(w.find("[data-testid='poll-qr-toggle']").exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("opens the overlay from a cross-window broadcast even without a trigger button", async () => {
+    // Audience window: not signed in (no trigger button) but must still show
+    // the QR when the presenter window broadcasts it.
+    const url = "https://example.test/sync-talk";
+    const audience = mount(PollQrButton, {
+      props: { voterUrl: url, canTrigger: false },
+      attachTo: document.body
+    });
+    await flushPromises();
+    expect(document.querySelector("[data-testid='poll-qr-overlay']")).toBeNull();
+
+    const presenter = useQrBroadcast(url);
+    presenter.set(true);
+    await tick();
+    await flushPromises();
+    expect(document.querySelector("[data-testid='poll-qr-overlay']")).not.toBeNull();
+
+    presenter.set(false);
+    await tick();
+    await flushPromises();
+    expect(document.querySelector("[data-testid='poll-qr-overlay']")).toBeNull();
+
+    presenter.stop();
+    audience.unmount();
   });
 
   it("closes the overlay on Escape", async () => {

@@ -329,4 +329,90 @@ test.describe("slidev deck question switching", () => {
 
     await admin.dispose();
   });
+
+  // Sign the deck in via the nav UI on a normal slide. The deck-auth token is
+  // stored in localStorage, shared across same-origin windows — so a presenter
+  // window opened afterwards on the same page picks it up.
+  async function signInDeck(page: import("@playwright/test").Page) {
+    await page.goto(`${SLIDEV}/3`);
+    await expect(page.getByTestId("poll-results").first()).toBeVisible({ timeout: 30_000 });
+    await page.evaluate(() => window.localStorage.removeItem("slidev-polls:deck-auth"));
+    await page.getByTestId("deck-auth-nav-trigger").click();
+    await page.getByTestId("deck-auth-username").fill("alice");
+    await page.getByTestId("deck-auth-password").fill("correct-horse");
+    await page.getByTestId("deck-auth-control").getByRole("button", { name: "sign in" }).click();
+    await expect(page.getByTestId("deck-auth-nav-trigger")).toContainText("deck", {
+      timeout: 20_000
+    });
+  }
+
+  test("presenter mode: the next-slide preview does not steal activation from the current question", async ({
+    page,
+    playwright,
+    baseURL
+  }) => {
+    const admin = await playwright.request.newContext({ baseURL });
+    await loginAsAlice(admin);
+    // Known starting point: Q1 active.
+    await adminOpen(admin, baseURL!, seededData.pollId, seededData.q1Id);
+
+    await signInDeck(page);
+
+    // Enter presenter mode on the Q1 slide (3). Slidev renders the next slide
+    // (4 = Q2) as a live `previewNext` component copy. Before the render-context
+    // gate, that preview panel reclaimed activation for Q2 on every snapshot —
+    // flipping the active question to the not-yet-presented one and making the
+    // presenter's view appear stale until a manual refresh.
+    await page.goto(`${SLIDEV}/presenter/3`);
+    await expect(page.getByTestId("poll-results").first()).toBeVisible({ timeout: 30_000 });
+
+    // The current (presenter-context) panel activates Q1; the preview must not
+    // touch the active question. It settles on Q1 and stays there.
+    await expect(async () => {
+      expect(await fetchActiveQuestionId(admin, baseURL!, seededData.pollId)).toBe(seededData.q1Id);
+    }).toPass({ timeout: 15_000 });
+    // Hold the window open: a reclaiming preview would flip it to Q2 within a
+    // few snapshots. Re-assert after a quiet interval to catch that flap.
+    await page.waitForTimeout(3000);
+    expect(await fetchActiveQuestionId(admin, baseURL!, seededData.pollId)).toBe(seededData.q1Id);
+
+    await admin.dispose();
+  });
+
+  test("presenter mode: a QR overlay toggled in the presenter appears on the audience window", async ({
+    page,
+    context,
+    playwright,
+    baseURL
+  }) => {
+    const admin = await playwright.request.newContext({ baseURL });
+    await loginAsAlice(admin);
+    await adminOpen(admin, baseURL!, seededData.pollId, seededData.q1Id);
+
+    await signInDeck(page);
+    await page.goto(`${SLIDEV}/presenter/3`);
+    await expect(page.getByTestId("poll-qr-toggle").first()).toBeVisible({ timeout: 30_000 });
+
+    // Audience window in the SAME browser context — shares the origin and thus
+    // the BroadcastChannel the QR sync rides on.
+    const audience = await context.newPage();
+    await audience.goto(`${SLIDEV}/3`);
+    await expect(audience.getByTestId("poll-results").first()).toBeVisible({ timeout: 30_000 });
+    await expect(audience.getByTestId("poll-qr-overlay")).toHaveCount(0);
+
+    // Presenter opens the QR; it must appear on the audience screen too — and
+    // exactly once. Slidev keeps every slide mounted, so a per-slug sync key
+    // would pop one overlay per question panel; the per-question key keeps it
+    // to the single on-screen question.
+    await page.getByTestId("poll-qr-toggle").first().click();
+    await expect(audience.getByTestId("poll-qr-overlay")).toHaveCount(1, { timeout: 10_000 });
+    await expect(audience.getByTestId("poll-qr-overlay")).toBeVisible();
+
+    // ...and closing it in the presenter clears the audience overlay.
+    await page.keyboard.press("Escape");
+    await expect(audience.getByTestId("poll-qr-overlay")).toHaveCount(0, { timeout: 10_000 });
+
+    await audience.close();
+    await admin.dispose();
+  });
 });
