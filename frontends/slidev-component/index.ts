@@ -1,6 +1,7 @@
 import "@slidev-polls/shared/tokens.css";
 
 export { default as PollResults } from "./components/PollResults.vue";
+export { default as PollQr } from "./components/PollQr.vue";
 export { configureDeckAuthBackend } from "./composables/configureDeckAuthBackend";
 export {
   usePollResults,
