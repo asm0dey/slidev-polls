@@ -306,6 +306,9 @@ test.describe("slidev deck question switching", () => {
       page.locator('[data-testid="poll-results"]', { hasText: "Which JVM for the workshop?" })
     ).toBeVisible({ timeout: 15_000 });
 
+    // The QR-toggle is presenter-only: an anonymous deck must not expose it.
+    await expect(page.getByTestId("poll-qr-toggle")).toHaveCount(0);
+
     // Close Q1, open Q2, navigate to slide 4.
     await adminClose(admin, baseURL!, seededData.pollId);
     await adminOpen(admin, baseURL!, seededData.pollId, seededData.q2Id);
@@ -407,6 +410,12 @@ test.describe("slidev deck question switching", () => {
     await page.getByTestId("poll-qr-toggle").first().click();
     await expect(audience.getByTestId("poll-qr-overlay")).toHaveCount(1, { timeout: 10_000 });
     await expect(audience.getByTestId("poll-qr-overlay")).toBeVisible();
+
+    // The overlay must render a scannable QR (an SVG) and print the voter URL
+    // (`${pollServer}/${slug}`) so the audience can read or scan it.
+    const overlay = audience.getByTestId("poll-qr-overlay");
+    await expect(overlay.locator("svg").first()).toBeVisible();
+    await expect(overlay).toContainText(seededData.slug);
 
     // ...and closing it in the presenter clears the audience overlay.
     await page.keyboard.press("Escape");

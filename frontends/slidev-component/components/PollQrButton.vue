@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import QRCodeStyling from "qr-code-styling";
+import { buildQrOptions } from "../composables/qrOptions";
 import { useQrBroadcast } from "../composables/useQrBroadcast";
 
 const props = withDefaults(
@@ -27,21 +28,6 @@ const { open, set, stop } = useQrBroadcast(props.syncKey ?? props.voterUrl);
 const qrHost = ref<HTMLDivElement | null>(null);
 let qr: QRCodeStyling | null = null;
 
-function buildOptions(url: string) {
-  return {
-    width: 512,
-    height: 512,
-    type: "svg" as const,
-    data: url,
-    margin: 8,
-    qrOptions: { errorCorrectionLevel: "M" as const },
-    dotsOptions: { type: "rounded" as const, color: "#111111" },
-    cornersSquareOptions: { type: "extra-rounded" as const, color: "#111111" },
-    cornersDotOptions: { type: "dot" as const, color: "#111111" },
-    backgroundOptions: { color: "#ffffff" }
-  };
-}
-
 // Build (or tear down) the QR whenever the shared overlay state flips. This
 // covers both a local toggle and a remote broadcast from the other window, so
 // the audience screen renders the QR even though it never clicked anything.
@@ -53,7 +39,7 @@ watch(open, async (isOpen) => {
   await nextTick();
   if (!qrHost.value) return;
   qrHost.value.replaceChildren();
-  qr = new QRCodeStyling(buildOptions(props.voterUrl));
+  qr = new QRCodeStyling(buildQrOptions(props.voterUrl));
   qr.append(qrHost.value);
 });
 
@@ -68,7 +54,7 @@ function toggle(): void {
 watch(
   () => props.voterUrl,
   (v) => {
-    if (open.value && qr) qr.update(buildOptions(v));
+    if (open.value && qr) qr.update(buildQrOptions(v));
   }
 );
 

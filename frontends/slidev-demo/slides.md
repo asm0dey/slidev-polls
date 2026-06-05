@@ -47,6 +47,33 @@ To run this deck:
 layout: center
 ---
 
+## Scan to join
+
+Point your phone at the code — it opens the voter page for this poll
+(`pollServer/<slug>`). Always visible, no sign-in needed.
+
+<PollQr slug="my-first-poll" />
+
+---
+layout: two-cols
+---
+
+## Join while you watch
+
+The QR sits beside the slide content — voters scan from the right column
+while the point stays on the left.
+
+- Same voter URL as the centered slide
+- No sign-in; nothing leaves the browser
+
+::right::
+
+<PollQr slug="my-first-poll" />
+
+---
+layout: center
+---
+
 ## Q1 — paste your snippet here
 
 <!--
@@ -87,16 +114,6 @@ layout: center
   pollId="b5d7771d-e50a-460a-b488-a920c3967a95"
   questionId="cd390cf9-492b-44b4-9931-595d0975a9bc"
 />
-
----
-
-## Vote against either question
-
-| URL                                      | What it is           |
-| ---------------------------------------- | -------------------- |
-| `http://localhost:8080/<slug>`           | voter SPA slug route |
-| network panel → `/api/polls/…/stream`    | live SSE feed        |
-| network panel → `/api/deck/.../activate` | presenter-only POST  |
 
 ---
 

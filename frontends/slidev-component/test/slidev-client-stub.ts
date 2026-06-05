@@ -9,6 +9,14 @@ import { ref } from "vue";
 
 export const configs: Record<string, unknown> = {};
 
+// Per-slide frontmatter the stubbed useSlideContext() reports. Tests flip this
+// (e.g. __setFrontmatter({ pollServer: "..." })) to exercise the frontmatter
+// branch of useVoterUrl. Defaults to empty so existing tests are unaffected.
+let frontmatter: Record<string, unknown> = {};
+export function __setFrontmatter(fm: Record<string, unknown>): void {
+  frontmatter = fm;
+}
+
 // Match the runtime shape of @slidev/client/env's slideWidth (a Ref<number>);
 // 980 is slidev's default canvasWidth so the test sees the same panel sizing
 // the deck would.
@@ -31,7 +39,7 @@ export function useSlideContext(): {
 } {
   return {
     $slidev: { configs },
-    $frontmatter: {},
+    $frontmatter: frontmatter,
     $renderContext: ref(renderContext)
   };
 }

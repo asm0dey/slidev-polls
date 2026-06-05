@@ -32,7 +32,10 @@ You provision the demo poll yourself via the backoffice:
    `<PollResults slug pollId questionId deckToken />` to your clipboard.
    Paste those tags into `slides.md` on the slides where you want the live
    results to render.
-3. Reload the deck. Slide 3 / 4 host the pasted `<PollResults>` for Q1 / Q2.
+3. Reload the deck. Slides 5 / 6 host the pasted `<PollResults>` for Q1 / Q2.
+   Slides 3 / 4 show join QR codes via `<PollQr slug="…" />` (a centered one
+   and a `layout: two-cols` variant) — audience scans to reach
+   `http://localhost:8080/{slug}` without signing in.
 4. The auth control top-right of the deck signs the deck in via the deck
    token; navigating to a slide that owns a question fires one
    `POST /api/deck/polls/{pollId}/activate`.
