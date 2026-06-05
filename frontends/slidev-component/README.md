@@ -71,6 +71,18 @@ fullscreen overlay with a styled rounded-dot QR code (rendered locally via
 scan to join without typing. Click the backdrop, the close button, or press
 `Escape` to dismiss. The button is hidden when the deck is not signed in.
 
+### Inline QR code (`<PollQr>`)
+
+`<PollQr slug="my-poll" />` renders an always-visible, inline QR code for a
+poll's voter URL on any slide — no button, no overlay, no sign-in. It fills its
+container width and prints the URL underneath. The host is taken from
+`pollServer` in the slide frontmatter or deck headmatter (falling back to the
+deck's own origin), and the `slug` prop selects the poll, so the encoded URL is
+`${pollServer || window.location.origin}/${slug}`. The QR is generated locally
+with `qr-code-styling`; nothing leaves the browser. Use this when you want a
+permanent join code on a slide; use the presenter-only QR-toggle button on
+`<PollResults>` when you want an on-demand fullscreen overlay instead.
+
 ## Peer dependencies
 
 - `@slidev/client ^52.0.0`
