@@ -7,13 +7,13 @@ export function buildQrOptions(url: string): Options {
   return {
     width: 512,
     height: 512,
-    type: "svg",
+    type: "svg" as const,
     data: url,
     margin: 8,
     qrOptions: { errorCorrectionLevel: "M" },
-    dotsOptions: { type: "rounded", color: "#111111" },
-    cornersSquareOptions: { type: "extra-rounded", color: "#111111" },
-    cornersDotOptions: { type: "dot", color: "#111111" },
+    dotsOptions: { type: "rounded" as const, color: "#111111" },
+    cornersSquareOptions: { type: "extra-rounded" as const, color: "#111111" },
+    cornersDotOptions: { type: "dot" as const, color: "#111111" },
     backgroundOptions: { color: "#ffffff" }
   };
 }

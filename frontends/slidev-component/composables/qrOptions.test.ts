@@ -12,5 +12,8 @@ describe("buildQrOptions", () => {
     expect(opts.qrOptions?.errorCorrectionLevel).toBe("M");
     expect(opts.width).toBe(512);
     expect(opts.height).toBe(512);
+    expect(opts.margin).toBe(8);
+    expect(opts.backgroundOptions?.color).toBe("#ffffff");
+    expect(opts.dotsOptions?.color).toBe("#111111");
   });
 });
