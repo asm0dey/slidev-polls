@@ -30,7 +30,7 @@ RUN bun run --filter '@slidev-polls/shared'     build \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.3_11-glibc AS backend-builder
+FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.4_9-glibc AS backend-builder
 WORKDIR /src
 
 COPY mvnw ./
@@ -55,7 +55,7 @@ RUN ./mvnw package -Dmaven.test.skip=true -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS aot-trainer
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.4_9-distroless-glibc AS aot-trainer
 WORKDIR /app
 COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /tmp/slidev-polls-0.0.1-SNAPSHOT.jar
 
@@ -78,7 +78,7 @@ RUN ["java", \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.3_11-distroless-glibc AS runtime
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.4_9-distroless-glibc AS runtime
 WORKDIR /app
 COPY --from=aot-trainer /app/lib/ /app/lib/
 COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
