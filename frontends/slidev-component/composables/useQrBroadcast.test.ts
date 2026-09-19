@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { useQrBroadcast } from "./useQrBroadcast";
 
-// BroadcastChannel delivers to *other* instances asynchronously; a macrotask
-// tick lets the queued message land before we assert.
+// BroadcastChannel delivers to *other* instances asynchronously, and a single
+// macrotask tick is not always enough on a loaded machine. Poll for the
+// expected transition; a tick is only sufficient where we assert that nothing
+// arrives.
 function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -14,12 +16,10 @@ describe("useQrBroadcast", () => {
     expect(audience.open.value).toBe(false);
 
     presenter.set(true);
-    await tick();
-    expect(audience.open.value).toBe(true);
+    await vi.waitFor(() => expect(audience.open.value).toBe(true));
 
     presenter.set(false);
-    await tick();
-    expect(audience.open.value).toBe(false);
+    await vi.waitFor(() => expect(audience.open.value).toBe(false));
 
     presenter.stop();
     audience.stop();
