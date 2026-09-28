@@ -134,7 +134,7 @@ class AdminAuthWebMvcTest {
     @Test
     void foreign_presenter_delete_returns_403() throws Exception {
         UUID pollId = UUID.randomUUID();
-        doThrow(new NotOwnerException("not yours")).when(pollService).deleteForOwner(eq(pollId), eq("bob"));
+        doThrow(new NotOwnerException("not yours")).when(pollService).deleteForOwner(pollId, "bob");
 
         mvc
             .perform(delete("/api/admin/polls/" + pollId).with(user("bob").roles("AUTHENTICATED")).with(csrf()))
