@@ -14,32 +14,30 @@ import jakarta.servlet.http.HttpServletRequest;
  * environment; derivation from the request is correct in every environment for free.
  */
 final class PublicUrlBase {
-
-  private PublicUrlBase() {}
-
-  static String of(HttpServletRequest request) {
-    StringBuilder buf = new StringBuilder();
-    String forwardedProto = request.getHeader("X-Forwarded-Proto");
-    String scheme =
-        forwardedProto != null && !forwardedProto.isBlank() ? forwardedProto : request.getScheme();
-    buf.append(scheme).append("://");
-
-    String forwardedHost = request.getHeader("X-Forwarded-Host");
-    if (forwardedHost != null && !forwardedHost.isBlank()) {
-      buf.append(forwardedHost);
-    } else {
-      buf.append(request.getServerName());
-      int port = request.getServerPort();
-      if (port > 0
-          && !((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))) {
-        buf.append(':').append(port);
-      }
+    private PublicUrlBase() {
     }
 
-    String context = request.getContextPath();
-    if (context != null && !context.isBlank() && !"/".equals(context)) {
-      buf.append(context);
+    static String of(HttpServletRequest request) {
+        StringBuilder buf = new StringBuilder();
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        String scheme = forwardedProto != null && !forwardedProto.isBlank() ? forwardedProto : request.getScheme();
+        buf.append(scheme).append("://");
+
+        String forwardedHost = request.getHeader("X-Forwarded-Host");
+        if (forwardedHost != null && !forwardedHost.isBlank()) {
+            buf.append(forwardedHost);
+        } else {
+            buf.append(request.getServerName());
+            int port = request.getServerPort();
+            if (port > 0 && !((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))) {
+                buf.append(':').append(port);
+            }
+        }
+
+        String context = request.getContextPath();
+        if (context != null && !context.isBlank() && !"/".equals(context)) {
+            buf.append(context);
+        }
+        return buf.toString();
     }
-    return buf.toString();
-  }
 }

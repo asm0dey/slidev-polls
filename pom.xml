@@ -176,7 +176,7 @@
             </plugin>
 
             <!--
-              Spotless: google-java-format on every Java source, applied at
+              Spotless: Prince of Space on every Java source, applied at
               `verify` so `./mvnw verify` fails loud on a drifted format.
             -->
             <plugin>
@@ -185,11 +185,11 @@
                 <version>3.10.3</version>
                 <configuration>
                     <java>
-                        <googleJavaFormat>
-                            <version>1.28.0</version>
-                            <style>GOOGLE</style>
-                            <reflowLongStrings>true</reflowLongStrings>
-                        </googleJavaFormat>
+                        <princeOfSpace>
+                            <version>2.2.0</version>
+                            <lineLength>120</lineLength>
+                            <javaLanguageLevel>25</javaLanguageLevel>
+                        </princeOfSpace>
                         <removeUnusedImports/>
                         <formatAnnotations/>
                     </java>

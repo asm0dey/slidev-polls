@@ -6,7 +6,7 @@ package site.asm0dey.slidev.polls.core.error;
  * structural pre-conditions trigger this exception now.
  */
 public class ActivationRejectedException extends RuntimeException {
-  public ActivationRejectedException(String message) {
-    super(message);
-  }
+    public ActivationRejectedException(String message) {
+        super(message);
+    }
 }

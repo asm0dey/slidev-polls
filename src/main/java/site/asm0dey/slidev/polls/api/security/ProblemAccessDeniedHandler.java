@@ -23,23 +23,21 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 public class ProblemAccessDeniedHandler implements AccessDeniedHandler {
+    private final ObjectMapper objectMapper;
 
-  private final ObjectMapper objectMapper;
+    public ProblemAccessDeniedHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
-  public ProblemAccessDeniedHandler(ObjectMapper objectMapper) {
-    this.objectMapper = objectMapper;
-  }
-
-  @Override
-  public void handle(
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull AccessDeniedException ex)
-      throws IOException {
-    response.setStatus(HttpStatus.FORBIDDEN.value());
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    Problem body =
-        new Problem(ProblemCode.FORBIDDEN, "access denied", MDC.get(CorrelationIdFilter.MDC_KEY));
-    objectMapper.writeValue(response.getOutputStream(), body);
-  }
+    @Override
+    public void handle(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull AccessDeniedException ex
+    ) throws IOException {
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        Problem body = new Problem(ProblemCode.FORBIDDEN, "access denied", MDC.get(CorrelationIdFilter.MDC_KEY));
+        objectMapper.writeValue(response.getOutputStream(), body);
+    }
 }

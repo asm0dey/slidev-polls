@@ -12,88 +12,97 @@ import site.asm0dey.slidev.polls.core.domain.Poll;
  * poll-persistence}.
  */
 public interface PollRepository {
+    /**
+     * Insert a new poll aggregate (with its questions and options). Returns the hydrated aggregate.
+     */
+    Poll insert(Poll poll);
 
-  /**
-   * Insert a new poll aggregate (with its questions and options). Returns the hydrated aggregate.
-   */
-  Poll insert(Poll poll);
+    Optional<Poll> findById(UUID pollId);
 
-  Optional<Poll> findById(UUID pollId);
+    Optional<Poll> findBySlug(String slug);
 
-  Optional<Poll> findBySlug(String slug);
+    List<Poll> findByOwner(String ownerUsername);
 
-  List<Poll> findByOwner(String ownerUsername);
+    /**
+     * Re-assigns ownership; returns the reloaded poll.
+     */
+    Poll transferOwner(UUID pollId, String newOwnerUsername);
 
-  /** Re-assigns ownership; returns the reloaded poll. */
-  Poll transferOwner(UUID pollId, String newOwnerUsername);
+    /**
+     * Polls owned by {@code username} or where {@code username} is a collaborator.
+     */
+    List<Poll> findOwnedOrCollaborated(String username);
 
-  /** Polls owned by {@code username} or where {@code username} is a collaborator. */
-  List<Poll> findOwnedOrCollaborated(String username);
+    /**
+     * Case-insensitive slug lookup; excludes poll {@code excludingPollId} when non-null.
+     */
+    boolean slugTaken(String slug, UUID excludingPollId);
 
-  /** Case-insensitive slug lookup; excludes poll {@code excludingPollId} when non-null. */
-  boolean slugTaken(String slug, UUID excludingPollId);
+    /**
+     * Replace poll header fields (title, slug) — not questions.
+     */
+    Poll updateHeader(UUID pollId, String title, String slug);
 
-  /** Replace poll header fields (title, slug) — not questions. */
-  Poll updateHeader(UUID pollId, String title, String slug);
+    /**
+     * Reconcile the questions list for {@code pollId}: questions with an {@code id} already on the
+     * poll are updated in place (prompt, ordinal, options diffed), questions with a null id are
+     * inserted with a fresh UUID, and any existing question whose id is not in {@code incoming} is
+     * deleted. Cascades onto {@code poll_options} and {@code votes} via FK ON DELETE CASCADE — that
+     * is intended only for explicit removals, never for unchanged questions.
+     */
+    Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming);
 
-  /**
-   * Reconcile the questions list for {@code pollId}: questions with an {@code id} already on the
-   * poll are updated in place (prompt, ordinal, options diffed), questions with a null id are
-   * inserted with a fresh UUID, and any existing question whose id is not in {@code incoming} is
-   * deleted. Cascades onto {@code poll_options} and {@code votes} via FK ON DELETE CASCADE — that
-   * is intended only for explicit removals, never for unchanged questions.
-   */
-  Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming);
+    void delete(UUID pollId);
 
-  void delete(UUID pollId);
+    /**
+     * Atomically close any currently-ACTIVE question on {@code pollId} and mark {@code questionId}
+     * ACTIVE. The partial unique index on {@code poll_questions(poll_id) WHERE status = 'ACTIVE'} is
+     * the storage-level invariant (FR-004, {@code @TS-004}); implementations MUST surface
+     * unique-constraint races as a distinct exception type so the service can translate them.
+     */
+    Poll activateQuestion(UUID pollId, UUID questionId);
 
-  /**
-   * Atomically close any currently-ACTIVE question on {@code pollId} and mark {@code questionId}
-   * ACTIVE. The partial unique index on {@code poll_questions(poll_id) WHERE status = 'ACTIVE'} is
-   * the storage-level invariant (FR-004, {@code @TS-004}); implementations MUST surface
-   * unique-constraint races as a distinct exception type so the service can translate them.
-   */
-  Poll activateQuestion(UUID pollId, UUID questionId);
+    /**
+     * Close the currently-ACTIVE question on {@code pollId}. No-op when none is active.
+     */
+    Poll closeActiveQuestion(UUID pollId);
 
-  /** Close the currently-ACTIVE question on {@code pollId}. No-op when none is active. */
-  Poll closeActiveQuestion(UUID pollId);
+    /**
+     * Conditional close: close the currently-ACTIVE question on {@code pollId} only when {@code
+     * expectedQuestionId} is null, or matches the question that is active. The guard is applied
+     * atomically under the poll-row lock, so a slide-leave close scoped to the question its slide
+     * opened cannot clobber a concurrent next-slide activate that already moved the active question
+     * on. No-op when none is active or the active question differs from {@code expectedQuestionId}.
+     */
+    Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId);
 
-  /**
-   * Conditional close: close the currently-ACTIVE question on {@code pollId} only when {@code
-   * expectedQuestionId} is null, or matches the question that is active. The guard is applied
-   * atomically under the poll-row lock, so a slide-leave close scoped to the question its slide
-   * opened cannot clobber a concurrent next-slide activate that already moved the active question
-   * on. No-op when none is active or the active question differs from {@code expectedQuestionId}.
-   */
-  Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId);
+    /**
+     * Replace the allowed-origins list for {@code pollId}. A non-null (even empty) list replaces the
+     * current value. Throws {@link site.asm0dey.slidev.polls.core.error.NotFoundException} when the
+     * poll does not exist.
+     */
+    Poll updateAllowedOrigins(UUID pollId, List<String> origins);
 
-  /**
-   * Replace the allowed-origins list for {@code pollId}. A non-null (even empty) list replaces the
-   * current value. Throws {@link site.asm0dey.slidev.polls.core.error.NotFoundException} when the
-   * poll does not exist.
-   */
-  Poll updateAllowedOrigins(UUID pollId, List<String> origins);
+    /**
+     * True iff some poll's {@code allowed_origins} array contains {@code origin} verbatim. Used by
+     * the per-poll CORS resolver for pre-auth deck-login preflight where no path or header identifies
+     * a single poll. Implemented as a single existence query so the resolver does not pay for
+     * question / option hydration on every preflight.
+     */
+    boolean isOriginAllowedByAnyPoll(String origin);
 
-  /**
-   * True iff some poll's {@code allowed_origins} array contains {@code origin} verbatim. Used by
-   * the per-poll CORS resolver for pre-auth deck-login preflight where no path or header identifies
-   * a single poll. Implemented as a single existence query so the resolver does not pay for
-   * question / option hydration on every preflight.
-   */
-  boolean isOriginAllowedByAnyPoll(String origin);
+    /**
+     * Transition every question on {@code pollId} back to {@code DRAFT}, clearing {@code
+     * activated_at} and {@code closed_at}; null {@code polls.active_question_id} and set {@code
+     * polls.status = DRAFT}. Idempotent.
+     */
+    Poll resetQuestionsToDraft(UUID pollId);
 
-  /**
-   * Transition every question on {@code pollId} back to {@code DRAFT}, clearing {@code
-   * activated_at} and {@code closed_at}; null {@code polls.active_question_id} and set {@code
-   * polls.status = DRAFT}. Idempotent.
-   */
-  Poll resetQuestionsToDraft(UUID pollId);
-
-  /**
-   * Distinct-voter ballot counts per question on {@code pollId}. Missing questions (no votes yet)
-   * are simply absent from the returned map — callers default to {@code 0}. Used by the admin DTO
-   * assembler to surface {@code voteCount} on every question and by the structural-edit lock to
-   * decide whether a question is still safe to mutate (FR-013, RESOURCE_HAS_VOTES).
-   */
-  Map<UUID, Long> voteCountByQuestion(UUID pollId);
+    /**
+     * Distinct-voter ballot counts per question on {@code pollId}. Missing questions (no votes yet)
+     * are simply absent from the returned map — callers default to {@code 0}. Used by the admin DTO
+     * assembler to surface {@code voteCount} on every question and by the structural-edit lock to
+     * decide whether a question is still safe to mutate (FR-013, RESOURCE_HAS_VOTES).
+     */
+    Map<UUID, Long> voteCountByQuestion(UUID pollId);
 }

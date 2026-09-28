@@ -1,7 +1,6 @@
 package site.asm0dey.slidev.polls.api.security;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.ADMIN_USER;
-
 import java.util.Collections;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.NonNull;
@@ -23,35 +22,33 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class AdminUserDetailsService implements UserDetailsService {
+    static final String ROLE_AUTHENTICATED = "ROLE_AUTHENTICATED";
+    private final DSLContext dsl;
 
-  static final String ROLE_AUTHENTICATED = "ROLE_AUTHENTICATED";
-
-  private final DSLContext dsl;
-
-  public AdminUserDetailsService(DSLContext dsl) {
-    this.dsl = dsl;
-  }
-
-  @Override
-  public @NonNull UserDetails loadUserByUsername(@NonNull String username)
-      throws UsernameNotFoundException {
-    if (username.isBlank()) {
-      throw new UsernameNotFoundException("empty username");
+    public AdminUserDetailsService(DSLContext dsl) {
+        this.dsl = dsl;
     }
-    String lookup = username.toLowerCase();
-    var row =
-        dsl.select(ADMIN_USER.USERNAME, ADMIN_USER.PASSWORD_HASH, ADMIN_USER.BLOCKED_AT)
+
+    @Override
+    public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
+        if (username.isBlank()) {
+            throw new UsernameNotFoundException("empty username");
+        }
+        String lookup = username.toLowerCase();
+        var row = dsl
+            .select(ADMIN_USER.USERNAME, ADMIN_USER.PASSWORD_HASH, ADMIN_USER.BLOCKED_AT)
             .from(ADMIN_USER)
             .where(ADMIN_USER.USERNAME.eq(lookup))
             .fetchOne();
-    if (row == null) {
-      throw new UsernameNotFoundException("no such presenter: " + lookup);
+        if (row == null) {
+            throw new UsernameNotFoundException("no such presenter: " + lookup);
+        }
+        boolean blocked = row.get(ADMIN_USER.BLOCKED_AT) != null;
+        return User
+            .withUsername(row.get(ADMIN_USER.USERNAME))
+            .password(row.get(ADMIN_USER.PASSWORD_HASH))
+            .disabled(blocked)
+            .authorities(Collections.singletonList(() -> ROLE_AUTHENTICATED))
+            .build();
     }
-    boolean blocked = row.get(ADMIN_USER.BLOCKED_AT) != null;
-    return User.withUsername(row.get(ADMIN_USER.USERNAME))
-        .password(row.get(ADMIN_USER.PASSWORD_HASH))
-        .disabled(blocked)
-        .authorities(Collections.singletonList(() -> ROLE_AUTHENTICATED))
-        .build();
-  }
 }

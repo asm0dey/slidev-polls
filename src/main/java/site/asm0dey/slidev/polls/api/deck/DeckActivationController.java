@@ -25,46 +25,49 @@ import site.asm0dey.slidev.polls.core.service.PollService;
 @RestController
 @RequestMapping("/api/deck/polls/{pollId}")
 public class DeckActivationController {
+    private final PollService pollService;
 
-  private final PollService pollService;
-
-  public DeckActivationController(PollService pollService) {
-    this.pollService = pollService;
-  }
-
-  @PostMapping("/activate")
-  public DeckActivatedResponse activate(
-      @PathVariable UUID pollId,
-      @RequestBody ActivateRequest body,
-      @AuthenticationPrincipal DeckPrincipal principal) {
-    if (!principal.pollId().equals(pollId)) {
-      throw new DeckTokenPollMismatchException(
-          "deck token " + principal.tokenId() + " is not scoped to poll " + pollId);
+    public DeckActivationController(PollService pollService) {
+        this.pollService = pollService;
     }
-    Poll after = pollService.activateQuestion(pollId, body.questionId());
-    return new DeckActivatedResponse(pollId, after.activeQuestionId());
-  }
 
-  @PostMapping("/close")
-  public DeckActivatedResponse close(
-      @PathVariable UUID pollId,
-      @RequestBody(required = false) CloseRequest body,
-      @AuthenticationPrincipal DeckPrincipal principal) {
-    if (!principal.pollId().equals(pollId)) {
-      throw new DeckTokenPollMismatchException(
-          "deck token " + principal.tokenId() + " is not scoped to poll " + pollId);
+    @PostMapping("/activate")
+    public DeckActivatedResponse activate(
+            @PathVariable UUID pollId,
+            @RequestBody ActivateRequest body,
+            @AuthenticationPrincipal DeckPrincipal principal
+    ) {
+        if (!principal.pollId().equals(pollId)) {
+            throw new DeckTokenPollMismatchException(
+                    "deck token " + principal.tokenId() + " is not scoped to poll " + pollId
+            );
+        }
+        Poll after = pollService.activateQuestion(pollId, body.questionId());
+        return new DeckActivatedResponse(pollId, after.activeQuestionId());
     }
-    // Body carries the questionId the caller believes is active. When supplied, the
-    // service no-ops if a different question has since become active — prevents a
-    // slide-leave close from racing past the next slide's activate and clobbering it.
-    UUID expected = body == null ? null : body.questionId();
-    Poll after = pollService.closeActiveQuestion(pollId, expected);
-    return new DeckActivatedResponse(pollId, after.activeQuestionId());
-  }
 
-  public record ActivateRequest(UUID questionId) {}
+    @PostMapping("/close")
+    public DeckActivatedResponse close(
+            @PathVariable UUID pollId,
+            @RequestBody(required = false) CloseRequest body,
+            @AuthenticationPrincipal DeckPrincipal principal
+    ) {
+        if (!principal.pollId().equals(pollId)) {
+            throw new DeckTokenPollMismatchException(
+                    "deck token " + principal.tokenId() + " is not scoped to poll " + pollId
+            );
+        }
+        // Body carries the questionId the caller believes is active. When supplied, the
+        // service no-ops if a different question has since become active — prevents a
+        // slide-leave close from racing past the next slide's activate and clobbering it.
+        UUID expected = body == null ? null : body.questionId();
+        Poll after = pollService.closeActiveQuestion(pollId, expected);
+        return new DeckActivatedResponse(pollId, after.activeQuestionId());
+    }
 
-  public record CloseRequest(UUID questionId) {}
+    public record ActivateRequest(UUID questionId) {}
 
-  public record DeckActivatedResponse(UUID pollId, UUID activeQuestionId) {}
+    public record CloseRequest(UUID questionId) {}
+
+    public record DeckActivatedResponse(UUID pollId, UUID activeQuestionId) {}
 }

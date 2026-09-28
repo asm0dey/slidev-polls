@@ -38,65 +38,65 @@ import site.asm0dey.slidev.polls.core.service.PollService;
 @RestController
 @RequestMapping("/api/deck/auth")
 public class DeckAuthController {
+    private final AuthenticationManager authenticationManager;
+    private final PollService pollService;
+    private final DeckTokenService deckTokenService;
 
-  private final AuthenticationManager authenticationManager;
-  private final PollService pollService;
-  private final DeckTokenService deckTokenService;
-
-  public DeckAuthController(
-      AuthenticationManager authenticationManager,
-      PollService pollService,
-      DeckTokenService deckTokenService) {
-    this.authenticationManager = authenticationManager;
-    this.pollService = pollService;
-    this.deckTokenService = deckTokenService;
-  }
-
-  @GetMapping("/me")
-  public DeckPrincipalView me(@AuthenticationPrincipal DeckPrincipal principal) {
-    return new DeckPrincipalView(principal.tokenId(), principal.pollId(), principal.label());
-  }
-
-  @PostMapping("/login")
-  public ResponseEntity<DeckLoginResponse> login(@Valid @RequestBody DeckLoginRequest body) {
-    Authentication authenticated;
-    try {
-      authenticated =
-          authenticationManager.authenticate(
-              UsernamePasswordAuthenticationToken.unauthenticated(
-                  body.username(), body.password()));
-    } catch (BadCredentialsException ex) {
-      throw new BadDeckCredentialsException("invalid username or password", ex);
+    public DeckAuthController(
+            AuthenticationManager authenticationManager,
+            PollService pollService,
+            DeckTokenService deckTokenService
+    ) {
+        this.authenticationManager = authenticationManager;
+        this.pollService = pollService;
+        this.deckTokenService = deckTokenService;
     }
-    String username = authenticated.getName();
-    // Owned OR collaborated polls — a collaborator who owns nothing must still be able to mint a
-    // deck token for a poll shared with them (mint() authorizes editors, not just owners).
-    List<Poll> polls = pollService.listVisibleTo(username);
-    if (polls.isEmpty()) {
-      throw new BadDeckCredentialsException("presenter has no accessible poll", null);
+
+    @GetMapping("/me")
+    public DeckPrincipalView me(@AuthenticationPrincipal DeckPrincipal principal) {
+        return new DeckPrincipalView(principal.tokenId(), principal.pollId(), principal.label());
     }
-    Poll poll =
-        polls.stream()
+
+    @PostMapping("/login")
+    public ResponseEntity<DeckLoginResponse> login(@Valid @RequestBody DeckLoginRequest body) {
+        Authentication authenticated;
+        try {
+            authenticated = authenticationManager.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(
+                    body.username(),
+                    body.password()
+            ));
+        } catch (BadCredentialsException ex) {
+            throw new BadDeckCredentialsException("invalid username or password", ex);
+        }
+        String username = authenticated.getName();
+        // Owned OR collaborated polls — a collaborator who owns nothing must still be able to mint a
+        // deck token for a poll shared with them (mint() authorizes editors, not just owners).
+        List<Poll> polls = pollService.listVisibleTo(username);
+        if (polls.isEmpty()) {
+            throw new BadDeckCredentialsException("presenter has no accessible poll", null);
+        }
+        Poll poll = polls
+            .stream()
             .max(Comparator.comparing(Poll::createdAt))
             .orElseThrow(() -> new BadDeckCredentialsException("no poll available", null));
-    DeckTokenService.Minted minted = deckTokenService.mint(poll.id(), username, "deck");
-    DeckLoginResponse payload =
-        new DeckLoginResponse(
-            minted.plaintext(),
-            minted.token().id(),
-            minted.token().pollId(),
-            minted.token().label());
-    return ResponseEntity.ok(payload);
-  }
-
-  /**
-   * Wraps credential-rejection so {@code GlobalExceptionHandler}'s {@link AuthenticationException}
-   * branch emits a consistent 401 without leaking Spring Security's internal "Bad credentials"
-   * wording.
-   */
-  static final class BadDeckCredentialsException extends AuthenticationException {
-    BadDeckCredentialsException(String msg, Throwable cause) {
-      super(msg, cause);
+        DeckTokenService.Minted minted = deckTokenService.mint(poll.id(), username, "deck");
+        DeckLoginResponse payload = new DeckLoginResponse(
+                minted.plaintext(),
+                minted.token().id(),
+                minted.token().pollId(),
+                minted.token().label()
+        );
+        return ResponseEntity.ok(payload);
     }
-  }
+
+    /**
+     * Wraps credential-rejection so {@code GlobalExceptionHandler}'s {@link AuthenticationException}
+     * branch emits a consistent 401 without leaking Spring Security's internal "Bad credentials"
+     * wording.
+     */
+    static final class BadDeckCredentialsException extends AuthenticationException {
+        BadDeckCredentialsException(String msg, Throwable cause) {
+            super(msg, cause);
+        }
+    }
 }

@@ -38,102 +38,89 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        // Argon2id with OWASP "stronger" parameters: 64 MiB memory, 3 iterations, 4 lanes.
+        // Self-describing hash format ($argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>) means future
+        // parameter tuning does not break verification of older rows.
+        return new Argon2PasswordEncoder(16, 32, 4, 65536, 3);
+    }
 
-  @Bean
-  PasswordEncoder passwordEncoder() {
-    // Argon2id with OWASP "stronger" parameters: 64 MiB memory, 3 iterations, 4 lanes.
-    // Self-describing hash format ($argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>) means future
-    // parameter tuning does not break verification of older rows.
-    return new Argon2PasswordEncoder(16, 32, 4, 65536, 3);
-  }
+    @Bean
+    AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+        // Explicit ProviderManager wiring so AdminAuthController can depend on a concrete
+        // AuthenticationManager bean; Spring Boot 4's auto-configuration does not publish one by
+        // default once a UserDetailsService bean of our own is in play.
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        return new ProviderManager(provider);
+    }
 
-  @Bean
-  AuthenticationManager authenticationManager(
-      UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-    // Explicit ProviderManager wiring so AdminAuthController can depend on a concrete
-    // AuthenticationManager bean; Spring Boot 4's auto-configuration does not publish one by
-    // default once a UserDetailsService bean of our own is in play.
-    DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
-    provider.setPasswordEncoder(passwordEncoder);
-    return new ProviderManager(provider);
-  }
+    @Bean
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ProblemAuthenticationEntryPoint entryPoint,
+            ProblemAccessDeniedHandler accessDeniedHandler,
+            DeckTokenAuthenticationFilter deckTokenFilter,
+            PerPollCorsConfigurationSource corsSource
+    ) {
+        // CSRF tokens live in a cookie the backoffice SPA can read (CookieCsrfTokenRepository
+        // withHttpOnlyFalse), so a JSON POST from the SPA can echo them on a header. The raw-value
+        // handler avoids the XOR scheme that confuses simple fetch clients — the cookie value and the
+        // header value are identical (per Spring Security 7 docs).
+        CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
+        // Passing null disables the extra request attribute (name falls back to
+        // csrfToken.getParameterName()).
+        // The parameter is unannotated in a @NullMarked package but null is an intentional, documented
+        // value.
+        @Nullable String noAttrName = null;
+        csrfHandler.setCsrfRequestAttributeName(noAttrName);
 
-  @Bean
-  SecurityFilterChain securityFilterChain(
-      HttpSecurity http,
-      ProblemAuthenticationEntryPoint entryPoint,
-      ProblemAccessDeniedHandler accessDeniedHandler,
-      DeckTokenAuthenticationFilter deckTokenFilter,
-      PerPollCorsConfigurationSource corsSource) {
-    // CSRF tokens live in a cookie the backoffice SPA can read (CookieCsrfTokenRepository
-    // withHttpOnlyFalse), so a JSON POST from the SPA can echo them on a header. The raw-value
-    // handler avoids the XOR scheme that confuses simple fetch clients — the cookie value and the
-    // header value are identical (per Spring Security 7 docs).
-    CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
-    // Passing null disables the extra request attribute (name falls back to
-    // csrfToken.getParameterName()).
-    // The parameter is unannotated in a @NullMarked package but null is an intentional, documented
-    // value.
-    @Nullable String noAttrName = null;
-    csrfHandler.setCsrfRequestAttributeName(noAttrName);
-
-    http.cors(cors -> cors.configurationSource(corsSource))
-        .authorizeHttpRequests(
-            auth ->
-                auth
-                    // Login must be reachable before the caller holds a session.
-                    .requestMatchers(HttpMethod.POST, "/api/admin/login")
-                    .permitAll()
-                    // First-run bootstrap is intentionally public — the SPA polls /setup/status
-                    // before any admin exists, and POST /setup creates the very first admin. The
-                    // service layer (AdminUserService) enforces the once-only semantics by
-                    // throwing SetupLockedException once admin_user is non-empty.
-                    .requestMatchers("/api/admin/setup/**", "/api/admin/setup")
-                    .permitAll()
-                    // Everything else under /api/admin/** requires authentication.
-                    .requestMatchers("/api/admin/**")
-                    .authenticated()
-                    // Deck login is permitAll — the caller has no deck token yet (BUG-002). The
-                    // controller calls AuthenticationManager itself.
-                    .requestMatchers(HttpMethod.POST, "/api/deck/auth/login")
-                    .permitAll()
-                    // SPA shells and public surfaces are open at the filter chain.
-                    .requestMatchers("/", "/admin/", "/admin/**")
-                    .permitAll()
-                    .requestMatchers("/api/polls/**", "/api/public/**")
-                    .permitAll()
-                    // Deck endpoints require the DECK authority the DeckTokenAuthenticationFilter
-                    // attaches on a valid X-Deck-Token header (@TS-053). Without the authority
-                    // the request falls through to the ProblemAuthenticationEntryPoint which
-                    // emits DECK_TOKEN_INVALID (the entry point reads from the request path).
-                    .requestMatchers("/api/deck/**")
-                    .hasAuthority(DeckPrincipal.ROLE)
-                    // Everything else (SPA static, catch-all, voter slug route) is open too — the
-                    // SpaForwardingConfig (T087) does the actual routing; we just don't gate it.
-                    .anyRequest()
-                    .permitAll())
-        .addFilterBefore(deckTokenFilter, UsernamePasswordAuthenticationFilter.class)
-        .csrf(
-            csrf ->
-                csrf.csrfTokenRepository(csrfRepo)
-                    .csrfTokenRequestHandler(csrfHandler)
-                    // The voter never holds a session, so its state-changing endpoints are CSRF-
-                    // exempt. Admin login is exempt too: the caller has no session yet, so there's
-                    // no CSRF surface to protect.
-                    .ignoringRequestMatchers(
+        http
+            .cors(cors -> cors.configurationSource(corsSource))
+            .authorizeHttpRequests(auth -> auth
+                // Login must be reachable before the caller holds a session.
+                .requestMatchers(HttpMethod.POST, "/api/admin/login")
+                .permitAll()
+                // throwing SetupLockedException once admin_user is non-empty.
+                .requestMatchers("/api/admin/setup/**", "/api/admin/setup")
+                .permitAll()
+                // Everything else under /api/admin/** requires authentication.
+                .requestMatchers("/api/admin/**")
+                .authenticated()
+                // controller calls AuthenticationManager itself.
+                .requestMatchers(HttpMethod.POST, "/api/deck/auth/login")
+                .permitAll()
+                // SPA shells and public surfaces are open at the filter chain.
+                .requestMatchers("/", "/admin/", "/admin/**")
+                .permitAll()
+                .requestMatchers("/api/polls/**", "/api/public/**")
+                .permitAll()
+                // emits DECK_TOKEN_INVALID (the entry point reads from the request path).
+                .requestMatchers("/api/deck/**")
+                .hasAuthority(DeckPrincipal.ROLE)
+                // SpaForwardingConfig (T087) does the actual routing; we just don't gate it.
+                .anyRequest()
+                .permitAll())
+            .addFilterBefore(deckTokenFilter, UsernamePasswordAuthenticationFilter.class)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfRepo)
+                .csrfTokenRequestHandler(csrfHandler)
+                // no CSRF surface to protect.
+                .ignoringRequestMatchers(
                         "/api/polls/**",
                         "/api/public/**",
                         "/api/deck/**",
                         "/api/admin/login",
                         "/api/admin/setup",
-                        "/api/admin/setup/**"))
-        .exceptionHandling(
-            ex -> ex.authenticationEntryPoint(entryPoint).accessDeniedHandler(accessDeniedHandler))
-        .formLogin(AbstractHttpConfigurer::disable)
-        .httpBasic(AbstractHttpConfigurer::disable)
-        .logout(Customizer.withDefaults());
+                        "/api/admin/setup/**"
+                ))
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint).accessDeniedHandler(accessDeniedHandler))
+            .formLogin(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .logout(Customizer.withDefaults());
 
-    return http.build();
-  }
+        return http.build();
+    }
 }

@@ -12,23 +12,27 @@ import site.asm0dey.slidev.polls.core.domain.AdminUser;
  * {@link #insert(String, String)}.
  */
 public interface AdminUserRepository {
-  long count();
+    long count();
 
-  boolean existsByUsername(String username);
+    boolean existsByUsername(String username);
 
-  void insert(String username, String passwordHash);
+    void insert(String username, String passwordHash);
 
-  List<AdminUser> listAll();
+    List<AdminUser> listAll();
 
-  Optional<String> findPasswordHash(String username);
+    Optional<String> findPasswordHash(String username);
 
-  Optional<String> findBootstrapAdminUsername();
+    Optional<String> findBootstrapAdminUsername();
 
-  void updatePasswordHash(String username, String passwordHash);
+    void updatePasswordHash(String username, String passwordHash);
 
-  /** Sets or clears the block timestamp ({@code null} unblocks). */
-  void setBlockedAt(String username, Instant blockedAt);
+    /**
+     * Sets or clears the block timestamp ({@code null} unblocks).
+     */
+    void setBlockedAt(String username, Instant blockedAt);
 
-  /** Usernames whose {@code blocked_at} is non-null. */
-  Set<String> listBlockedUsernames();
+    /**
+     * Usernames whose {@code blocked_at} is non-null.
+     */
+    Set<String> listBlockedUsernames();
 }

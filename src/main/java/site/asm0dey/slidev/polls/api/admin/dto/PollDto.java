@@ -14,27 +14,28 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
  * config property through every layer.
  */
 public record PollDto(
-    UUID id,
-    String title,
-    String slug,
-    PollStatus status,
-    String publicUrl,
-    UUID activeQuestionId,
-    boolean isOwner) {
+        UUID id,
+        String title,
+        String slug,
+        PollStatus status,
+        String publicUrl,
+        UUID activeQuestionId,
+        boolean isOwner
+) {
+    public static PollDto from(Poll domain, String publicUrlBase, boolean isOwner) {
+        String base = publicUrlBase == null ? "" : stripTrailingSlash(publicUrlBase);
+        return new PollDto(
+                domain.id(),
+                domain.title(),
+                domain.slug(),
+                domain.status(),
+                base + "/" + domain.slug(),
+                domain.activeQuestionId(),
+                isOwner
+        );
+    }
 
-  public static PollDto from(Poll domain, String publicUrlBase, boolean isOwner) {
-    String base = publicUrlBase == null ? "" : stripTrailingSlash(publicUrlBase);
-    return new PollDto(
-        domain.id(),
-        domain.title(),
-        domain.slug(),
-        domain.status(),
-        base + "/" + domain.slug(),
-        domain.activeQuestionId(),
-        isOwner);
-  }
-
-  private static String stripTrailingSlash(String base) {
-    return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
-  }
+    private static String stripTrailingSlash(String base) {
+        return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+    }
 }

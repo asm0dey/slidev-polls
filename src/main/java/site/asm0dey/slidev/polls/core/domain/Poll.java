@@ -12,18 +12,18 @@ import java.util.UUID;
  * null} when no question is active.
  */
 public record Poll(
-    UUID id,
-    String ownerUsername,
-    String title,
-    String slug,
-    PollStatus status,
-    UUID activeQuestionId,
-    List<Question> questions,
-    List<String> allowedOrigins,
-    Instant createdAt,
-    Instant updatedAt) {
-
-  public Poll {
-    allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
-  }
+        UUID id,
+        String ownerUsername,
+        String title,
+        String slug,
+        PollStatus status,
+        UUID activeQuestionId,
+        List<Question> questions,
+        List<String> allowedOrigins,
+        Instant createdAt,
+        Instant updatedAt
+) {
+    public Poll {
+        allowedOrigins = allowedOrigins == null ? List.of() : List.copyOf(allowedOrigins);
+    }
 }

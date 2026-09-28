@@ -5,7 +5,7 @@ package site.asm0dey.slidev.polls.core.error;
  * second vote for the same question (FR-009, @TS-023).
  */
 public class AlreadyVotedException extends RuntimeException {
-  public AlreadyVotedException(String message) {
-    super(message);
-  }
+    public AlreadyVotedException(String message) {
+        super(message);
+    }
 }

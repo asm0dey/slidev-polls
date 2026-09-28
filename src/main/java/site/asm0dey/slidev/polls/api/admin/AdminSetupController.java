@@ -22,23 +22,22 @@ import site.asm0dey.slidev.polls.core.service.CreateAdminCommand;
 @RestController
 @RequestMapping("/api/admin/setup")
 public class AdminSetupController {
+    private final AdminUserService service;
 
-  private final AdminUserService service;
+    public AdminSetupController(AdminUserService service) {
+        this.service = service;
+    }
 
-  public AdminSetupController(AdminUserService service) {
-    this.service = service;
-  }
+    @GetMapping("/status")
+    public SetupStatusResponse status() {
+        return new SetupStatusResponse(service.isSetupRequired());
+    }
 
-  @GetMapping("/status")
-  public SetupStatusResponse status() {
-    return new SetupStatusResponse(service.isSetupRequired());
-  }
-
-  @PostMapping
-  public ResponseEntity<UserResponse> setup(@Valid @RequestBody SetupRequest body) {
-    var created =
-        service.createInitialAdmin(new CreateAdminCommand(body.username(), body.password()));
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(new UserResponse(created.username(), created.createdAt(), false));
-  }
+    @PostMapping
+    public ResponseEntity<UserResponse> setup(@Valid @RequestBody SetupRequest body) {
+        var created = service.createInitialAdmin(new CreateAdminCommand(body.username(), body.password()));
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(new UserResponse(created.username(), created.createdAt(), false));
+    }
 }

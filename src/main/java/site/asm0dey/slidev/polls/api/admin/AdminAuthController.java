@@ -32,65 +32,65 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin")
 public class AdminAuthController {
+    private final AuthenticationManager authenticationManager;
+    private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
-  private final AuthenticationManager authenticationManager;
-  private final SecurityContextRepository securityContextRepository =
-      new HttpSessionSecurityContextRepository();
-
-  public AdminAuthController(AuthenticationManager authenticationManager) {
-    this.authenticationManager = authenticationManager;
-  }
-
-  @PostMapping("/login")
-  public ResponseEntity<Void> login(
-      @Valid @RequestBody LoginRequest body,
-      HttpServletRequest request,
-      jakarta.servlet.http.HttpServletResponse response) {
-    UsernamePasswordAuthenticationToken token =
-        UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password());
-    try {
-      Authentication authenticated = authenticationManager.authenticate(token);
-      SecurityContext context = SecurityContextHolder.createEmptyContext();
-      context.setAuthentication(authenticated);
-      SecurityContextHolder.setContext(context);
-      // Writing the context to the repository forces a session on first login and stores the
-      // authentication against JSESSIONID/SP_SESSION; subsequent requests are reloaded
-      // automatically by SecurityContextPersistenceFilter.
-      securityContextRepository.saveContext(context, request, response);
-    } catch (BadCredentialsException ex) {
-      // Rewrap so the GlobalExceptionHandler's AuthenticationException branch fires. The default
-      // BadCredentialsException message leaks internal wording ("Bad credentials"); we keep the
-      // user-facing message on the wrapped exception.
-      throw new BadCredentialsAsAuthException("invalid username or password", ex);
+    public AdminAuthController(AuthenticationManager authenticationManager) {
+        this.authenticationManager = authenticationManager;
     }
-    return ResponseEntity.noContent().build();
-  }
 
-  @PostMapping("/logout")
-  public ResponseEntity<Void> logout(
-      HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
-    // Clear the SecurityContext (in-memory) and the stored context (session).
-    SecurityContextHolder.clearContext();
-    SecurityContext empty = SecurityContextHolder.createEmptyContext();
-    securityContextRepository.saveContext(empty, request, response);
-    var session = request.getSession(false);
-    if (session != null) {
-      session.invalidate();
+    @PostMapping("/login")
+    public ResponseEntity<Void> login(
+            @Valid @RequestBody LoginRequest body,
+            HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse response
+    ) {
+        UsernamePasswordAuthenticationToken token =
+                UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password());
+        try {
+            Authentication authenticated = authenticationManager.authenticate(token);
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authenticated);
+            SecurityContextHolder.setContext(context);
+            // Writing the context to the repository forces a session on first login and stores the
+            // authentication against JSESSIONID/SP_SESSION; subsequent requests are reloaded
+            // automatically by SecurityContextPersistenceFilter.
+            securityContextRepository.saveContext(context, request, response);
+        } catch (BadCredentialsException ex) {
+            // Rewrap so the GlobalExceptionHandler's AuthenticationException branch fires. The default
+            // BadCredentialsException message leaks internal wording ("Bad credentials"); we keep the
+            // user-facing message on the wrapped exception.
+            throw new BadCredentialsAsAuthException("invalid username or password", ex);
+        }
+        return ResponseEntity.noContent().build();
     }
-    return ResponseEntity.noContent().build();
-  }
 
-  /** Mirrors {@code LoginRequest} in {@code openapi.yaml}. */
-  public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
-
-  /**
-   * Carries the original {@link BadCredentialsException} as the cause so the global handler's
-   * {@code AuthenticationException} branch fires uniformly, without leaking Spring Security's
-   * internal "Bad credentials" wording.
-   */
-  static final class BadCredentialsAsAuthException extends AuthenticationException {
-    BadCredentialsAsAuthException(String msg, Throwable cause) {
-      super(msg, cause);
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        // Clear the SecurityContext (in-memory) and the stored context (session).
+        SecurityContextHolder.clearContext();
+        SecurityContext empty = SecurityContextHolder.createEmptyContext();
+        securityContextRepository.saveContext(empty, request, response);
+        var session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ResponseEntity.noContent().build();
     }
-  }
+
+    /**
+     * Mirrors {@code LoginRequest} in {@code openapi.yaml}.
+     */
+    public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+
+    /**
+     * Carries the original {@link BadCredentialsException} as the cause so the global handler's
+     * {@code AuthenticationException} branch fires uniformly, without leaking Spring Security's
+     * internal "Bad credentials" wording.
+     */
+    static final class BadCredentialsAsAuthException extends AuthenticationException {
+        BadCredentialsAsAuthException(String msg, Throwable cause) {
+            super(msg, cause);
+        }
+    }
 }

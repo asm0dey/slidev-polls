@@ -187,7 +187,8 @@ tasks:
       - |
         if [ -f {{.E2E_MARKER}} ]; then
           {{.TASK_EXE}} codegen
-          docker compose -f {{.COMPOSE_DEV}} up --build -d
+          # CI pre-builds the image with a layer cache and sets E2E_COMPOSE_BUILD=--no-build.
+          docker compose -f {{.COMPOSE_DEV}} up ${E2E_COMPOSE_BUILD:---build} -d
           for _ in $(seq 1 300); do
             if curl -sf --max-time 2 "{{.E2E_BASE_URL}}/" >/dev/null 2>&1; then
               echo "[e2e] backend ready at {{.E2E_BASE_URL}}"

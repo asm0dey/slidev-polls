@@ -14,8 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(scanBasePackages = "site.asm0dey.slidev.polls")
 @EnableScheduling
 public class PollApiApplication {
-
-  public static void main(String[] args) {
-    SpringApplication.run(PollApiApplication.class, args);
-  }
+    public static void main(String[] args) {
+        SpringApplication.run(PollApiApplication.class, args);
+    }
 }

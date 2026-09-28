@@ -1,7 +1,6 @@
 package site.asm0dey.slidev.polls.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import org.flywaydb.core.Flyway;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
@@ -19,45 +18,39 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 // names are stable identifiers independent of codegen.
 @Testcontainers
 class V7MigrationIT {
+    @Container
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
 
-  @Container
-  static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
-
-  @Test
-  void v7DropsDisplayNameColumn() {
-    Flyway upToV6 =
-        Flyway.configure()
+    @Test
+    void v7DropsDisplayNameColumn() {
+        Flyway upToV6 = Flyway
+            .configure()
             .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
             .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
             .target("6")
             .load();
-    upToV6.migrate();
+        upToV6.migrate();
 
-    try (var dsl =
-        DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
-      int preCount =
-          dsl.fetchCount(
-              DSL.table("information_schema.columns"),
-              DSL.field("table_name")
-                  .eq("admin_user")
-                  .and(DSL.field("column_name").eq("display_name")));
-      assertThat(preCount).as("display_name present at V6").isOne();
+        try (var dsl = DSL.using(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            int preCount = dsl.fetchCount(
+                    DSL.table("information_schema.columns"),
+                    DSL.field("table_name").eq("admin_user").and(DSL.field("column_name").eq("display_name"))
+            );
+            assertThat(preCount).as("display_name present at V6").isOne();
 
-      Flyway upToV7 =
-          Flyway.configure()
-              .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-              .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
-              .target("7")
-              .load();
-      upToV7.migrate();
+            Flyway upToV7 = Flyway
+                .configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
+                .target("7")
+                .load();
+            upToV7.migrate();
 
-      int postCount =
-          dsl.fetchCount(
-              DSL.table("information_schema.columns"),
-              DSL.field("table_name")
-                  .eq("admin_user")
-                  .and(DSL.field("column_name").eq("display_name")));
-      assertThat(postCount).as("display_name dropped at V7").isZero();
+            int postCount = dsl.fetchCount(
+                    DSL.table("information_schema.columns"),
+                    DSL.field("table_name").eq("admin_user").and(DSL.field("column_name").eq("display_name"))
+            );
+            assertThat(postCount).as("display_name dropped at V7").isZero();
+        }
     }
-  }
 }

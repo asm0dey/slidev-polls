@@ -24,39 +24,38 @@ import org.testcontainers.utility.DockerImageName;
  * V), and the repositories under test in later tasks only need a JDBC {@link DataSource} plus jOOQ.
  */
 public abstract class AbstractPostgresTest {
+    protected static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
 
-  protected static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
+    static {
+        POSTGRES.start();
+    }
 
-  static {
-    POSTGRES.start();
-  }
-
-  @BeforeAll
-  static void migrate() {
-    Flyway flyway =
-        Flyway.configure()
+    @BeforeAll
+    static void migrate() {
+        Flyway flyway = Flyway
+            .configure()
             .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
             .locations("classpath:db/migration/postgresql", "classpath:db/migration/common")
             .cleanDisabled(false)
             .load();
-    // Wipe the reused container before re-applying migrations so each test class starts from a
-    // clean schema (see class doc). Without the clean, rows owned across classes — e.g. a poll
-    // referencing admin_user via polls_owner_username_fk — leak forward and break delete-based
-    // setups such as BootstrapAdminIT.
-    flyway.clean();
-    flyway.migrate();
-  }
+        // Wipe the reused container before re-applying migrations so each test class starts from a
+        // clean schema (see class doc). Without the clean, rows owned across classes — e.g. a poll
+        // referencing admin_user via polls_owner_username_fk — leak forward and break delete-based
+        // setups such as BootstrapAdminIT.
+        flyway.clean();
+        flyway.migrate();
+    }
 
-  protected static DataSource dataSource() {
-    PGSimpleDataSource ds = new PGSimpleDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUser(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
-    return ds;
-  }
+    protected static DataSource dataSource() {
+        PGSimpleDataSource ds = new PGSimpleDataSource();
+        ds.setUrl(POSTGRES.getJdbcUrl());
+        ds.setUser(POSTGRES.getUsername());
+        ds.setPassword(POSTGRES.getPassword());
+        return ds;
+    }
 
-  protected static DSLContext dsl() {
-    return DSL.using(new DefaultConfiguration().set(dataSource()).set(SQLDialect.POSTGRES));
-  }
+    protected static DSLContext dsl() {
+        return DSL.using(new DefaultConfiguration().set(dataSource()).set(SQLDialect.POSTGRES));
+    }
 }

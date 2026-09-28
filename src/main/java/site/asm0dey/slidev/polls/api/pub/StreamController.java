@@ -31,47 +31,44 @@ import site.asm0dey.slidev.polls.realtime.sse.SnapshotPayload;
 @RestController
 @RequestMapping("/api/polls")
 public class StreamController {
+    private static final Logger LOG = System.getLogger(StreamController.class.getName());
+    /**
+     * 24h absolute ceiling on the emitter hold-open. The browser will reconnect well before this
+     * fires; the timeout only exists so a client that walks away from their laptop overnight does not
+     * wedge a worker thread forever.
+     */
+    private static final long EMITTER_TIMEOUT_MS = 24L * 60L * 60L * 1000L;
+    private final PollRepository pollRepository;
+    private final SseHub hub;
+    private final SnapshotBuilder snapshots;
 
-  private static final Logger LOG = System.getLogger(StreamController.class.getName());
-
-  /**
-   * 24h absolute ceiling on the emitter hold-open. The browser will reconnect well before this
-   * fires; the timeout only exists so a client that walks away from their laptop overnight does not
-   * wedge a worker thread forever.
-   */
-  private static final long EMITTER_TIMEOUT_MS = 24L * 60L * 60L * 1000L;
-
-  private final PollRepository pollRepository;
-  private final SseHub hub;
-  private final SnapshotBuilder snapshots;
-
-  public StreamController(PollRepository pollRepository, SseHub hub, SnapshotBuilder snapshots) {
-    this.pollRepository = pollRepository;
-    this.hub = hub;
-    this.snapshots = snapshots;
-  }
-
-  @GetMapping("/{slug}/stream")
-  public SseEmitter stream(@PathVariable String slug) {
-    if (!SlugValidator.isValidFormat(slug)) {
-      throw new NotFoundException("no poll with slug '" + slug + "'");
+    public StreamController(PollRepository pollRepository, SseHub hub, SnapshotBuilder snapshots) {
+        this.pollRepository = pollRepository;
+        this.hub = hub;
+        this.snapshots = snapshots;
     }
-    Poll poll =
-        pollRepository
+
+    @GetMapping("/{slug}/stream")
+    public SseEmitter stream(@PathVariable String slug) {
+        if (!SlugValidator.isValidFormat(slug)) {
+            throw new NotFoundException("no poll with slug '" + slug + "'");
+        }
+        Poll poll =
+                pollRepository
             .findBySlug(slug)
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
 
-    SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
-    SnapshotPayload initial = snapshots.build(poll, Instant.now());
-    try {
-      emitter.send(SseEmitter.event().name("snapshot").data(initial));
-    } catch (IOException ex) {
-      // Connection died before we could write the initial snapshot — client will reconnect and
-      // we'll try again. Don't propagate; logging is enough.
-      LOG.log(Level.DEBUG, "initial snapshot send failed for slug {0}: {1}", slug, ex);
-      emitter.completeWithError(ex);
-      return emitter;
+        SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+        SnapshotPayload initial = snapshots.build(poll, Instant.now());
+        try {
+            emitter.send(SseEmitter.event().name("snapshot").data(initial));
+        } catch (IOException ex) {
+            // Connection died before we could write the initial snapshot — client will reconnect and
+            // we'll try again. Don't propagate; logging is enough.
+            LOG.log(Level.DEBUG, "initial snapshot send failed for slug {0}: {1}", slug, ex);
+            emitter.completeWithError(ex);
+            return emitter;
+        }
+        return hub.register(poll.id(), emitter);
     }
-    return hub.register(poll.id(), emitter);
-  }
 }
