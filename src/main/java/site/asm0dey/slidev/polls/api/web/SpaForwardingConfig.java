@@ -54,72 +54,71 @@ import org.springframework.web.servlet.resource.PathResourceResolver;
 @Configuration
 @Controller
 public class SpaForwardingConfig implements WebMvcConfigurer {
+    // Voter shell — the SPA reads the slug from window.location.pathname and resolves it via
+    // /api/polls/by-slug/{slug} on its own. The regex mirrors the polls.slug CHECK constraint so
+    // a URL that could never be a real poll (upper-case, leading hyphen, dot-containing) falls
+    // through to Spring's default 404 handling instead of serving the voter shell.
+    @GetMapping({"/", "/{slug:[a-z0-9-]{3,40}}"})
+    public String voterShell(@PathVariable(required = false) @Nullable String slug) {
+        return "forward:/index.html";
+    }
 
-  // Voter shell — the SPA reads the slug from window.location.pathname and resolves it via
-  // /api/polls/by-slug/{slug} on its own. The regex mirrors the polls.slug CHECK constraint so
-  // a URL that could never be a real poll (upper-case, leading hyphen, dot-containing) falls
-  // through to Spring's default 404 handling instead of serving the voter shell.
-  @GetMapping({"/", "/{slug:[a-z0-9-]{3,40}}"})
-  public String voterShell(@PathVariable(required = false) @Nullable String slug) {
-    return "forward:/index.html";
-  }
+    // /admin (no trailing slash) — browsers land here when a user types "…/admin". Vue Router's
+    // base is /admin/ so we need to land them at the slashed form or the SPA's asset-relative URLs
+    // resolve against the wrong base. A plain redirect is cheaper than a forward and browser-
+    // cacheable.
+    @GetMapping("/admin")
+    public String adminTrailingSlashRedirect() {
+        return "redirect:/admin/";
+    }
 
-  // /admin (no trailing slash) — browsers land here when a user types "…/admin". Vue Router's
-  // base is /admin/ so we need to land them at the slashed form or the SPA's asset-relative URLs
-  // resolve against the wrong base. A plain redirect is cheaper than a forward and browser-
-  // cacheable.
-  @GetMapping("/admin")
-  public String adminTrailingSlashRedirect() {
-    return "redirect:/admin/";
-  }
-
-  @Override
-  public void addResourceHandlers(ResourceHandlerRegistry registry) {
-    registry
-        .addResourceHandler("/admin/", "/admin/**")
-        .addResourceLocations("classpath:/static/admin/")
-        .resourceChain(false)
-        .addResolver(new SpaShellFallbackResolver());
-  }
-
-  /**
-   * Resolves a request under {@code /admin/**} to either the requested file or the SPA shell.
-   *
-   * <ul>
-   *   <li>Empty or {@code "/"} path → {@code index.html} (the bare {@code /admin/} case).
-   *   <li>Existing readable resource → that resource (the shell and every hashed asset).
-   *   <li>Dot-less path that does not exist → {@code index.html} (SPA deep links like {@code
-   *       /admin/polls/42} whose last segment carries no extension).
-   *   <li>Dotted path that does not exist → {@code null} so Spring returns 404 (a missing asset
-   *       should not masquerade as the shell with a 200, or the browser tries to execute HTML as
-   *       JavaScript).
-   * </ul>
-   */
-  private static final class SpaShellFallbackResolver extends PathResourceResolver {
     @Override
-    protected @Nullable Resource getResource(
-        @NonNull String resourcePath, @NonNull Resource location) throws IOException {
-      if (resourcePath.isEmpty() || "/".equals(resourcePath)) {
-        return readable(location.createRelative("index.html"));
-      }
-      Resource direct = location.createRelative(resourcePath);
-      if (direct.exists() && direct.isReadable()) {
-        return direct;
-      }
-      if (!lastSegmentHasDot(resourcePath)) {
-        return readable(location.createRelative("index.html"));
-      }
-      return null;
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry
+            .addResourceHandler("/admin/", "/admin/**")
+            .addResourceLocations("classpath:/static/admin/")
+            .resourceChain(false)
+            .addResolver(new SpaShellFallbackResolver());
     }
 
-    private static Resource readable(Resource r) {
-      return (r.exists() && r.isReadable()) ? r : null;
-    }
+    /**
+     * Resolves a request under {@code /admin/**} to either the requested file or the SPA shell.
+     *
+     * <ul>
+     *   <li>Empty or {@code "/"} path → {@code index.html} (the bare {@code /admin/} case).
+     *   <li>Existing readable resource → that resource (the shell and every hashed asset).
+     *   <li>Dot-less path that does not exist → {@code index.html} (SPA deep links like {@code
+     *       /admin/polls/42} whose last segment carries no extension).
+     *   <li>Dotted path that does not exist → {@code null} so Spring returns 404 (a missing asset
+     *       should not masquerade as the shell with a 200, or the browser tries to execute HTML as
+     *       JavaScript).
+     * </ul>
+     */
+    private static final class SpaShellFallbackResolver extends PathResourceResolver {
+        @Override
+        protected @Nullable Resource getResource(@NonNull String resourcePath, @NonNull Resource location)
+                throws IOException {
+            if (resourcePath.isEmpty() || "/".equals(resourcePath)) {
+                return readable(location.createRelative("index.html"));
+            }
+            Resource direct = location.createRelative(resourcePath);
+            if (direct.exists() && direct.isReadable()) {
+                return direct;
+            }
+            if (!lastSegmentHasDot(resourcePath)) {
+                return readable(location.createRelative("index.html"));
+            }
+            return null;
+        }
 
-    private static boolean lastSegmentHasDot(String path) {
-      int lastSlash = path.lastIndexOf('/');
-      String tail = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
-      return tail.indexOf('.') >= 0;
+        private static Resource readable(Resource r) {
+            return (r.exists() && r.isReadable()) ? r : null;
+        }
+
+        private static boolean lastSegmentHasDot(String path) {
+            int lastSlash = path.lastIndexOf('/');
+            String tail = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+            return tail.indexOf('.') >= 0;
+        }
     }
-  }
 }

@@ -27,96 +27,99 @@ import site.asm0dey.slidev.polls.core.error.NotFoundException;
  */
 @Service
 public class DeckTokenService {
+    private static final SecureRandom RNG = new SecureRandom();
+    private static final Base64.Encoder BASE64 = Base64.getUrlEncoder().withoutPadding();
+    private final DeckTokenRepository repository;
+    private final PollRepository pollRepository;
+    private final PollAuthorizer authorizer;
 
-  private static final SecureRandom RNG = new SecureRandom();
-  private static final Base64.Encoder BASE64 = Base64.getUrlEncoder().withoutPadding();
-
-  private final DeckTokenRepository repository;
-  private final PollRepository pollRepository;
-  private final PollAuthorizer authorizer;
-
-  public DeckTokenService(
-      DeckTokenRepository repository, PollRepository pollRepository, PollAuthorizer authorizer) {
-    this.repository = repository;
-    this.pollRepository = pollRepository;
-    this.authorizer = authorizer;
-  }
-
-  /**
-   * Mint a new token for {@code pollId}. Caller MUST ensure {@code ownerUsername} owns the poll —
-   * the service performs the check here, not at the controller, so unit tests fail closed.
-   */
-  @Transactional
-  public Minted mint(UUID pollId, String ownerUsername, String label) {
-    requireEditor(pollId, ownerUsername);
-    byte[] random = new byte[32];
-    RNG.nextBytes(random);
-    String plaintext = BASE64.encodeToString(random);
-    String hash = sha256(plaintext);
-    DeckToken saved =
-        repository.insert(
-            new DeckToken(
-                UUID.randomUUID(), pollId, hash, label, Instant.now(), null, ownerUsername));
-    return new Minted(saved, plaintext);
-  }
-
-  @Transactional(readOnly = true)
-  public List<DeckToken> list(UUID pollId, String ownerUsername) {
-    requireEditor(pollId, ownerUsername);
-    return repository.findByPoll(pollId);
-  }
-
-  @Transactional
-  public DeckToken revoke(UUID pollId, UUID tokenId, String ownerUsername) {
-    requireEditor(pollId, ownerUsername);
-    DeckToken existing =
-        repository.findById(tokenId).orElseThrow(() -> new NotFoundException(tokenId.toString()));
-    if (!existing.pollId().equals(pollId)) {
-      // Mismatched token id / poll id in the URL; treat as not-found rather than mismatch so a
-      // guessed tokenId does not leak the fact that it exists on some other poll.
-      throw new NotFoundException(tokenId.toString());
+    public DeckTokenService(DeckTokenRepository repository, PollRepository pollRepository, PollAuthorizer authorizer) {
+        this.repository = repository;
+        this.pollRepository = pollRepository;
+        this.authorizer = authorizer;
     }
-    if (existing.revokedAt() != null) {
-      return existing;
-    }
-    return repository.revoke(tokenId);
-  }
 
-  /** Look up a live (non-revoked) token by plaintext. Used by the deck-auth filter. */
-  @Transactional(readOnly = true)
-  public Optional<DeckToken> resolveLive(String plaintext) {
-    if (plaintext == null || plaintext.isBlank()) {
-      return Optional.empty();
+    /**
+     * Mint a new token for {@code pollId}. Caller MUST ensure {@code ownerUsername} owns the poll —
+     * the service performs the check here, not at the controller, so unit tests fail closed.
+     */
+    @Transactional
+    public Minted mint(UUID pollId, String ownerUsername, String label) {
+        requireEditor(pollId, ownerUsername);
+        byte[] random = new byte[32];
+        RNG.nextBytes(random);
+        String plaintext = BASE64.encodeToString(random);
+        String hash = sha256(plaintext);
+        DeckToken saved =
+                repository.insert(
+                        new DeckToken(UUID.randomUUID(), pollId, hash, label, Instant.now(), null, ownerUsername)
+        );
+        return new Minted(saved, plaintext);
     }
-    return repository.findLiveByHash(sha256(plaintext));
-  }
 
-  private void requireEditor(UUID pollId, String username) {
-    Poll poll =
-        pollRepository.findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-    if (!authorizer.isEditor(poll, username)) {
-      // 404 (not 403) so a non-editor cannot probe which polls exist.
-      throw new NotFoundException(pollId.toString());
+    @Transactional(readOnly = true)
+    public List<DeckToken> list(UUID pollId, String ownerUsername) {
+        requireEditor(pollId, ownerUsername);
+        return repository.findByPoll(pollId);
     }
-  }
 
-  static String sha256(String plaintext) {
-    try {
-      MessageDigest md = MessageDigest.getInstance("SHA-256");
-      byte[] digest = md.digest(plaintext.getBytes(StandardCharsets.UTF_8));
-      // Hex-encode for a stable, column-safe representation; base64 would also work but hex is
-      // the convention we put in the V4 migration's comment and matches the unique-index check.
-      StringBuilder sb = new StringBuilder(digest.length * 2);
-      for (byte b : digest) {
-        sb.append(String.format("%02x", b));
-      }
-      return sb.toString();
-    } catch (NoSuchAlgorithmException ex) {
-      // SHA-256 is required to be present on every JRE per JLS, so this is unreachable.
-      throw new IllegalStateException("SHA-256 not available", ex);
+    @Transactional
+    public DeckToken revoke(UUID pollId, UUID tokenId, String ownerUsername) {
+        requireEditor(pollId, ownerUsername);
+        DeckToken existing = repository
+            .findById(tokenId)
+            .orElseThrow(() -> new NotFoundException(tokenId.toString()));
+        if (!existing.pollId().equals(pollId)) {
+            // Mismatched token id / poll id in the URL; treat as not-found rather than mismatch so a
+            // guessed tokenId does not leak the fact that it exists on some other poll.
+            throw new NotFoundException(tokenId.toString());
+        }
+        if (existing.revokedAt() != null) {
+            return existing;
+        }
+        return repository.revoke(tokenId);
     }
-  }
 
-  /** Tuple returned by {@link #mint}: the persisted row plus the one-time plaintext. */
-  public record Minted(DeckToken token, String plaintext) {}
+    /**
+     * Look up a live (non-revoked) token by plaintext. Used by the deck-auth filter.
+     */
+    @Transactional(readOnly = true)
+    public Optional<DeckToken> resolveLive(String plaintext) {
+        if (plaintext == null || plaintext.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.findLiveByHash(sha256(plaintext));
+    }
+
+    private void requireEditor(UUID pollId, String username) {
+        Poll poll = pollRepository
+            .findById(pollId)
+            .orElseThrow(() -> new NotFoundException(pollId.toString()));
+        if (!authorizer.isEditor(poll, username)) {
+            // 404 (not 403) so a non-editor cannot probe which polls exist.
+            throw new NotFoundException(pollId.toString());
+        }
+    }
+
+    static String sha256(String plaintext) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(plaintext.getBytes(StandardCharsets.UTF_8));
+            // Hex-encode for a stable, column-safe representation; base64 would also work but hex is
+            // the convention we put in the V4 migration's comment and matches the unique-index check.
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            // SHA-256 is required to be present on every JRE per JLS, so this is unreachable.
+            throw new IllegalStateException("SHA-256 not available", ex);
+        }
+    }
+
+    /**
+     * Tuple returned by {@link #mint}: the persisted row plus the one-time plaintext.
+     */
+    public record Minted(DeckToken token, String plaintext) {}
 }

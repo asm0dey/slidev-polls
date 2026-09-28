@@ -11,20 +11,21 @@ import java.util.UUID;
  * caller; the global exception handler maps this to {@code 409 RESOURCE_HAS_VOTES}.
  */
 public class ResourceHasVotesException extends RuntimeException {
-  private final UUID resourceId;
-  private final String kind; // "QUESTION" or "OPTION"
+    private final UUID resourceId;
+    // "QUESTION" or "OPTION"
+    private final String kind;
 
-  public ResourceHasVotesException(String kind, UUID id) {
-    super(kind + " " + id + " has votes and cannot be modified");
-    this.resourceId = id;
-    this.kind = kind;
-  }
+    public ResourceHasVotesException(String kind, UUID id) {
+        super(kind + " " + id + " has votes and cannot be modified");
+        this.resourceId = id;
+        this.kind = kind;
+    }
 
-  public UUID resourceId() {
-    return resourceId;
-  }
+    public UUID resourceId() {
+        return resourceId;
+    }
 
-  public String kind() {
-    return kind;
-  }
+    public String kind() {
+        return kind;
+    }
 }

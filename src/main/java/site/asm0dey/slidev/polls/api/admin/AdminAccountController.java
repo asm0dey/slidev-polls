@@ -23,30 +23,30 @@ import site.asm0dey.slidev.polls.core.service.AdminUserService;
 @RestController
 @RequestMapping("/api/admin/account")
 public class AdminAccountController {
+    private final AdminUserService service;
+    private final SessionRevoker sessionRevoker;
 
-  private final AdminUserService service;
-  private final SessionRevoker sessionRevoker;
+    public AdminAccountController(AdminUserService service, SessionRevoker sessionRevoker) {
+        this.service = service;
+        this.sessionRevoker = sessionRevoker;
+    }
 
-  public AdminAccountController(AdminUserService service, SessionRevoker sessionRevoker) {
-    this.service = service;
-    this.sessionRevoker = sessionRevoker;
-  }
+    @GetMapping
+    public AccountResponse account(@AuthenticationPrincipal UserDetails principal) {
+        String username = principal.getUsername();
+        return new AccountResponse(username, service.isBootstrapAdmin(username));
+    }
 
-  @GetMapping
-  public AccountResponse account(@AuthenticationPrincipal UserDetails principal) {
-    String username = principal.getUsername();
-    return new AccountResponse(username, service.isBootstrapAdmin(username));
-  }
-
-  @PostMapping("/password")
-  public ResponseEntity<Void> changePassword(
-      @Valid @RequestBody ChangePasswordRequest body,
-      @AuthenticationPrincipal UserDetails principal,
-      HttpServletRequest request) {
-    String username = principal.getUsername();
-    service.changeOwnPassword(username, body.currentPassword(), body.newPassword());
-    // Keep the session that just authenticated here; kill the user's other sessions.
-    sessionRevoker.expireAllExcept(username, request.getSession().getId());
-    return ResponseEntity.noContent().build();
-  }
+    @PostMapping("/password")
+    public ResponseEntity<Void> changePassword(
+            @Valid @RequestBody ChangePasswordRequest body,
+            @AuthenticationPrincipal UserDetails principal,
+            HttpServletRequest request
+    ) {
+        String username = principal.getUsername();
+        service.changeOwnPassword(username, body.currentPassword(), body.newPassword());
+        // Keep the session that just authenticated here; kill the user's other sessions.
+        sessionRevoker.expireAllExcept(username, request.getSession().getId());
+        return ResponseEntity.noContent().build();
+    }
 }

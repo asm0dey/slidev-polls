@@ -5,7 +5,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -37,46 +36,46 @@ import tools.jackson.databind.ObjectMapper;
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class QuestionLockIT {
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private DSLContext dsl;
+    @Autowired
+    private PasswordEncoder encoder;
+    @Autowired
+    private VoteRepository voteRepository;
 
-  @Autowired private MockMvc mvc;
-  @Autowired private ObjectMapper objectMapper;
-  @Autowired private DSLContext dsl;
-  @Autowired private PasswordEncoder encoder;
-  @Autowired private VoteRepository voteRepository;
+    @BeforeEach
+    void seedAlice() {
+        AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
+    }
 
-  @BeforeEach
-  void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
-  }
-
-  @Test
-  void destructive_edit_against_voted_question_returns_409_resource_has_votes() throws Exception {
-    MockHttpSession session = loginAsAlice();
-    JsonNode detail = createTwoOptionPoll(session, "Lock demo", "lock-demo");
-    UUID pollId = UUID.fromString(detail.get("id").asString());
-    JsonNode q = detail.get("questions").get(0);
-    UUID qid = UUID.fromString(q.get("id").asString());
-    UUID oA = UUID.fromString(q.get("options").get(0).get("id").asString());
-    UUID oB = UUID.fromString(q.get("options").get(1).get("id").asString());
-
-    // Activate Q1 so the votes are accepted by the storage layer's status check.
-    mvc.perform(
-            post("/api/admin/polls/" + pollId + "/open")
+    @Test
+    void destructive_edit_against_voted_question_returns_409_resource_has_votes() throws Exception {
+        MockHttpSession session = loginAsAlice();
+        JsonNode detail = createTwoOptionPoll(session, "Lock demo", "lock-demo");
+        UUID pollId = UUID.fromString(detail.get("id").asString());
+        JsonNode q = detail.get("questions").get(0);
+        UUID qid = UUID.fromString(q.get("id").asString());
+        UUID oA = UUID.fromString(q.get("options").get(0).get("id").asString());
+        UUID oB = UUID.fromString(q.get("options").get(1).get("id").asString());
+        // Activate Q1 so the votes are accepted by the storage layer's status check.
+        mvc
+            .perform(post("/api/admin/polls/" + pollId + "/open")
                 .session(session)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"questionId\":\"" + qid + "\"}"))
-        .andExpect(status().isOk());
-
-    // Seed a single recorded vote against option A.
-    voteRepository.insert(
-        new Vote(UUID.randomUUID(), pollId, qid, List.of(oA), "voter-token-1", Instant.now()));
-
-    // Destructive edit: drop option A from the payload. Question still references option B and a
-    // brand-new option C so the @Size(min=2) constraint passes; the lock fires server-side.
-    String patchBody =
-        String.format(
-            """
+                .content("{\"questionId\":\"" + qid + "\"}")
+            )
+            .andExpect(status().isOk());
+        // Seed a single recorded vote against option A.
+        voteRepository.insert(new Vote(UUID.randomUUID(), pollId, qid, List.of(oA), "voter-token-1", Instant.now()));
+        // Destructive edit: drop option A from the payload. Question still references option B and a
+        // brand-new option C so the @Size(min=2) constraint passes; the lock fires server-side.
+        String patchBody = String.format(
+                """
             {
               "questions": [
                 {
@@ -90,41 +89,41 @@ class QuestionLockIT {
               ]
             }
             """,
-            qid, oB);
+                qid,
+                oB
+        );
 
-    mvc.perform(
-            patch("/api/admin/polls/" + pollId)
+        mvc
+            .perform(patch("/api/admin/polls/" + pollId)
                 .session(session)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(patchBody))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("RESOURCE_HAS_VOTES"))
-        .andExpect(jsonPath("$.errors['OPTION." + oA + "']").isArray());
-  }
+                .content(patchBody)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("RESOURCE_HAS_VOTES"))
+            .andExpect(jsonPath("$.errors['OPTION." + oA + "']").isArray());
+    }
 
-  // ---------- fixtures -----------------------------------------------------
-
-  private MockHttpSession loginAsAlice() throws Exception {
-    MvcResult login =
-        mvc.perform(
-                post("/api/admin/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}"))
+    // ---------- fixtures -----------------------------------------------------
+    private MockHttpSession loginAsAlice() throws Exception {
+        MvcResult login = mvc
+            .perform(post("/api/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}")
+            )
             .andExpect(status().isNoContent())
             .andReturn();
-    MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
-    if (session == null) {
-      throw new IllegalStateException("login did not establish a session");
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        if (session == null) {
+            throw new IllegalStateException("login did not establish a session");
+        }
+        return session;
     }
-    return session;
-  }
 
-  private JsonNode createTwoOptionPoll(MockHttpSession session, String title, String slug)
-      throws Exception {
-    String body =
-        String.format(
-            """
+    private JsonNode createTwoOptionPoll(MockHttpSession session, String title, String slug) throws Exception {
+        String body = String.format(
+                """
             {
               "title": "%s",
               "slug": "%s",
@@ -133,16 +132,18 @@ class QuestionLockIT {
               ]
             }
             """,
-            title, slug);
-    MvcResult created =
-        mvc.perform(
-                post("/api/admin/polls")
-                    .session(session)
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body))
+                title,
+                slug
+        );
+        MvcResult created = mvc
+            .perform(post("/api/admin/polls")
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+            )
             .andExpect(status().isCreated())
             .andReturn();
-    return objectMapper.readTree(created.getResponse().getContentAsString());
-  }
+        return objectMapper.readTree(created.getResponse().getContentAsString());
+    }
 }

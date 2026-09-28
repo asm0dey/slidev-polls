@@ -10,7 +10,6 @@ import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_COLLABORATO
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_OPTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
-
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -46,562 +45,572 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
  */
 @Repository
 public class PollRepositoryImpl implements PollRepository {
+    private final DSLContext dsl;
 
-  private final DSLContext dsl;
+    public PollRepositoryImpl(DSLContext dsl) {
+        this.dsl = dsl;
+    }
 
-  public PollRepositoryImpl(DSLContext dsl) {
-    this.dsl = dsl;
-  }
+    @Override
+    public Poll insert(Poll poll) {
+        OffsetDateTime now = OffsetDateTime.now();
+        dsl
+            .insertInto(POLLS)
+            .set(POLLS.ID, poll.id())
+            .set(POLLS.OWNER_USERNAME, poll.ownerUsername())
+            .set(POLLS.TITLE, poll.title())
+            .set(POLLS.SLUG, poll.slug())
+            .set(POLLS.CREATED_AT, now)
+            .set(POLLS.UPDATED_AT, now)
+            .execute();
+        writeOrigins(poll.id(), poll.allowedOrigins());
+        insertQuestions(poll.id(), poll.questions());
+        return findById(poll.id()).orElseThrow(() -> new NotFoundException(poll.id().toString()));
+    }
 
-  @Override
-  public Poll insert(Poll poll) {
-    OffsetDateTime now = OffsetDateTime.now();
-    dsl.insertInto(POLLS)
-        .set(POLLS.ID, poll.id())
-        .set(POLLS.OWNER_USERNAME, poll.ownerUsername())
-        .set(POLLS.TITLE, poll.title())
-        .set(POLLS.SLUG, poll.slug())
-        .set(POLLS.CREATED_AT, now)
-        .set(POLLS.UPDATED_AT, now)
-        .execute();
-    writeOrigins(poll.id(), poll.allowedOrigins());
-    insertQuestions(poll.id(), poll.questions());
-    return findById(poll.id()).orElseThrow(() -> new NotFoundException(poll.id().toString()));
-  }
+    @Override
+    public Optional<Poll> findById(UUID pollId) {
+        return findById(dsl, pollId);
+    }
 
-  @Override
-  public Optional<Poll> findById(UUID pollId) {
-    return findById(dsl, pollId);
-  }
+    private Optional<Poll> findById(DSLContext ctx, UUID pollId) {
+        return ctx
+            .select(POLLS.fields())
+            .select(QUESTIONS_FIELD)
+            .select(ORIGINS_FIELD)
+            .from(POLLS)
+            .where(POLLS.ID.eq(pollId))
+            .fetchOptional()
+            .map(this::toPoll);
+    }
 
-  private Optional<Poll> findById(DSLContext ctx, UUID pollId) {
-    return ctx.select(POLLS.fields())
-        .select(QUESTIONS_FIELD)
-        .select(ORIGINS_FIELD)
-        .from(POLLS)
-        .where(POLLS.ID.eq(pollId))
-        .fetchOptional()
-        .map(this::toPoll);
-  }
+    @Override
+    public Optional<Poll> findBySlug(String slug) {
+        return dsl
+            .select(POLLS.fields())
+            .select(QUESTIONS_FIELD)
+            .select(ORIGINS_FIELD)
+            .from(POLLS)
+            .where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()))
+            .fetchOptional()
+            .map(this::toPoll);
+    }
 
-  @Override
-  public Optional<Poll> findBySlug(String slug) {
-    return dsl.select(POLLS.fields())
-        .select(QUESTIONS_FIELD)
-        .select(ORIGINS_FIELD)
-        .from(POLLS)
-        .where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()))
-        .fetchOptional()
-        .map(this::toPoll);
-  }
+    @Override
+    public List<Poll> findByOwner(String ownerUsername) {
+        return dsl
+            .select(POLLS.fields())
+            .select(QUESTIONS_FIELD)
+            .select(ORIGINS_FIELD)
+            .from(POLLS)
+            .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
+            .orderBy(POLLS.CREATED_AT.desc())
+            .fetch()
+            .map(this::toPoll);
+    }
 
-  @Override
-  public List<Poll> findByOwner(String ownerUsername) {
-    return dsl.select(POLLS.fields())
-        .select(QUESTIONS_FIELD)
-        .select(ORIGINS_FIELD)
-        .from(POLLS)
-        .where(POLLS.OWNER_USERNAME.eq(ownerUsername))
-        .orderBy(POLLS.CREATED_AT.desc())
-        .fetch()
-        .map(this::toPoll);
-  }
-
-  @Override
-  public Poll transferOwner(UUID pollId, String newOwnerUsername) {
-    int updated =
-        dsl.update(POLLS)
+    @Override
+    public Poll transferOwner(UUID pollId, String newOwnerUsername) {
+        int updated = dsl
+            .update(POLLS)
             .set(POLLS.OWNER_USERNAME, newOwnerUsername)
             .set(POLLS.UPDATED_AT, OffsetDateTime.now())
             .where(POLLS.ID.eq(pollId))
             .execute();
-    if (updated == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
+        if (updated == 0) {
+            throw new NotFoundException("poll " + pollId + " does not exist");
+        }
+        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
     }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
 
-  @Override
-  public List<Poll> findOwnedOrCollaborated(String username) {
-    return dsl.select(POLLS.fields())
-        .select(QUESTIONS_FIELD)
-        .select(ORIGINS_FIELD)
-        .from(POLLS)
-        .where(
-            POLLS
-                .OWNER_USERNAME
+    @Override
+    public List<Poll> findOwnedOrCollaborated(String username) {
+        return dsl
+            .select(POLLS.fields())
+            .select(QUESTIONS_FIELD)
+            .select(ORIGINS_FIELD)
+            .from(POLLS)
+            .where(POLLS.OWNER_USERNAME
                 .eq(username)
-                .or(
-                    POLLS.ID.in(
-                        dsl.select(POLL_COLLABORATORS.POLL_ID)
-                            .from(POLL_COLLABORATORS)
-                            .where(POLL_COLLABORATORS.USERNAME.eq(username)))))
-        .orderBy(POLLS.CREATED_AT.desc())
-        .fetch()
-        .map(this::toPoll);
-  }
+                .or(POLLS.ID.in(dsl
+                    .select(POLL_COLLABORATORS.POLL_ID)
+                    .from(POLL_COLLABORATORS)
+                    .where(POLL_COLLABORATORS.USERNAME.eq(username))
+                ))
+            )
+            .orderBy(POLLS.CREATED_AT.desc())
+            .fetch()
+            .map(this::toPoll);
+    }
 
-  @Override
-  public boolean slugTaken(String slug, UUID excludingPollId) {
-    var base = dsl.selectOne().from(POLLS).where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()));
-    var scoped = excludingPollId == null ? base : base.and(POLLS.ID.ne(excludingPollId));
-    return scoped.fetchOptional().isPresent();
-  }
+    @Override
+    public boolean slugTaken(String slug, UUID excludingPollId) {
+        var base = dsl.selectOne().from(POLLS).where(POLLS.SLUG_LOWER.eq(slug.toLowerCase()));
+        var scoped = excludingPollId == null ? base : base.and(POLLS.ID.ne(excludingPollId));
+        return scoped.fetchOptional().isPresent();
+    }
 
-  @Override
-  public Poll updateHeader(UUID pollId, String title, String slug) {
-    int updated =
-        dsl.update(POLLS)
+    @Override
+    public Poll updateHeader(UUID pollId, String title, String slug) {
+        int updated = dsl
+            .update(POLLS)
             .set(POLLS.TITLE, title)
             .set(POLLS.SLUG, slug)
             .set(POLLS.UPDATED_AT, OffsetDateTime.now())
             .where(POLLS.ID.eq(pollId))
             .execute();
-    if (updated == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
+        if (updated == 0) {
+            throw new NotFoundException("poll " + pollId + " does not exist");
+        }
+        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
     }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
 
-  @Override
-  public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming) {
-    java.util.Set<UUID> existingQuestionIds =
-        new java.util.HashSet<>(
-            dsl.select(POLL_QUESTIONS.ID)
-                .from(POLL_QUESTIONS)
+    @Override
+    public Poll replaceQuestions(UUID pollId, List<CreatePollCommand.QuestionUpdate> incoming) {
+        java.util.Set<UUID> existingQuestionIds = new java.util.HashSet<>(dsl
+            .select(POLL_QUESTIONS.ID)
+            .from(POLL_QUESTIONS)
+            .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
+            .fetch(POLL_QUESTIONS.ID)
+        );
+
+        java.util.Set<UUID> keepQuestionIds = new java.util.HashSet<>();
+        for (CreatePollCommand.QuestionUpdate q : incoming) {
+            if (q.id() != null) {
+                keepQuestionIds.add(q.id());
+            }
+        }
+        java.util.Set<UUID> toDelete = new java.util.HashSet<>(existingQuestionIds);
+        toDelete.removeAll(keepQuestionIds);
+        if (!toDelete.isEmpty()) {
+            dsl.deleteFrom(POLL_QUESTIONS).where(POLL_QUESTIONS.ID.in(toDelete)).execute();
+        }
+
+        for (int i = 0; i < incoming.size(); i++) {
+            CreatePollCommand.QuestionUpdate q = incoming.get(i);
+            UUID qid = (q.id() != null && existingQuestionIds.contains(q.id())) ? q.id() : null;
+            if (qid != null) {
+                dsl
+                    .update(POLL_QUESTIONS)
+                    .set(POLL_QUESTIONS.PROMPT, q.prompt())
+                    .set(POLL_QUESTIONS.ORDINAL, i)
+                    .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+                    .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
+                    .where(POLL_QUESTIONS.ID.eq(qid))
+                    .execute();
+                syncOptions(qid, q.options());
+            } else {
+                UUID newQid = UUID.randomUUID();
+                dsl
+                    .insertInto(POLL_QUESTIONS)
+                    .set(POLL_QUESTIONS.ID, newQid)
+                    .set(POLL_QUESTIONS.POLL_ID, pollId)
+                    .set(POLL_QUESTIONS.PROMPT, q.prompt())
+                    .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
+                    .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
+                    .set(POLL_QUESTIONS.ORDINAL, i)
+                    .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
+                    .execute();
+                insertNewOptions(newQid, q.options());
+            }
+        }
+        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    }
+
+    private void syncOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> incoming) {
+        java.util.Set<UUID> existing = new java.util.HashSet<>(dsl
+            .select(POLL_OPTIONS.ID)
+            .from(POLL_OPTIONS)
+            .where(POLL_OPTIONS.QUESTION_ID.eq(questionId))
+            .fetch(POLL_OPTIONS.ID)
+        );
+        java.util.Set<UUID> keep = new java.util.HashSet<>();
+        for (CreatePollCommand.OptionUpdate o : incoming) {
+            if (o.id() != null) {
+                keep.add(o.id());
+            }
+        }
+        java.util.Set<UUID> toDelete = new java.util.HashSet<>(existing);
+        toDelete.removeAll(keep);
+        if (!toDelete.isEmpty()) {
+            dsl.deleteFrom(POLL_OPTIONS).where(POLL_OPTIONS.ID.in(toDelete)).execute();
+        }
+        for (int i = 0; i < incoming.size(); i++) {
+            CreatePollCommand.OptionUpdate o = incoming.get(i);
+            if (o.id() != null && existing.contains(o.id())) {
+                dsl
+                    .update(POLL_OPTIONS)
+                    .set(POLL_OPTIONS.LABEL, o.label())
+                    .set(POLL_OPTIONS.POSITION, i)
+                    .where(POLL_OPTIONS.ID.eq(o.id()))
+                    .execute();
+            } else {
+                dsl
+                    .insertInto(POLL_OPTIONS)
+                    .set(POLL_OPTIONS.ID, UUID.randomUUID())
+                    .set(POLL_OPTIONS.QUESTION_ID, questionId)
+                    .set(POLL_OPTIONS.LABEL, o.label())
+                    .set(POLL_OPTIONS.POSITION, i)
+                    .execute();
+            }
+        }
+    }
+
+    private void insertNewOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> options) {
+        if (options == null || options.isEmpty()) {
+            return;
+        }
+        var insert = dsl.insertInto(
+                POLL_OPTIONS,
+                POLL_OPTIONS.ID,
+                POLL_OPTIONS.QUESTION_ID,
+                POLL_OPTIONS.LABEL,
+                POLL_OPTIONS.POSITION
+        );
+        for (int i = 0; i < options.size(); i++) {
+            insert = insert.values(UUID.randomUUID(), questionId, options.get(i).label(), i);
+        }
+        insert.execute();
+    }
+
+    @Override
+    public void delete(UUID pollId) {
+        int deleted = dsl.deleteFrom(POLLS).where(POLLS.ID.eq(pollId)).execute();
+        if (deleted == 0) {
+            throw new NotFoundException("poll " + pollId + " does not exist");
+        }
+    }
+
+    @Override
+    public Poll activateQuestion(UUID pollId, UUID questionId) {
+        // Canonical state lives only on poll_questions.status. We flip every row of the poll in a
+        // single CASE-driven UPDATE:
+        //   - the target row becomes ACTIVE (activated_at = now, closed_at = NULL),
+        //   - any currently-ACTIVE row that is not the target becomes CLOSED
+        //     (activated_at = NULL, closed_at = now),
+        //   - every other row keeps its existing status / timestamps.
+        // polls.updated_at is maintained by a trigger that fires on poll_questions changes
+        // (V10 / H2 V2).
+        //
+        // SERIALIZATION: the CASE-driven UPDATE scans every poll_questions row of the poll and
+        // takes per-tuple row locks in heap/MVCC order. Two concurrent activates on the same
+        // poll can acquire those locks in different orders and deadlock on `poll_questions`
+        // (observed in practice when the Slidev addon's slide-switch flow fires close+activate
+        // POSTs from several mounted PollPanels at once). A `SELECT polls FOR UPDATE` on the
+        // owning poll row up front serialises every activation on the same pollId behind a
+        // single row lock — and PATCH /api/admin/polls/{id} naturally takes the same row lock
+        // via its `UPDATE polls` so the two paths can no longer interleave their per-question
+        // locks. The lookup also enforces the poll's existence, replacing what findById did at
+        // the end of the method.
+        // The lock + state-flipping UPDATE must share a single connection / transaction; otherwise
+        // the FOR UPDATE row lock taken by lockPollRow is released the moment its statement returns
+        // (autocommit), and the serialisation guarantee evaporates. In production the call already
+        // sits inside PollService's @Transactional boundary; the explicit dsl.transactionResult here
+        // is a defensive wrap that also makes the lock effective when the repository is invoked
+        // directly (e.g. from tests).
+        return dsl.transactionResult(cfg -> {
+            DSLContext tx = cfg.dsl();
+            lockPollRow(tx, pollId);
+            int matches =
+                    tx.fetchCount(
+                            POLL_QUESTIONS,
+                            POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId))
+            );
+            if (matches == 0) {
+                throw new NotFoundException("question " + questionId + " not in poll " + pollId);
+            }
+
+            OffsetDateTime now = OffsetDateTime.now();
+            // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT
+            // NULL). The CASE expressions keep that invariant by setting activated_at=now only
+            // when status transitions to ACTIVE and clearing it when an ACTIVE row is closed in
+            // the same statement.
+            tx
+                .update(POLL_QUESTIONS)
+                .set(
+                        POLL_QUESTIONS.STATUS,
+                        when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
+                            .when(
+                                    POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
+                                    val(QuestionStatus.CLOSED.name())
+                            )
+                            .otherwise(POLL_QUESTIONS.STATUS)
+                )
+                .set(
+                        POLL_QUESTIONS.ACTIVATED_AT,
+                        when(POLL_QUESTIONS.ID.eq(questionId), val(now))
+                            .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val((OffsetDateTime) null))
+                            .otherwise(POLL_QUESTIONS.ACTIVATED_AT)
+                )
+                .set(
+                        POLL_QUESTIONS.CLOSED_AT,
+                        when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
+                            .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
+                            .otherwise(POLL_QUESTIONS.CLOSED_AT)
+                )
                 .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-                .fetch(POLL_QUESTIONS.ID));
-
-    java.util.Set<UUID> keepQuestionIds = new java.util.HashSet<>();
-    for (CreatePollCommand.QuestionUpdate q : incoming) {
-      if (q.id() != null) keepQuestionIds.add(q.id());
-    }
-    java.util.Set<UUID> toDelete = new java.util.HashSet<>(existingQuestionIds);
-    toDelete.removeAll(keepQuestionIds);
-    if (!toDelete.isEmpty()) {
-      dsl.deleteFrom(POLL_QUESTIONS).where(POLL_QUESTIONS.ID.in(toDelete)).execute();
+                .execute();
+            return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+        });
     }
 
-    for (int i = 0; i < incoming.size(); i++) {
-      CreatePollCommand.QuestionUpdate q = incoming.get(i);
-      UUID qid = (q.id() != null && existingQuestionIds.contains(q.id())) ? q.id() : null;
-      if (qid != null) {
-        dsl.update(POLL_QUESTIONS)
-            .set(POLL_QUESTIONS.PROMPT, q.prompt())
-            .set(POLL_QUESTIONS.ORDINAL, i)
-            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
-            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
-            .where(POLL_QUESTIONS.ID.eq(qid))
-            .execute();
-        syncOptions(qid, q.options());
-      } else {
-        UUID newQid = UUID.randomUUID();
-        dsl.insertInto(POLL_QUESTIONS)
-            .set(POLL_QUESTIONS.ID, newQid)
-            .set(POLL_QUESTIONS.POLL_ID, pollId)
-            .set(POLL_QUESTIONS.PROMPT, q.prompt())
-            .set(POLL_QUESTIONS.MIN_SELECTIONS, q.minSelections())
-            .set(POLL_QUESTIONS.MAX_SELECTIONS, q.maxSelections())
-            .set(POLL_QUESTIONS.ORDINAL, i)
+    @Override
+    public Poll closeActiveQuestion(UUID pollId) {
+        return closeActiveQuestion(pollId, null);
+    }
+
+    @Override
+    public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
+        // Same serialisation reason as activateQuestion — keeps concurrent close + activate on
+        // the same poll from interleaving their per-row locks on poll_questions.
+        //
+        // The expectedQuestionId guard is evaluated INSIDE the poll-row lock: the deck fires a
+        // slide-leave close scoped to the question that slide opened, and the next slide's activate
+        // serialises behind the same lock. Folding the guard into the UPDATE's WHERE (rather than a
+        // prior unlocked read in the service) makes the close a true no-op when the active question
+        // has already moved on, so it can never clobber the newer activation (the source of the
+        // deck slide-switch flake / a real presenter-facing race on rapid navigation).
+        return dsl.transactionResult(cfg -> {
+            DSLContext tx = cfg.dsl();
+            lockPollRow(tx, pollId);
+            OffsetDateTime now = OffsetDateTime.now();
+            Condition where =
+                    POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()));
+            if (expectedQuestionId != null) {
+                where = where.and(POLL_QUESTIONS.ID.eq(expectedQuestionId));
+            }
+            // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not
+            // ACTIVE.
+            tx
+                .update(POLL_QUESTIONS)
+                .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
+                .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+                .set(POLL_QUESTIONS.CLOSED_AT, now)
+                .where(where)
+                .execute();
+            return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+        });
+    }
+
+    @Override
+    public Poll resetQuestionsToDraft(UUID pollId) {
+        dsl
+            .update(POLL_QUESTIONS)
             .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
+            .setNull(POLL_QUESTIONS.ACTIVATED_AT)
+            .setNull(POLL_QUESTIONS.CLOSED_AT)
+            .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
             .execute();
-        insertNewOptions(newQid, q.options());
-      }
+        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
     }
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
 
-  private void syncOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> incoming) {
-    java.util.Set<UUID> existing =
-        new java.util.HashSet<>(
-            dsl.select(POLL_OPTIONS.ID)
-                .from(POLL_OPTIONS)
-                .where(POLL_OPTIONS.QUESTION_ID.eq(questionId))
-                .fetch(POLL_OPTIONS.ID));
-    java.util.Set<UUID> keep = new java.util.HashSet<>();
-    for (CreatePollCommand.OptionUpdate o : incoming) {
-      if (o.id() != null) keep.add(o.id());
+    @Override
+    public boolean isOriginAllowedByAnyPoll(String origin) {
+        return dsl.fetchExists(dsl
+            .selectOne()
+            .from(POLL_ALLOWED_ORIGINS)
+            .where(POLL_ALLOWED_ORIGINS.ORIGIN.eq(origin)));
     }
-    java.util.Set<UUID> toDelete = new java.util.HashSet<>(existing);
-    toDelete.removeAll(keep);
-    if (!toDelete.isEmpty()) {
-      dsl.deleteFrom(POLL_OPTIONS).where(POLL_OPTIONS.ID.in(toDelete)).execute();
-    }
-    for (int i = 0; i < incoming.size(); i++) {
-      CreatePollCommand.OptionUpdate o = incoming.get(i);
-      if (o.id() != null && existing.contains(o.id())) {
-        dsl.update(POLL_OPTIONS)
-            .set(POLL_OPTIONS.LABEL, o.label())
-            .set(POLL_OPTIONS.POSITION, i)
-            .where(POLL_OPTIONS.ID.eq(o.id()))
-            .execute();
-      } else {
-        dsl.insertInto(POLL_OPTIONS)
-            .set(POLL_OPTIONS.ID, UUID.randomUUID())
-            .set(POLL_OPTIONS.QUESTION_ID, questionId)
-            .set(POLL_OPTIONS.LABEL, o.label())
-            .set(POLL_OPTIONS.POSITION, i)
-            .execute();
-      }
-    }
-  }
 
-  private void insertNewOptions(UUID questionId, List<CreatePollCommand.OptionUpdate> options) {
-    if (options == null || options.isEmpty()) {
-      return;
-    }
-    var insert =
-        dsl.insertInto(
-            POLL_OPTIONS,
-            POLL_OPTIONS.ID,
-            POLL_OPTIONS.QUESTION_ID,
-            POLL_OPTIONS.LABEL,
-            POLL_OPTIONS.POSITION);
-    for (int i = 0; i < options.size(); i++) {
-      insert = insert.values(UUID.randomUUID(), questionId, options.get(i).label(), i);
-    }
-    insert.execute();
-  }
-
-  @Override
-  public void delete(UUID pollId) {
-    int deleted = dsl.deleteFrom(POLLS).where(POLLS.ID.eq(pollId)).execute();
-    if (deleted == 0) {
-      throw new NotFoundException("poll " + pollId + " does not exist");
-    }
-  }
-
-  @Override
-  public Poll activateQuestion(UUID pollId, UUID questionId) {
-    // Canonical state lives only on poll_questions.status. We flip every row of the poll in a
-    // single CASE-driven UPDATE:
-    //   - the target row becomes ACTIVE (activated_at = now, closed_at = NULL),
-    //   - any currently-ACTIVE row that is not the target becomes CLOSED
-    //     (activated_at = NULL, closed_at = now),
-    //   - every other row keeps its existing status / timestamps.
-    // polls.updated_at is maintained by a trigger that fires on poll_questions changes
-    // (V10 / H2 V2).
-    //
-    // SERIALIZATION: the CASE-driven UPDATE scans every poll_questions row of the poll and
-    // takes per-tuple row locks in heap/MVCC order. Two concurrent activates on the same
-    // poll can acquire those locks in different orders and deadlock on `poll_questions`
-    // (observed in practice when the Slidev addon's slide-switch flow fires close+activate
-    // POSTs from several mounted PollPanels at once). A `SELECT polls FOR UPDATE` on the
-    // owning poll row up front serialises every activation on the same pollId behind a
-    // single row lock — and PATCH /api/admin/polls/{id} naturally takes the same row lock
-    // via its `UPDATE polls` so the two paths can no longer interleave their per-question
-    // locks. The lookup also enforces the poll's existence, replacing what findById did at
-    // the end of the method.
-    // The lock + state-flipping UPDATE must share a single connection / transaction; otherwise
-    // the FOR UPDATE row lock taken by lockPollRow is released the moment its statement returns
-    // (autocommit), and the serialisation guarantee evaporates. In production the call already
-    // sits inside PollService's @Transactional boundary; the explicit dsl.transactionResult here
-    // is a defensive wrap that also makes the lock effective when the repository is invoked
-    // directly (e.g. from tests).
-    return dsl.transactionResult(
-        cfg -> {
-          DSLContext tx = cfg.dsl();
-          lockPollRow(tx, pollId);
-          int matches =
-              tx.fetchCount(
-                  POLL_QUESTIONS,
-                  POLL_QUESTIONS.POLL_ID.eq(pollId).and(POLL_QUESTIONS.ID.eq(questionId)));
-          if (matches == 0) {
-            throw new NotFoundException("question " + questionId + " not in poll " + pollId);
-          }
-
-          OffsetDateTime now = OffsetDateTime.now();
-          // poll_questions_active_timestamp_ck demands (status='ACTIVE') = (activated_at IS NOT
-          // NULL). The CASE expressions keep that invariant by setting activated_at=now only
-          // when status transitions to ACTIVE and clearing it when an ACTIVE row is closed in
-          // the same statement.
-          tx.update(POLL_QUESTIONS)
-              .set(
-                  POLL_QUESTIONS.STATUS,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val(QuestionStatus.ACTIVE.name()))
-                      .when(
-                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                          val(QuestionStatus.CLOSED.name()))
-                      .otherwise(POLL_QUESTIONS.STATUS))
-              .set(
-                  POLL_QUESTIONS.ACTIVATED_AT,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val(now))
-                      .when(
-                          POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()),
-                          val((OffsetDateTime) null))
-                      .otherwise(POLL_QUESTIONS.ACTIVATED_AT))
-              .set(
-                  POLL_QUESTIONS.CLOSED_AT,
-                  when(POLL_QUESTIONS.ID.eq(questionId), val((OffsetDateTime) null))
-                      .when(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()), val(now))
-                      .otherwise(POLL_QUESTIONS.CLOSED_AT))
-              .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-              .execute();
-          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-        });
-  }
-
-  @Override
-  public Poll closeActiveQuestion(UUID pollId) {
-    return closeActiveQuestion(pollId, null);
-  }
-
-  @Override
-  public Poll closeActiveQuestion(UUID pollId, UUID expectedQuestionId) {
-    // Same serialisation reason as activateQuestion — keeps concurrent close + activate on
-    // the same poll from interleaving their per-row locks on poll_questions.
-    //
-    // The expectedQuestionId guard is evaluated INSIDE the poll-row lock: the deck fires a
-    // slide-leave close scoped to the question that slide opened, and the next slide's activate
-    // serialises behind the same lock. Folding the guard into the UPDATE's WHERE (rather than a
-    // prior unlocked read in the service) makes the close a true no-op when the active question
-    // has already moved on, so it can never clobber the newer activation (the source of the
-    // deck slide-switch flake / a real presenter-facing race on rapid navigation).
-    return dsl.transactionResult(
-        cfg -> {
-          DSLContext tx = cfg.dsl();
-          lockPollRow(tx, pollId);
-          OffsetDateTime now = OffsetDateTime.now();
-          Condition where =
-              POLL_QUESTIONS
-                  .POLL_ID
-                  .eq(pollId)
-                  .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()));
-          if (expectedQuestionId != null) {
-            where = where.and(POLL_QUESTIONS.ID.eq(expectedQuestionId));
-          }
-          // poll_questions_active_timestamp_ck demands activated_at be NULL when status is not
-          // ACTIVE.
-          tx.update(POLL_QUESTIONS)
-              .set(POLL_QUESTIONS.STATUS, QuestionStatus.CLOSED.name())
-              .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-              .set(POLL_QUESTIONS.CLOSED_AT, now)
-              .where(where)
-              .execute();
-          return findById(tx, pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-        });
-  }
-
-  @Override
-  public Poll resetQuestionsToDraft(UUID pollId) {
-    dsl.update(POLL_QUESTIONS)
-        .set(POLL_QUESTIONS.STATUS, QuestionStatus.DRAFT.name())
-        .setNull(POLL_QUESTIONS.ACTIVATED_AT)
-        .setNull(POLL_QUESTIONS.CLOSED_AT)
-        .where(POLL_QUESTIONS.POLL_ID.eq(pollId))
-        .execute();
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
-
-  @Override
-  public boolean isOriginAllowedByAnyPoll(String origin) {
-    return dsl.fetchExists(
-        dsl.selectOne().from(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.ORIGIN.eq(origin)));
-  }
-
-  @Override
-  public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
-    dsl.deleteFrom(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(pollId)).execute();
-    writeOrigins(pollId, origins);
-    int touched =
-        dsl.update(POLLS)
+    @Override
+    public Poll updateAllowedOrigins(UUID pollId, List<String> origins) {
+        dsl.deleteFrom(POLL_ALLOWED_ORIGINS).where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(pollId)).execute();
+        writeOrigins(pollId, origins);
+        int touched = dsl
+            .update(POLLS)
             .set(POLLS.UPDATED_AT, OffsetDateTime.now())
             .where(POLLS.ID.eq(pollId))
             .execute();
-    if (touched == 0) throw new NotFoundException("poll " + pollId + " does not exist");
-    return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
+        if (touched == 0) {
+            throw new NotFoundException("poll " + pollId + " does not exist");
+        }
+        return findById(pollId).orElseThrow(() -> new NotFoundException(pollId.toString()));
+    }
 
-  private void writeOrigins(UUID pollId, List<String> origins) {
-    if (origins == null || origins.isEmpty()) return;
-    var rows =
-        java.util.stream.IntStream.range(0, origins.size())
-            .mapToObj(
-                i ->
-                    dsl.insertInto(POLL_ALLOWED_ORIGINS)
-                        .set(POLL_ALLOWED_ORIGINS.POLL_ID, pollId)
-                        .set(POLL_ALLOWED_ORIGINS.ORIGIN, origins.get(i))
-                        .set(POLL_ALLOWED_ORIGINS.POSITION, i))
+    private void writeOrigins(UUID pollId, List<String> origins) {
+        if (origins == null || origins.isEmpty()) {
+            return;
+        }
+        var rows = java.util.stream.IntStream
+            .range(0, origins.size())
+            .mapToObj(i -> dsl
+                .insertInto(POLL_ALLOWED_ORIGINS)
+                .set(POLL_ALLOWED_ORIGINS.POLL_ID, pollId)
+                .set(POLL_ALLOWED_ORIGINS.ORIGIN, origins.get(i))
+                .set(POLL_ALLOWED_ORIGINS.POSITION, i))
             .toList();
-    dsl.batch(rows).execute();
-  }
-
-  private void insertQuestions(UUID pollId, List<Question> questions) {
-    if (questions == null || questions.isEmpty()) {
-      return;
-    }
-    // Resolve UUIDs up front so the options INSERT below can reference the parent
-    // question ids without a second pass through the input list.
-    List<UUID> qids = new java.util.ArrayList<>(questions.size());
-    for (Question q : questions) {
-      qids.add(q.id() != null ? q.id() : UUID.randomUUID());
+        dsl.batch(rows).execute();
     }
 
-    var questionsInsert =
-        dsl.insertInto(
-            POLL_QUESTIONS,
-            POLL_QUESTIONS.ID,
-            POLL_QUESTIONS.POLL_ID,
-            POLL_QUESTIONS.PROMPT,
-            POLL_QUESTIONS.MIN_SELECTIONS,
-            POLL_QUESTIONS.MAX_SELECTIONS,
-            POLL_QUESTIONS.ORDINAL,
-            POLL_QUESTIONS.STATUS);
-    for (int i = 0; i < questions.size(); i++) {
-      Question q = questions.get(i);
-      questionsInsert =
-          questionsInsert.values(
-              qids.get(i),
-              pollId,
-              q.prompt(),
-              q.minSelections(),
-              q.maxSelections(),
-              q.ordinal(),
-              q.status().name());
-    }
-    questionsInsert.execute();
+    private void insertQuestions(UUID pollId, List<Question> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return;
+        }
+        // Resolve UUIDs up front so the options INSERT below can reference the parent
+        // question ids without a second pass through the input list.
+        List<UUID> qids = new java.util.ArrayList<>(questions.size());
+        for (Question q : questions) {
+            qids.add(q.id() != null ? q.id() : UUID.randomUUID());
+        }
 
-    var optionsInsert =
-        dsl.insertInto(
-            POLL_OPTIONS,
+        var questionsInsert = dsl.insertInto(
+                POLL_QUESTIONS,
+                POLL_QUESTIONS.ID,
+                POLL_QUESTIONS.POLL_ID,
+                POLL_QUESTIONS.PROMPT,
+                POLL_QUESTIONS.MIN_SELECTIONS,
+                POLL_QUESTIONS.MAX_SELECTIONS,
+                POLL_QUESTIONS.ORDINAL,
+                POLL_QUESTIONS.STATUS
+        );
+        for (int i = 0; i < questions.size(); i++) {
+            Question q = questions.get(i);
+            questionsInsert = questionsInsert.values(
+                    qids.get(i),
+                    pollId,
+                    q.prompt(),
+                    q.minSelections(),
+                    q.maxSelections(),
+                    q.ordinal(),
+                    q.status().name()
+            );
+        }
+        questionsInsert.execute();
+
+        var optionsInsert = dsl.insertInto(
+                POLL_OPTIONS,
+                POLL_OPTIONS.ID,
+                POLL_OPTIONS.QUESTION_ID,
+                POLL_OPTIONS.LABEL,
+                POLL_OPTIONS.POSITION
+        );
+        int optionRows = 0;
+        for (int i = 0; i < questions.size(); i++) {
+            UUID qid = qids.get(i);
+            for (Option o : questions.get(i).options()) {
+                optionsInsert = optionsInsert.values(
+                        o.id() != null ? o.id() : UUID.randomUUID(),
+                        qid,
+                        o.label(),
+                        o.position()
+                );
+                optionRows++;
+            }
+        }
+        if (optionRows > 0) {
+            optionsInsert.execute();
+        }
+    }
+
+    /**
+     * Inner multiset that materialises every {@link Option} for the surrounding {@link Question} row
+     * — correlated by {@code POLL_OPTIONS.QUESTION_ID = POLL_QUESTIONS.ID}. Used inside {@link
+     * #QUESTIONS_FIELD}; never emitted on its own.
+     */
+    private static final Field<List<Option>> OPTIONS_FIELD = multiset(select(
             POLL_OPTIONS.ID,
             POLL_OPTIONS.QUESTION_ID,
             POLL_OPTIONS.LABEL,
-            POLL_OPTIONS.POSITION);
-    int optionRows = 0;
-    for (int i = 0; i < questions.size(); i++) {
-      UUID qid = qids.get(i);
-      for (Option o : questions.get(i).options()) {
-        optionsInsert =
-            optionsInsert.values(
-                o.id() != null ? o.id() : UUID.randomUUID(), qid, o.label(), o.position());
-        optionRows++;
-      }
-    }
-    if (optionRows > 0) {
-      optionsInsert.execute();
-    }
-  }
+            POLL_OPTIONS.POSITION
+    )
+        .from(POLL_OPTIONS)
+        .where(POLL_OPTIONS.QUESTION_ID.eq(POLL_QUESTIONS.ID))
+        .orderBy(POLL_OPTIONS.POSITION.asc())
+    )
+        .convertFrom(r -> r.map(o -> new Option(
+                o.get(POLL_OPTIONS.ID),
+                o.get(POLL_OPTIONS.QUESTION_ID),
+                o.get(POLL_OPTIONS.LABEL),
+                o.get(POLL_OPTIONS.POSITION)
+        )));
+    /**
+     * Outer multiset that materialises every {@link Question} (with its nested options) for the poll
+     * row in scope — correlated by {@code POLL_QUESTIONS.POLL_ID = POLLS.ID}. The whole poll
+     * aggregate is therefore one round-trip; on Postgres jOOQ emits a single SELECT with two
+     * subselects rendered as JSON arrays.
+     */
+    private static final Field<List<Question>> QUESTIONS_FIELD = multiset(select(
+            POLL_QUESTIONS.ID,
+            POLL_QUESTIONS.POLL_ID,
+            POLL_QUESTIONS.PROMPT,
+            POLL_QUESTIONS.ORDINAL,
+            POLL_QUESTIONS.STATUS,
+            POLL_QUESTIONS.MIN_SELECTIONS,
+            POLL_QUESTIONS.MAX_SELECTIONS,
+            POLL_QUESTIONS.ACTIVATED_AT,
+            POLL_QUESTIONS.CLOSED_AT,
+            OPTIONS_FIELD
+    )
+        .from(POLL_QUESTIONS)
+        .where(POLL_QUESTIONS.POLL_ID.eq(POLLS.ID))
+        .orderBy(POLL_QUESTIONS.ORDINAL.asc())
+    )
+        .convertFrom(r -> r.map(q -> new Question(
+                q.get(POLL_QUESTIONS.ID),
+                q.get(POLL_QUESTIONS.POLL_ID),
+                q.get(POLL_QUESTIONS.PROMPT),
+                q.get(POLL_QUESTIONS.ORDINAL),
+                QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
+                q.get(POLL_QUESTIONS.MIN_SELECTIONS),
+                q.get(POLL_QUESTIONS.MAX_SELECTIONS),
+                q.get(OPTIONS_FIELD),
+                q.get(POLL_QUESTIONS.ACTIVATED_AT) == null ? null : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
+                q.get(POLL_QUESTIONS.CLOSED_AT) == null ? null : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant()
+        )));
+    private static final Field<List<String>> ORIGINS_FIELD = multiset(select(POLL_ALLOWED_ORIGINS.ORIGIN)
+        .from(POLL_ALLOWED_ORIGINS)
+        .where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(POLLS.ID))
+        .orderBy(POLL_ALLOWED_ORIGINS.POSITION.asc())
+    )
+        .convertFrom(r -> r.map(o -> o.get(POLL_ALLOWED_ORIGINS.ORIGIN)));
 
-  /**
-   * Inner multiset that materialises every {@link Option} for the surrounding {@link Question} row
-   * — correlated by {@code POLL_OPTIONS.QUESTION_ID = POLL_QUESTIONS.ID}. Used inside {@link
-   * #QUESTIONS_FIELD}; never emitted on its own.
-   */
-  private static final Field<List<Option>> OPTIONS_FIELD =
-      multiset(
-              select(
-                      POLL_OPTIONS.ID,
-                      POLL_OPTIONS.QUESTION_ID,
-                      POLL_OPTIONS.LABEL,
-                      POLL_OPTIONS.POSITION)
-                  .from(POLL_OPTIONS)
-                  .where(POLL_OPTIONS.QUESTION_ID.eq(POLL_QUESTIONS.ID))
-                  .orderBy(POLL_OPTIONS.POSITION.asc()))
-          .convertFrom(
-              r ->
-                  r.map(
-                      o ->
-                          new Option(
-                              o.get(POLL_OPTIONS.ID),
-                              o.get(POLL_OPTIONS.QUESTION_ID),
-                              o.get(POLL_OPTIONS.LABEL),
-                              o.get(POLL_OPTIONS.POSITION))));
-
-  /**
-   * Outer multiset that materialises every {@link Question} (with its nested options) for the poll
-   * row in scope — correlated by {@code POLL_QUESTIONS.POLL_ID = POLLS.ID}. The whole poll
-   * aggregate is therefore one round-trip; on Postgres jOOQ emits a single SELECT with two
-   * subselects rendered as JSON arrays.
-   */
-  private static final Field<List<Question>> QUESTIONS_FIELD =
-      multiset(
-              select(
-                      POLL_QUESTIONS.ID,
-                      POLL_QUESTIONS.POLL_ID,
-                      POLL_QUESTIONS.PROMPT,
-                      POLL_QUESTIONS.ORDINAL,
-                      POLL_QUESTIONS.STATUS,
-                      POLL_QUESTIONS.MIN_SELECTIONS,
-                      POLL_QUESTIONS.MAX_SELECTIONS,
-                      POLL_QUESTIONS.ACTIVATED_AT,
-                      POLL_QUESTIONS.CLOSED_AT,
-                      OPTIONS_FIELD)
-                  .from(POLL_QUESTIONS)
-                  .where(POLL_QUESTIONS.POLL_ID.eq(POLLS.ID))
-                  .orderBy(POLL_QUESTIONS.ORDINAL.asc()))
-          .convertFrom(
-              r ->
-                  r.map(
-                      q ->
-                          new Question(
-                              q.get(POLL_QUESTIONS.ID),
-                              q.get(POLL_QUESTIONS.POLL_ID),
-                              q.get(POLL_QUESTIONS.PROMPT),
-                              q.get(POLL_QUESTIONS.ORDINAL),
-                              QuestionStatus.valueOf(q.get(POLL_QUESTIONS.STATUS)),
-                              q.get(POLL_QUESTIONS.MIN_SELECTIONS),
-                              q.get(POLL_QUESTIONS.MAX_SELECTIONS),
-                              q.get(OPTIONS_FIELD),
-                              q.get(POLL_QUESTIONS.ACTIVATED_AT) == null
-                                  ? null
-                                  : q.get(POLL_QUESTIONS.ACTIVATED_AT).toInstant(),
-                              q.get(POLL_QUESTIONS.CLOSED_AT) == null
-                                  ? null
-                                  : q.get(POLL_QUESTIONS.CLOSED_AT).toInstant())));
-
-  private static final Field<List<String>> ORIGINS_FIELD =
-      multiset(
-              select(POLL_ALLOWED_ORIGINS.ORIGIN)
-                  .from(POLL_ALLOWED_ORIGINS)
-                  .where(POLL_ALLOWED_ORIGINS.POLL_ID.eq(POLLS.ID))
-                  .orderBy(POLL_ALLOWED_ORIGINS.POSITION.asc()))
-          .convertFrom(r -> r.map(o -> o.get(POLL_ALLOWED_ORIGINS.ORIGIN)));
-
-  private Poll toPoll(Record row) {
-    List<Question> questions = row.get(QUESTIONS_FIELD);
-    UUID activeQuestionId =
-        questions.stream()
+    private Poll toPoll(Record row) {
+        List<Question> questions = row.get(QUESTIONS_FIELD);
+        UUID activeQuestionId = questions
+            .stream()
             .filter(q -> q.status() == QuestionStatus.ACTIVE)
             .findFirst()
             .map(Question::id)
             .orElse(null);
-    PollStatus status =
-        questions.stream().anyMatch(q -> q.status() == QuestionStatus.ACTIVE)
-            ? PollStatus.OPEN
-            : PollStatus.DRAFT;
-    return new Poll(
-        row.get(POLLS.ID),
-        row.get(POLLS.OWNER_USERNAME),
-        row.get(POLLS.TITLE),
-        row.get(POLLS.SLUG),
-        status,
-        activeQuestionId,
-        questions,
-        row.get(ORIGINS_FIELD),
-        row.get(POLLS.CREATED_AT).toInstant(),
-        row.get(POLLS.UPDATED_AT).toInstant());
-  }
+        PollStatus status =
+                questions.stream().anyMatch(q -> q.status() == QuestionStatus.ACTIVE)
+                ? PollStatus.OPEN
+                : PollStatus.DRAFT;
+        return new Poll(
+                row.get(POLLS.ID),
+                row.get(POLLS.OWNER_USERNAME),
+                row.get(POLLS.TITLE),
+                row.get(POLLS.SLUG),
+                status,
+                activeQuestionId,
+                questions,
+                row.get(ORIGINS_FIELD),
+                row.get(POLLS.CREATED_AT).toInstant(),
+                row.get(POLLS.UPDATED_AT).toInstant()
+        );
+    }
 
-  private static void lockPollRow(DSLContext tx, UUID pollId) {
-    tx.select(POLLS.ID)
-        .from(POLLS)
-        .where(POLLS.ID.eq(pollId))
-        .forUpdate()
-        .fetchOptional()
-        .orElseThrow(() -> new NotFoundException(pollId.toString()));
-  }
+    private static void lockPollRow(DSLContext tx, UUID pollId) {
+        tx
+            .select(POLLS.ID)
+            .from(POLLS)
+            .where(POLLS.ID.eq(pollId))
+            .forUpdate()
+            .fetchOptional()
+            .orElseThrow(() -> new NotFoundException(pollId.toString()));
+    }
 
-  @Override
-  public Map<UUID, Long> voteCountByQuestion(UUID pollId) {
-    Field<Integer> voteCount = DSL.count();
-    Map<UUID, Long> out = new HashMap<>();
-    dsl.select(VOTES.QUESTION_ID, voteCount)
-        .from(VOTES)
-        .where(VOTES.POLL_ID.eq(pollId))
-        .groupBy(VOTES.QUESTION_ID)
-        .fetch()
-        .forEach(r -> out.put(r.get(VOTES.QUESTION_ID), (long) r.get(voteCount)));
-    return out;
-  }
+    @Override
+    public Map<UUID, Long> voteCountByQuestion(UUID pollId) {
+        Field<Integer> voteCount = DSL.count();
+        Map<UUID, Long> out = new HashMap<>();
+        dsl
+            .select(VOTES.QUESTION_ID, voteCount)
+            .from(VOTES)
+            .where(VOTES.POLL_ID.eq(pollId))
+            .groupBy(VOTES.QUESTION_ID)
+            .fetch()
+            .forEach(r -> out.put(r.get(VOTES.QUESTION_ID), (long) r.get(voteCount)));
+        return out;
+    }
 }

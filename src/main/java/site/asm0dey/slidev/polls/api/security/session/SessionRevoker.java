@@ -12,31 +12,34 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class SessionRevoker {
+    private final FindByIndexNameSessionRepository<? extends Session> sessions;
 
-  private final FindByIndexNameSessionRepository<? extends Session> sessions;
-
-  public SessionRevoker(FindByIndexNameSessionRepository<? extends Session> sessions) {
-    this.sessions = sessions;
-  }
-
-  /** Deletes every session belonging to {@code username}. */
-  public void expireAll(String username) {
-    for (String id : idsFor(username)) {
-      sessions.deleteById(id);
+    public SessionRevoker(FindByIndexNameSessionRepository<? extends Session> sessions) {
+        this.sessions = sessions;
     }
-  }
 
-  /** Deletes every session belonging to {@code username} except the one with {@code keepId}. */
-  public void expireAllExcept(String username, String keepId) {
-    for (String id : idsFor(username)) {
-      if (!id.equals(keepId)) {
-        sessions.deleteById(id);
-      }
+    /**
+     * Deletes every session belonging to {@code username}.
+     */
+    public void expireAll(String username) {
+        for (String id : idsFor(username)) {
+            sessions.deleteById(id);
+        }
     }
-  }
 
-  private Iterable<String> idsFor(String username) {
-    Map<String, ? extends Session> found = sessions.findByPrincipalName(username);
-    return found.keySet();
-  }
+    /**
+     * Deletes every session belonging to {@code username} except the one with {@code keepId}.
+     */
+    public void expireAllExcept(String username, String keepId) {
+        for (String id : idsFor(username)) {
+            if (!id.equals(keepId)) {
+                sessions.deleteById(id);
+            }
+        }
+    }
+
+    private Iterable<String> idsFor(String username) {
+        Map<String, ? extends Session> found = sessions.findByPrincipalName(username);
+        return found.keySet();
+    }
 }

@@ -6,7 +6,7 @@ package site.asm0dey.slidev.polls.core.error;
  * (FR-010, @TS-025).
  */
 public class QuestionNotActiveException extends RuntimeException {
-  public QuestionNotActiveException(String message) {
-    super(message);
-  }
+    public QuestionNotActiveException(String message) {
+        super(message);
+    }
 }

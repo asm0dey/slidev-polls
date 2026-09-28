@@ -30,54 +30,53 @@ import site.asm0dey.slidev.polls.realtime.SseHub;
  */
 @Component
 public class TallyBroadcaster {
+    private static final String SNAPSHOT_EVENT = "snapshot";
+    private final SseHub hub;
+    private final SnapshotBuilder snapshots;
 
-  private static final String SNAPSHOT_EVENT = "snapshot";
+    public TallyBroadcaster(SseHub hub, SnapshotBuilder snapshots) {
+        this.hub = hub;
+        this.snapshots = snapshots;
+    }
 
-  private final SseHub hub;
-  private final SnapshotBuilder snapshots;
+    @EventListener
+    public void onVoteCast(VoteCastEvent event) {
+        resnapshotForQuestion(event.pollId(), event.questionId());
+    }
 
-  public TallyBroadcaster(SseHub hub, SnapshotBuilder snapshots) {
-    this.hub = hub;
-    this.snapshots = snapshots;
-  }
+    @EventListener
+    public void onVoteRetracted(VoteRetractedEvent event) {
+        resnapshotForQuestion(event.pollId(), event.questionId());
+    }
 
-  @EventListener
-  public void onVoteCast(VoteCastEvent event) {
-    resnapshotForQuestion(event.pollId(), event.questionId());
-  }
+    @EventListener
+    public void onActiveQuestionChanged(PollActiveQuestionChangedEvent event) {
+        snapshots
+            .build(event.pollId())
+            .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
+    }
 
-  @EventListener
-  public void onVoteRetracted(VoteRetractedEvent event) {
-    resnapshotForQuestion(event.pollId(), event.questionId());
-  }
+    @EventListener
+    public void onQuestionClosed(PollQuestionClosedEvent event) {
+        hub.broadcast(
+                event.pollId(),
+                "question-closed",
+                new QuestionClosedPayload(event.pollId(), event.questionId(), Instant.now())
+        );
+    }
 
-  @EventListener
-  public void onActiveQuestionChanged(PollActiveQuestionChangedEvent event) {
-    snapshots
-        .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
-  }
+    @EventListener
+    public void onVotesCleared(PollVotesClearedEvent event) {
+        snapshots
+            .build(event.pollId())
+            .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
+    }
 
-  @EventListener
-  public void onQuestionClosed(PollQuestionClosedEvent event) {
-    hub.broadcast(
-        event.pollId(),
-        "question-closed",
-        new QuestionClosedPayload(event.pollId(), event.questionId(), Instant.now()));
-  }
-
-  @EventListener
-  public void onVotesCleared(PollVotesClearedEvent event) {
-    snapshots
-        .build(event.pollId())
-        .ifPresent(payload -> hub.broadcast(event.pollId(), SNAPSHOT_EVENT, payload));
-  }
-
-  private void resnapshotForQuestion(UUID pollId, UUID questionId) {
-    // SnapshotBuilder produces the canonical wire payload used on (re)connect — re-emitting it
-    // after every ballot change keeps the client purely snapshot-driven (no delta application).
-    snapshots
-        .buildForQuestion(pollId, questionId)
-        .ifPresent(payload -> hub.broadcast(pollId, SNAPSHOT_EVENT, payload));
-  }
+    private void resnapshotForQuestion(UUID pollId, UUID questionId) {
+        // SnapshotBuilder produces the canonical wire payload used on (re)connect — re-emitting it
+        // after every ballot change keeps the client purely snapshot-driven (no delta application).
+        snapshots
+            .buildForQuestion(pollId, questionId)
+            .ifPresent(payload -> hub.broadcast(pollId, SNAPSHOT_EVENT, payload));
+    }
 }

@@ -17,32 +17,33 @@ import site.asm0dey.slidev.polls.core.domain.Question;
  * Question} DTO shape is reused from the admin surface since the OpenAPI schemas are identical.
  */
 public record PublicPollView(
-    UUID pollId,
-    String slug,
-    String title,
-    State state,
-    QuestionDto activeQuestion,
-    Boolean alreadyVoted) {
-
-  public enum State {
-    WAITING,
-    ACTIVE
-  }
-
-  public static PublicPollView from(Poll poll, Boolean alreadyVoted) {
-    UUID activeQuestionId = poll.activeQuestionId();
-    Question active = null;
-    if (activeQuestionId != null) {
-      active =
-          poll.questions().stream()
-              .filter(q -> q.id().equals(activeQuestionId))
-              .findFirst()
-              .orElse(null);
+        UUID pollId,
+        String slug,
+        String title,
+        State state,
+        QuestionDto activeQuestion,
+        Boolean alreadyVoted
+) {
+    public enum State {
+        WAITING,
+        ACTIVE
     }
-    State state = active == null ? State.WAITING : State.ACTIVE;
-    // Voter-facing view doesn't surface vote counts; default to 0 so the shared QuestionDto shape
-    // still serialises.
-    QuestionDto activeDto = active == null ? null : QuestionDto.from(active, 0);
-    return new PublicPollView(poll.id(), poll.slug(), poll.title(), state, activeDto, alreadyVoted);
-  }
+
+    public static PublicPollView from(Poll poll, Boolean alreadyVoted) {
+        UUID activeQuestionId = poll.activeQuestionId();
+        Question active = null;
+        if (activeQuestionId != null) {
+            active = poll
+                .questions()
+                .stream()
+                .filter(q -> q.id().equals(activeQuestionId))
+                .findFirst()
+                .orElse(null);
+        }
+        State state = active == null ? State.WAITING : State.ACTIVE;
+        // Voter-facing view doesn't surface vote counts; default to 0 so the shared QuestionDto shape
+        // still serialises.
+        QuestionDto activeDto = active == null ? null : QuestionDto.from(active, 0);
+        return new PublicPollView(poll.id(), poll.slug(), poll.title(), state, activeDto, alreadyVoted);
+    }
 }

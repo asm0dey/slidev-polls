@@ -1,7 +1,6 @@
 package site.asm0dey.slidev.polls.persistence.h2;
 
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,16 +18,18 @@ import org.jooq.impl.DSL;
  * matching Postgres trigger lives in V10.
  */
 public final class TouchPollUpdatedAtTrigger extends TriggerAdapter {
-
-  @Override
-  public void fire(Connection conn, ResultSet oldRow, ResultSet newRow) throws SQLException {
-    ResultSet src = newRow != null ? newRow : oldRow;
-    UUID pollId = src.getObject("poll_id", UUID.class);
-    if (pollId == null) return;
-    DSL.using(conn)
-        .update(POLLS)
-        .set(POLLS.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
-        .where(POLLS.ID.eq(pollId))
-        .execute();
-  }
+    @Override
+    public void fire(Connection conn, ResultSet oldRow, ResultSet newRow) throws SQLException {
+        ResultSet src = newRow != null ? newRow : oldRow;
+        UUID pollId = src.getObject("poll_id", UUID.class);
+        if (pollId == null) {
+            return;
+        }
+        DSL
+            .using(conn)
+            .update(POLLS)
+            .set(POLLS.UPDATED_AT, OffsetDateTime.now(ZoneOffset.UTC))
+            .where(POLLS.ID.eq(pollId))
+            .execute();
+    }
 }

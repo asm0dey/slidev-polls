@@ -12,27 +12,28 @@ import java.util.UUID;
  * maxSelections} options.
  */
 public record Question(
-    UUID id,
-    UUID pollId,
-    String prompt,
-    int ordinal,
-    QuestionStatus status,
-    int minSelections,
-    int maxSelections,
-    List<Option> options,
-    Instant activatedAt,
-    Instant closedAt) {
-
-  public Question {
-    if (maxSelections < 1) {
-      throw new IllegalArgumentException("maxSelections must be ≥ 1");
+        UUID id,
+        UUID pollId,
+        String prompt,
+        int ordinal,
+        QuestionStatus status,
+        int minSelections,
+        int maxSelections,
+        List<Option> options,
+        Instant activatedAt,
+        Instant closedAt
+) {
+    public Question {
+        if (maxSelections < 1) {
+            throw new IllegalArgumentException("maxSelections must be ≥ 1");
+        }
+        if (minSelections < 0) {
+            throw new IllegalArgumentException("minSelections must be ≥ 0");
+        }
+        if (minSelections > maxSelections) {
+            throw new IllegalArgumentException(
+                    "minSelections (" + minSelections + ") > maxSelections (" + maxSelections + ")"
+            );
+        }
     }
-    if (minSelections < 0) {
-      throw new IllegalArgumentException("minSelections must be ≥ 0");
-    }
-    if (minSelections > maxSelections) {
-      throw new IllegalArgumentException(
-          "minSelections (" + minSelections + ") > maxSelections (" + maxSelections + ")");
-    }
-  }
 }

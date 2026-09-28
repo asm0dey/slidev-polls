@@ -12,30 +12,29 @@ import site.asm0dey.slidev.polls.core.error.NotOwnerException;
  */
 @Component
 public class PollAuthorizer {
+    private final PollCollaboratorRepository collaborators;
 
-  private final PollCollaboratorRepository collaborators;
-
-  public PollAuthorizer(PollCollaboratorRepository collaborators) {
-    this.collaborators = collaborators;
-  }
-
-  public boolean isOwner(Poll poll, String username) {
-    return poll.ownerUsername().equals(username);
-  }
-
-  public boolean isEditor(Poll poll, String username) {
-    return isOwner(poll, username) || collaborators.exists(poll.id(), username);
-  }
-
-  public void requireOwner(Poll poll, String username) {
-    if (!isOwner(poll, username)) {
-      throw new NotOwnerException("poll " + poll.id() + " is not owned by " + username);
+    public PollAuthorizer(PollCollaboratorRepository collaborators) {
+        this.collaborators = collaborators;
     }
-  }
 
-  public void requireEditor(Poll poll, String username) {
-    if (!isEditor(poll, username)) {
-      throw new NotOwnerException("poll " + poll.id() + " is not editable by " + username);
+    public boolean isOwner(Poll poll, String username) {
+        return poll.ownerUsername().equals(username);
     }
-  }
+
+    public boolean isEditor(Poll poll, String username) {
+        return isOwner(poll, username) || collaborators.exists(poll.id(), username);
+    }
+
+    public void requireOwner(Poll poll, String username) {
+        if (!isOwner(poll, username)) {
+            throw new NotOwnerException("poll " + poll.id() + " is not owned by " + username);
+        }
+    }
+
+    public void requireEditor(Poll poll, String username) {
+        if (!isEditor(poll, username)) {
+            throw new NotOwnerException("poll " + poll.id() + " is not editable by " + username);
+        }
+    }
 }

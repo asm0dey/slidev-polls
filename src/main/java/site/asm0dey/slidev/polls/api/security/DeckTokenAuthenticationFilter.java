@@ -29,77 +29,79 @@ import site.asm0dey.slidev.polls.core.service.DeckTokenService;
  */
 @Component
 public class DeckTokenAuthenticationFilter extends OncePerRequestFilter {
+    static final String HEADER = "X-Deck-Token";
+    private final DeckTokenService service;
 
-  static final String HEADER = "X-Deck-Token";
-
-  private final DeckTokenService service;
-
-  public DeckTokenAuthenticationFilter(DeckTokenService service) {
-    this.service = service;
-  }
-
-  @Override
-  protected void doFilterInternal(
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull FilterChain chain)
-      throws ServletException, IOException {
-    String header = request.getHeader(HEADER);
-    if (header != null && !header.isBlank()) {
-      Optional<DeckToken> match = service.resolveLive(header);
-      if (match.isPresent()) {
-        DeckToken token = match.get();
-        DeckPrincipal principal = new DeckPrincipal(token.id(), token.pollId(), token.label());
-        SecurityContextHolder.getContext()
-            .setAuthentication(new DeckAuthenticationToken(principal));
-      }
-    }
-    try {
-      chain.doFilter(request, response);
-    } finally {
-      // Deck auth is request-scoped; the token MUST NOT bleed across threads.
-      SecurityContextHolder.clearContext();
-    }
-  }
-
-  @Override
-  protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-    String path = request.getRequestURI();
-    return path == null || !path.startsWith("/api/deck/");
-  }
-
-  /** Authentication wrapper around {@link DeckPrincipal}. Always authenticated. */
-  public static final class DeckAuthenticationToken extends AbstractAuthenticationToken {
-
-    private final DeckPrincipal principal;
-
-    public DeckAuthenticationToken(DeckPrincipal principal) {
-      super(principal.authorities());
-      this.principal = principal;
-      setAuthenticated(true);
+    public DeckTokenAuthenticationFilter(DeckTokenService service) {
+        this.service = service;
     }
 
     @Override
-    public Object getCredentials() {
-      return "";
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
+    ) throws ServletException, IOException {
+        String header = request.getHeader(HEADER);
+        if (header != null && !header.isBlank()) {
+            Optional<DeckToken> match = service.resolveLive(header);
+            if (match.isPresent()) {
+                DeckToken token = match.get();
+                DeckPrincipal principal = new DeckPrincipal(token.id(), token.pollId(), token.label());
+                SecurityContextHolder.getContext().setAuthentication(new DeckAuthenticationToken(principal));
+            }
+        }
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            // Deck auth is request-scoped; the token MUST NOT bleed across threads.
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Override
-    public DeckPrincipal getPrincipal() {
-      return principal;
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path == null || !path.startsWith("/api/deck/");
     }
 
-    @Override
-    public boolean equals(Object o) {
-      if (getClass() != o.getClass()) return false;
-      if (!super.equals(o)) return false;
-      DeckAuthenticationToken that = (DeckAuthenticationToken) o;
-      return Objects.equals(principal, that.principal);
-    }
+    /**
+     * Authentication wrapper around {@link DeckPrincipal}. Always authenticated.
+     */
+    public static final class DeckAuthenticationToken extends AbstractAuthenticationToken {
+        private final DeckPrincipal principal;
 
-    @Override
-    public int hashCode() {
-      return Objects.hash(super.hashCode(), principal);
+        public DeckAuthenticationToken(DeckPrincipal principal) {
+            super(principal.authorities());
+            this.principal = principal;
+            setAuthenticated(true);
+        }
+
+        @Override
+        public Object getCredentials() {
+            return "";
+        }
+
+        @Override
+        public DeckPrincipal getPrincipal() {
+            return principal;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+            DeckAuthenticationToken that = (DeckAuthenticationToken) o;
+            return Objects.equals(principal, that.principal);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), principal);
+        }
     }
-  }
 }
