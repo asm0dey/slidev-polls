@@ -1,7 +1,7 @@
 version: "3"
 
-# Task runner (https://taskfile.dev) entrypoints. Install once with
-# `brew install go-task/tap/go-task` or `go install github.com/go-task/task/v3/cmd/task@latest`.
+# Task runner (https://taskfile.dev) entrypoints. `task` itself is pinned in
+# mise.toml — run `mise install` once and it lands on PATH with the JDK and bun.
 #
 # Common flows:
 #   task dev           — inner-loop (host backend + Vite HMR + Postgres in compose)

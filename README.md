@@ -297,11 +297,21 @@ before the next boot.
 
 ### Tooling prerequisites
 
-- JDK 25 (use `JAVA_HOME=/path/to/jdk25 ./mvnw …` if your system JVM is older)
-- bun (npm works too, but the workspace and lockfile are bun)
-- Docker (for local Postgres and Testcontainers)
-- [task](https://taskfile.dev) — `brew install go-task/tap/go-task`, or
-  `go install github.com/go-task/task/v3/cmd/task@latest`
+Tool versions (JDK 25, bun, task) are pinned in `mise.toml`. Install
+[mise](https://mise.jdx.dev), then from the repo root:
+
+```bash
+mise trust && mise install
+```
+
+Activate mise in your shell (`eval "$(mise activate zsh)"` in `~/.zshrc`) so the
+pinned tools are on PATH inside the repo. Git hooks and IDEs run non-interactive
+shells, so also add `eval "$(mise activate zsh --shims)"` to `~/.zprofile`.
+Shims don't set `JAVA_HOME`, and `./mvnw` prefers `JAVA_HOME` over PATH, so
+don't export `JAVA_HOME` from your login profile (e.g. sdkman's init). Otherwise
+the lefthook `spotless` hook runs on that JDK instead of the pinned one.
+
+Docker is also required (local Postgres and Testcontainers).
 
 ### Common tasks
 
