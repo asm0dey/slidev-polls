@@ -307,7 +307,9 @@ mise trust && mise install
 Activate mise in your shell (`eval "$(mise activate zsh)"` in `~/.zshrc`) so the
 pinned tools are on PATH inside the repo. Git hooks and IDEs run non-interactive
 shells, so also add `eval "$(mise activate zsh --shims)"` to `~/.zprofile`.
-Otherwise the lefthook `spotless` hook falls back to your system JVM.
+Shims don't set `JAVA_HOME`, and `./mvnw` prefers `JAVA_HOME` over PATH, so
+don't export `JAVA_HOME` from your login profile (e.g. sdkman's init). Otherwise
+the lefthook `spotless` hook runs on that JDK instead of the pinned one.
 
 Docker is also required (local Postgres and Testcontainers).
 
