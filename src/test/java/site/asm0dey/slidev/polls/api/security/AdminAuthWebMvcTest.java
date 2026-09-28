@@ -1,6 +1,7 @@
 package site.asm0dey.slidev.polls.api.security;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -133,10 +134,7 @@ class AdminAuthWebMvcTest {
     @Test
     void foreign_presenter_delete_returns_403() throws Exception {
         UUID pollId = UUID.randomUUID();
-        org.mockito.Mockito
-            .doThrow(new NotOwnerException("not yours"))
-            .when(pollService)
-            .deleteForOwner(eq(pollId), eq("bob"));
+        doThrow(new NotOwnerException("not yours")).when(pollService).deleteForOwner(eq(pollId), eq("bob"));
 
         mvc
             .perform(delete("/api/admin/polls/" + pollId).with(user("bob").roles("AUTHENTICATED")).with(csrf()))
@@ -169,7 +167,7 @@ class AdminAuthWebMvcTest {
     @Test
     void rightful_owner_can_read_their_own_poll() throws Exception {
         UUID pollId = UUID.randomUUID();
-        when(pollService.getForEditor(eq(pollId), eq("alice"))).thenReturn(fixturePoll(pollId, "alice"));
+        when(pollService.getForEditor(pollId, "alice")).thenReturn(fixturePoll(pollId, "alice"));
 
         mvc
             .perform(get("/api/admin/polls/" + pollId).with(user("alice").roles("AUTHENTICATED")))

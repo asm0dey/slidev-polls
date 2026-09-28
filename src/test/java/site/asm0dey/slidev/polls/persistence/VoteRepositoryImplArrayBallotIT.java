@@ -87,10 +87,8 @@ class VoteRepositoryImplArrayBallotIT extends AbstractPostgresTest {
                     new Vote(UUID.randomUUID(), p.pollId(), p.questionId(), List.of(a), "voter", Instant.now())
             );
 
-            assertThatThrownBy(() -> voteRepository.insert(
-                    new Vote(UUID.randomUUID(), p.pollId(), p.questionId(), List.of(a), "voter", Instant.now())
-            ))
-                .isInstanceOf(AlreadyVotedException.class);
+            var second = new Vote(UUID.randomUUID(), p.pollId(), p.questionId(), List.of(a), "voter", Instant.now());
+            assertThatThrownBy(() -> voteRepository.insert(second)).isInstanceOf(AlreadyVotedException.class);
         }
 
         private P activateMultiQuestion(int options, int min, int max) {

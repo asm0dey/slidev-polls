@@ -27,18 +27,10 @@ class QuestionArityTest {
 
     @Test
     void minMustNotExceedMax() {
-        assertThatThrownBy(() -> new Question(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                "p",
-                0,
-                QuestionStatus.DRAFT,
-                3,
-                2,
-                List.of(),
-                null,
-                null
-        ))
+        UUID id = UUID.randomUUID();
+        UUID pollId = UUID.randomUUID();
+        List<Option> options = List.of();
+        assertThatThrownBy(() -> new Question(id, pollId, "p", 0, QuestionStatus.DRAFT, 3, 2, options, null, null))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -61,18 +53,10 @@ class QuestionArityTest {
 
     @Test
     void maxMustBeAtLeastOne() {
-        assertThatThrownBy(() -> new Question(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                "p",
-                0,
-                QuestionStatus.DRAFT,
-                0,
-                0,
-                List.of(),
-                null,
-                null
-        ))
+        UUID id = UUID.randomUUID();
+        UUID pollId = UUID.randomUUID();
+        List<Option> options = List.of();
+        assertThatThrownBy(() -> new Question(id, pollId, "p", 0, QuestionStatus.DRAFT, 0, 0, options, null, null))
             .isInstanceOf(IllegalArgumentException.class);
     }
 }

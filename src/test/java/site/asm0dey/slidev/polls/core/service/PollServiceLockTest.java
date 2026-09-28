@@ -44,7 +44,8 @@ class PollServiceLockTest {
     @Test
     void changingArityWithVotesRejected() {
         Fixture f = pollWithVotedOption();
-        assertThatThrownBy(() -> f.service.updateForOwner(f.pollId, "alice", f.flipArityOnActiveQuestion(0, 3)))
+        var update = f.flipArityOnActiveQuestion(0, 3);
+        assertThatThrownBy(() -> f.service.updateForOwner(f.pollId, "alice", update))
             .isInstanceOf(ResourceHasVotesException.class);
     }
 

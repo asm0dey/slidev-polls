@@ -72,8 +72,8 @@ class AdminUserServiceTest {
     void createInitialAdminThrowsWhenTableAlreadyPopulated() {
         when(repo.count()).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.createInitialAdmin(new CreateAdminCommand("alice", "password-twelve")))
-            .isInstanceOf(SetupLockedException.class);
+        var cmd = new CreateAdminCommand("alice", "password-twelve");
+        assertThatThrownBy(() -> service.createInitialAdmin(cmd)).isInstanceOf(SetupLockedException.class);
 
         verify(repo, never()).insert(anyString(), anyString());
     }
@@ -82,8 +82,8 @@ class AdminUserServiceTest {
     void createAdminThrowsWhenUsernameTaken() {
         when(repo.existsByUsername("alice")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createAdmin(new CreateAdminCommand("alice", "password-twelve")))
-            .isInstanceOf(UsernameTakenException.class);
+        var cmd = new CreateAdminCommand("alice", "password-twelve");
+        assertThatThrownBy(() -> service.createAdmin(cmd)).isInstanceOf(UsernameTakenException.class);
     }
 
     @Test
@@ -106,7 +106,7 @@ class AdminUserServiceTest {
 
     @Test
     void rejectsBlankUsername() {
-        assertThatThrownBy(() -> service.createInitialAdmin(new CreateAdminCommand("", "password-twelve")))
+        assertThatThrownBy(() -> new CreateAdminCommand("", "password-twelve"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("username");
     }
@@ -137,8 +137,8 @@ class AdminUserServiceTest {
             .when(txManager)
             .commit(any(TransactionStatus.class));
 
-        assertThatThrownBy(() -> service.createInitialAdmin(new CreateAdminCommand("alice", "password-twelve")))
-            .isInstanceOf(SetupLockedException.class);
+        var cmd = new CreateAdminCommand("alice", "password-twelve");
+        assertThatThrownBy(() -> service.createInitialAdmin(cmd)).isInstanceOf(SetupLockedException.class);
     }
 
     @Test
@@ -147,8 +147,8 @@ class AdminUserServiceTest {
         // Two setups racing with the SAME username — the loser's insert hits the PK before commit.
         doThrow(new DataIntegrityViolationException("admin_user_pkey")).when(repo).insert(anyString(), anyString());
 
-        assertThatThrownBy(() -> service.createInitialAdmin(new CreateAdminCommand("alice", "password-twelve")))
-            .isInstanceOf(SetupLockedException.class);
+        var cmd = new CreateAdminCommand("alice", "password-twelve");
+        assertThatThrownBy(() -> service.createInitialAdmin(cmd)).isInstanceOf(SetupLockedException.class);
     }
 
     @Test

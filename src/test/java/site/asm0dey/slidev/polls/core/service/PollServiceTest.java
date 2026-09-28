@@ -87,22 +87,16 @@ class PollServiceTest {
     // SlugInvalidException, never SlugTakenException/SlugReservedException.
     @Test
     void rejects_invalid_slug_format() {
-        assertThatThrownBy(() -> service.create(
-                "alice",
-                new CreatePollCommand("irrelevant", "UPPER", List.of(questionDraft("Prompt?", "A", "B")), null)
-        ))
-            .isInstanceOf(SlugInvalidException.class);
+        var cmd = new CreatePollCommand("irrelevant", "UPPER", List.of(questionDraft("Prompt?", "A", "B")), null);
+        assertThatThrownBy(() -> service.create("alice", cmd)).isInstanceOf(SlugInvalidException.class);
     }
 
     // @TS-012 — reserved slugs are rejected with a distinct error code, surfaced at the service
     // level as SlugReservedException. `admin` is on ReservedSlugs.
     @Test
     void rejects_reserved_slug() {
-        assertThatThrownBy(() -> service.create(
-                "alice",
-                new CreatePollCommand("irrelevant", "admin", List.of(questionDraft("Prompt?", "A", "B")), null)
-        ))
-            .isInstanceOf(SlugReservedException.class);
+        var cmd = new CreatePollCommand("irrelevant", "admin", List.of(questionDraft("Prompt?", "A", "B")), null);
+        assertThatThrownBy(() -> service.create("alice", cmd)).isInstanceOf(SlugReservedException.class);
     }
 
     // @TS-013 / @TS-014 — slug collision on create surfaces as SlugTakenException even if the case
@@ -114,11 +108,8 @@ class PollServiceTest {
                 new CreatePollCommand("My Talk", "my-talk", List.of(questionDraft("Prompt?", "A", "B")), null)
         );
 
-        assertThatThrownBy(() -> service.create(
-                "alice",
-                new CreatePollCommand("another", "my-talk", List.of(questionDraft("Prompt?", "A", "B")), null)
-        ))
-            .isInstanceOf(SlugTakenException.class);
+        var cmd = new CreatePollCommand("another", "my-talk", List.of(questionDraft("Prompt?", "A", "B")), null);
+        assertThatThrownBy(() -> service.create("alice", cmd)).isInstanceOf(SlugTakenException.class);
     }
 
     // @TS-040 / @TS-041 — ownership is enforced: a non-owner attempting to read, update, or delete
@@ -130,8 +121,9 @@ class PollServiceTest {
                 new CreatePollCommand("my poll", "my-poll", List.of(questionDraft("Q?", "A", "B")), null)
         );
 
-        assertThatThrownBy(() -> service.getForOwner(created.id(), "bob")).isInstanceOf(NotOwnerException.class);
-        assertThatThrownBy(() -> service.deleteForOwner(created.id(), "bob")).isInstanceOf(NotOwnerException.class);
+        UUID pollId = created.id();
+        assertThatThrownBy(() -> service.getForOwner(pollId, "bob")).isInstanceOf(NotOwnerException.class);
+        assertThatThrownBy(() -> service.deleteForOwner(pollId, "bob")).isInstanceOf(NotOwnerException.class);
     }
 
     // @TS-003 — presenter-visible activation: delegates to the repository's atomic activate. Having
@@ -183,9 +175,10 @@ class PollServiceTest {
                 new CreatePollCommand("disposable", "disposable", List.of(questionDraft("Q?", "A", "B")), null)
         );
 
-        service.deleteForOwner(created.id(), "alice");
+        UUID pollId = created.id();
+        service.deleteForOwner(pollId, "alice");
 
-        assertThatThrownBy(() -> service.getForOwner(created.id(), "alice")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.getForOwner(pollId, "alice")).isInstanceOf(NotFoundException.class);
     }
 
     // @TS-015 — renaming the slug on an existing poll runs the validation chain (format, reserved,
@@ -222,15 +215,13 @@ class PollServiceTest {
     // whose message echoes the offending value.
     @Test
     void rejectsMalformedOrigin() {
-        assertThatThrownBy(() -> service.create(
-                "alice",
-                new CreatePollCommand(
-                        "bad-origin-poll",
-                        "bad-origin-poll",
-                        List.of(questionDraft("Q?", "A", "B")),
-                        List.of("not a url")
-                )
-        ))
+        var cmd = new CreatePollCommand(
+                "bad-origin-poll",
+                "bad-origin-poll",
+                List.of(questionDraft("Q?", "A", "B")),
+                List.of("not a url")
+        );
+        assertThatThrownBy(() -> service.create("alice", cmd))
             .isInstanceOf(InvalidOriginException.class)
             .hasMessageContaining("not a url");
     }
@@ -330,7 +321,8 @@ class PollServiceTest {
                 "alice",
                 new CreatePollCommand("talk", "talk-abc", List.of(questionDraft("Q?", "A", "B")), null)
         );
-        assertThatThrownBy(() -> service.cloneForOwner(src.id(), "bob")).isInstanceOf(NotOwnerException.class);
+        UUID srcId = src.id();
+        assertThatThrownBy(() -> service.cloneForOwner(srcId, "bob")).isInstanceOf(NotOwnerException.class);
     }
 
     @Test
@@ -362,7 +354,8 @@ class PollServiceTest {
                 "alice",
                 new CreatePollCommand("t", "clear-not-owner", List.of(questionDraft("Q?", "A", "B")), null)
         );
-        assertThatThrownBy(() -> service.clearVotesForOwner(p.id(), "bob")).isInstanceOf(NotOwnerException.class);
+        UUID pollId = p.id();
+        assertThatThrownBy(() -> service.clearVotesForOwner(pollId, "bob")).isInstanceOf(NotOwnerException.class);
     }
 
     @Test

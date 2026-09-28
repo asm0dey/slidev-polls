@@ -39,7 +39,8 @@ class VoteServiceArityTest {
         1,
                 /* options */
         2);
-        assertThatThrownBy(() -> f.service.recordVote("p", List.of(f.options.getFirst(), f.options.getLast()), "v"))
+        var ballot = List.of(f.options.getFirst(), f.options.getLast());
+        assertThatThrownBy(() -> f.service.recordVote("p", ballot, "v"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("between 1 and 1");
     }
@@ -75,18 +76,15 @@ class VoteServiceArityTest {
     @Test
     void ballotAboveMaxRejected() {
         Fixture f = fixture(0, 2, 3);
-        assertThatThrownBy(() -> f.service.recordVote(
-                "p",
-                List.of(f.options.getFirst(), f.options.get(1), f.options.getLast()),
-                "v"
-        ))
-            .isInstanceOf(IllegalArgumentException.class);
+        var ballot = List.of(f.options.getFirst(), f.options.get(1), f.options.getLast());
+        assertThatThrownBy(() -> f.service.recordVote("p", ballot, "v")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void duplicateOptionInBallotRejected() {
         Fixture f = fixture(0, 3, 3);
-        assertThatThrownBy(() -> f.service.recordVote("p", List.of(f.options.getFirst(), f.options.getFirst()), "v"))
+        var ballot = List.of(f.options.getFirst(), f.options.getFirst());
+        assertThatThrownBy(() -> f.service.recordVote("p", ballot, "v"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("duplicate");
     }

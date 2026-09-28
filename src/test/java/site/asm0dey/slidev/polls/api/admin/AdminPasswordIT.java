@@ -88,7 +88,9 @@ class AdminPasswordIT {
                 .with(csrf())
                 .contentType("application/json")
                 .content(
-                        "{\\\"currentPassword\\\":\\\"bobs-old-password-12\\\",\\\"newPassword\\\":\\\"bobs-new-" + "password-34\\\"}"
+                        """
+                        {"currentPassword":"bobs-old-password-12","newPassword":"bobs-new-password-34"}
+                        """
                 )
             )
             .andExpect(status().isNoContent());
@@ -110,9 +112,9 @@ class AdminPasswordIT {
                 .session(s)
                 .with(csrf())
                 .contentType("application/json")
-                .content(
-                        "{\\\"currentPassword\\\":\\\"WRONG-password-12\\\",\\\"newPassword\\\":\\\"bobs-new-" + "password-34\\\"}"
-                )
+                .content("""
+                        {"currentPassword":"WRONG-password-12","newPassword":"bobs-new-password-34"}
+                        """)
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("FORBIDDEN"));
@@ -146,7 +148,9 @@ class AdminPasswordIT {
                 .with(csrf())
                 .contentType("application/json")
                 .content(
-                        "{\\\"currentPassword\\\":\\\"bobs-old-password-12\\\",\\\"newPassword\\\":\\\"bobs-new-" + "password-34\\\"}"
+                        """
+                        {"currentPassword":"bobs-old-password-12","newPassword":"bobs-new-password-34"}
+                        """
                 )
             )
             .andExpect(status().isNoContent());

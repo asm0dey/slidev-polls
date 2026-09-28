@@ -90,9 +90,8 @@ class VoteServiceTest {
     void rejects_retract_when_poll_has_no_active_question() {
         Poll seeded = seedPollWithoutActiveQuestion();
 
-        assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1")).isInstanceOf(
-                QuestionNotActiveException.class
-        );
+        String slug = seeded.slug();
+        assertThatThrownBy(() -> service.retractVote(slug, "v-1")).isInstanceOf(QuestionNotActiveException.class);
         assertThat(events.published()).isEmpty();
     }
 
@@ -130,9 +129,8 @@ class VoteServiceTest {
         service.recordVote(seeded.slug(), List.of(optionA), "v-1");
         votes.simulateConcurrentClose(seeded.activeQuestionId());
 
-        assertThatThrownBy(() -> service.retractVote(seeded.slug(), "v-1")).isInstanceOf(
-                QuestionNotActiveException.class
-        );
+        String slug = seeded.slug();
+        assertThatThrownBy(() -> service.retractVote(slug, "v-1")).isInstanceOf(QuestionNotActiveException.class);
         // Row stays — the DELETE was refused by the status guard.
         assertThat(votes.rowsFor(seeded.activeQuestionId())).hasSize(1);
         // Only the original VoteCastEvent landed; no retract event.

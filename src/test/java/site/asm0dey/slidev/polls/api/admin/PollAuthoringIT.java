@@ -269,9 +269,9 @@ class PollAuthoringIT {
         MockHttpSession session = loginAsAlice();
 
         String body =
-                "{\\\"title\\\":\\\"talk\\\",\\\"slug\\\":\\\"talk-original\\\",\\\"questions\\\":"
-                + "[{\\\"prompt\\\":\\\"Q?\\\",\\\"options\\\":[{\\\"label\\\":\\\"A\\\"},{\\\"label\\\":"
-                + "\\\"B\\\"}]}]}";
+                """
+                {"title":"talk","slug":"talk-original","questions":[{"prompt":"Q?","options":[{"label":"A"},{"label":"B"}]}]}
+                """;
         String src = mvc
             .perform(post("/api/admin/polls")
                 .session(session)
@@ -301,8 +301,9 @@ class PollAuthoringIT {
         MockHttpSession session = loginAsAlice();
 
         String body =
-                "{\\\"title\\\":\\\"t\\\",\\\"slug\\\":\\\"clear-it\\\",\\\"questions\\\":[{\\\"prompt\\\":"
-                + "\\\"Q?\\\",\\\"options\\\":[{\\\"label\\\":\\\"A\\\"},{\\\"label\\\":\\\"B\\\"}]}]}";
+                """
+                {"title":"t","slug":"clear-it","questions":[{"prompt":"Q?","options":[{"label":"A"},{"label":"B"}]}]}
+                """;
         MvcResult created = mvc
             .perform(post("/api/admin/polls")
                 .session(session)

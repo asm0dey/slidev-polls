@@ -122,7 +122,9 @@ class GlobalExceptionHandlerTest {
         mvc
             .perform(post("/__problem__/validate")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\\\"label\\\":" + "\\\"\\\"}")
+                .content("""
+                    {"label":""}
+                    """)
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
