@@ -19,22 +19,22 @@ import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
  * problem codes promise.
  */
 public record CreatePollRequest(
-    @NotBlank @Size(min = 1, max = 200) String title,
-    // No Size constraint on slug: format, length, reserved, and uniqueness all funnel through
-    // SlugValidator / ReservedSlugs / PollRepository inside PollService, and every violation
-    // surfaces as a 409 with a slug-specific ProblemCode (@TS-011..@TS-014). A @Size here would
-    // leak short/long slugs out as 400 VALIDATION_FAILED, which is the wrong wire contract.
-    String slug,
-    @Valid @Size(min = 1) List<CreateQuestionRequest> questions,
-    @Size(max = 32) List<String> allowedOrigins) {
-
-  public CreatePollCommand toCommand() {
-    List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>();
-    if (questions != null) {
-      for (CreateQuestionRequest q : questions) {
-        drafts.add(q.toDraft());
-      }
+        @NotBlank @Size(min = 1, max = 200) String title,
+        // No Size constraint on slug: format, length, reserved, and uniqueness all funnel through
+        // SlugValidator / ReservedSlugs / PollRepository inside PollService, and every violation
+        // surfaces as a 409 with a slug-specific ProblemCode (@TS-011..@TS-014). A @Size here would
+        // leak short/long slugs out as 400 VALIDATION_FAILED, which is the wrong wire contract.
+        String slug,
+        @Valid @Size(min = 1) List<CreateQuestionRequest> questions,
+        @Size(max = 32) List<String> allowedOrigins
+) {
+    public CreatePollCommand toCommand() {
+        List<CreatePollCommand.QuestionDraft> drafts = new ArrayList<>();
+        if (questions != null) {
+            for (CreateQuestionRequest q : questions) {
+                drafts.add(q.toDraft());
+            }
+        }
+        return new CreatePollCommand(title, slug, drafts, allowedOrigins);
     }
-    return new CreatePollCommand(title, slug, drafts, allowedOrigins);
-  }
 }

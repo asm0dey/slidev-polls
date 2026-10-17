@@ -9,13 +9,13 @@ import java.util.List;
  * list; {@code null} means "do not change origins".
  */
 public record UpdatePollCommand(
-    String title,
-    String slug,
-    List<CreatePollCommand.QuestionUpdate> questions,
-    List<String> allowedOrigins) {
-
-  public UpdatePollCommand {
-    // null is a meaningful "unchanged" signal — preserve it; only copy when non-null
-    allowedOrigins = allowedOrigins == null ? null : List.copyOf(allowedOrigins);
-  }
+        String title,
+        String slug,
+        List<CreatePollCommand.QuestionUpdate> questions,
+        List<String> allowedOrigins
+) {
+    public UpdatePollCommand {
+        // null is a meaningful "unchanged" signal — preserve it; only copy when non-null
+        allowedOrigins = allowedOrigins == null ? null : List.copyOf(allowedOrigins);
+    }
 }

@@ -13,27 +13,28 @@ import java.util.UUID;
  * footer can render "{voters} voters · {selections} selections" without a second round-trip.
  */
 public record SnapshotPayload(
-    UUID pollId,
-    String slug,
-    ActiveQuestion activeQuestion,
-    List<TallyEntry> tally,
-    long voterCount,
-    Instant emittedAt) {
+        UUID pollId,
+        String slug,
+        ActiveQuestion activeQuestion,
+        List<TallyEntry> tally,
+        long voterCount,
+        Instant emittedAt
+) {
+    /**
+     * Per-question arity rides on the snapshot so the voter UI (radio vs checkbox, Submit/Skip
+     * labels) and the results panel (voters vs selections footer) can branch on it without a separate
+     * fetch. Single-choice questions surface {@code (1, 1)}.
+     */
+    public record ActiveQuestion(
+            UUID id,
+            String prompt,
+            int ordinal,
+            int minSelections,
+            int maxSelections,
+            List<ActiveOption> options
+    ) {}
 
-  /**
-   * Per-question arity rides on the snapshot so the voter UI (radio vs checkbox, Submit/Skip
-   * labels) and the results panel (voters vs selections footer) can branch on it without a separate
-   * fetch. Single-choice questions surface {@code (1, 1)}.
-   */
-  public record ActiveQuestion(
-      UUID id,
-      String prompt,
-      int ordinal,
-      int minSelections,
-      int maxSelections,
-      List<ActiveOption> options) {}
+    public record ActiveOption(UUID id, String label, int position) {}
 
-  public record ActiveOption(UUID id, String label, int position) {}
-
-  public record TallyEntry(UUID optionId, long count) {}
+    public record TallyEntry(UUID optionId, long count) {}
 }

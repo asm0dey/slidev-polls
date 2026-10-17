@@ -16,37 +16,40 @@ import site.asm0dey.slidev.polls.core.domain.PollStatus;
  * question simply reports zero.
  */
 public record PollDetailDto(
-    UUID id,
-    String title,
-    String slug,
-    PollStatus status,
-    String publicUrl,
-    UUID activeQuestionId,
-    List<QuestionDto> questions,
-    List<String> allowedOrigins,
-    boolean isOwner) {
-
-  public static PollDetailDto from(
-      Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts, boolean isOwner) {
-    PollDto summary = PollDto.from(domain, publicUrlBase, isOwner);
-    List<QuestionDto> questions =
-        domain.questions().stream()
+        UUID id,
+        String title,
+        String slug,
+        PollStatus status,
+        String publicUrl,
+        UUID activeQuestionId,
+        List<QuestionDto> questions,
+        List<String> allowedOrigins,
+        boolean isOwner
+) {
+    public static PollDetailDto from(Poll domain, String publicUrlBase, Map<UUID, Long> voteCounts, boolean isOwner) {
+        PollDto summary = PollDto.from(domain, publicUrlBase, isOwner);
+        List<QuestionDto> questions = domain
+            .questions()
+            .stream()
             .map(q -> QuestionDto.from(q, voteCounts.getOrDefault(q.id(), 0L).intValue()))
             .toList();
-    return new PollDetailDto(
-        summary.id(),
-        summary.title(),
-        summary.slug(),
-        summary.status(),
-        summary.publicUrl(),
-        summary.activeQuestionId(),
-        questions,
-        domain.allowedOrigins(),
-        isOwner);
-  }
+        return new PollDetailDto(
+                summary.id(),
+                summary.title(),
+                summary.slug(),
+                summary.status(),
+                summary.publicUrl(),
+                summary.activeQuestionId(),
+                questions,
+                domain.allowedOrigins(),
+                isOwner
+        );
+    }
 
-  /** Convenience for callers that don't yet have vote counts — every question reports {@code 0}. */
-  public static PollDetailDto from(Poll domain, String publicUrlBase, boolean isOwner) {
-    return from(domain, publicUrlBase, Map.of(), isOwner);
-  }
+    /**
+     * Convenience for callers that don't yet have vote counts — every question reports {@code 0}.
+     */
+    public static PollDetailDto from(Poll domain, String publicUrlBase, boolean isOwner) {
+        return from(domain, publicUrlBase, Map.of(), isOwner);
+    }
 }

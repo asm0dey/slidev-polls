@@ -26,34 +26,31 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    private final ObjectMapper objectMapper;
 
-  private final ObjectMapper objectMapper;
+    public ProblemAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
-  public ProblemAuthenticationEntryPoint(ObjectMapper objectMapper) {
-    this.objectMapper = objectMapper;
-  }
-
-  @Override
-  public void commence(
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull AuthenticationException ex)
-      throws IOException {
-    response.setStatus(HttpStatus.UNAUTHORIZED.value());
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    // Deck endpoints have a distinct failure mode: the caller presented either no X-Deck-Token or
-    // a stale one. Callers map DECK_TOKEN_INVALID to the "mint a fresh token" UX, distinct from
-    // "log back in" — Principle VI.
-    String path = request.getRequestURI();
-    ProblemCode code =
-        path != null && path.startsWith("/api/deck/")
-            ? ProblemCode.DECK_TOKEN_INVALID
-            : ProblemCode.AUTH_REQUIRED;
-    String message =
-        code == ProblemCode.DECK_TOKEN_INVALID
-            ? "deck token missing or revoked"
-            : "authentication required";
-    Problem body = new Problem(code, message, MDC.get(CorrelationIdFilter.MDC_KEY));
-    objectMapper.writeValue(response.getOutputStream(), body);
-  }
+    @Override
+    public void commence(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull AuthenticationException ex
+    ) throws IOException {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        // Deck endpoints have a distinct failure mode: the caller presented either no X-Deck-Token or
+        // a stale one. Callers map DECK_TOKEN_INVALID to the "mint a fresh token" UX, distinct from
+        // "log back in" — Principle VI.
+        String path = request.getRequestURI();
+        ProblemCode code =
+                path != null && path.startsWith("/api/deck/")
+                ? ProblemCode.DECK_TOKEN_INVALID
+                : ProblemCode.AUTH_REQUIRED;
+        String message =
+                code == ProblemCode.DECK_TOKEN_INVALID ? "deck token missing or revoked" : "authentication required";
+        Problem body = new Problem(code, message, MDC.get(CorrelationIdFilter.MDC_KEY));
+        objectMapper.writeValue(response.getOutputStream(), body);
+    }
 }

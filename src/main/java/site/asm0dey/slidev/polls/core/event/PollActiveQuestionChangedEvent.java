@@ -10,5 +10,4 @@ import java.util.UUID;
  * <p>Subscribers (e.g. {@code TallyBroadcaster}) re-fetch the poll and rebuild the {@code snapshot}
  * SSE event from live state; the event itself only carries the identifiers so it can be routed.
  */
-public record PollActiveQuestionChangedEvent(
-    UUID pollId, UUID newActiveQuestionId, Instant occurredAt) {}
+public record PollActiveQuestionChangedEvent(UUID pollId, UUID newActiveQuestionId, Instant occurredAt) {}

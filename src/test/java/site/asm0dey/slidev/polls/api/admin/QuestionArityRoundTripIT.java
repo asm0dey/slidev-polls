@@ -4,7 +4,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,22 +28,24 @@ import site.asm0dey.slidev.polls.api.testsupport.AdminUserTestFixtures;
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class QuestionArityRoundTripIT {
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private DSLContext dsl;
+    @Autowired
+    private PasswordEncoder encoder;
 
-  @Autowired private MockMvc mvc;
-  @Autowired private DSLContext dsl;
-  @Autowired private PasswordEncoder encoder;
+    @BeforeEach
+    void seedAlice() {
+        dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS).execute();
+        AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
+    }
 
-  @BeforeEach
-  void seedAlice() {
-    dsl.deleteFrom(site.asm0dey.slidev.polls.persistence.jooq.Tables.POLLS).execute();
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
-  }
-
-  @Test
-  void createPersistsAndReturnsArityAndZeroVoteCount() throws Exception {
-    MockHttpSession session = loginAsAlice();
-    String body =
-        """
+    @Test
+    void createPersistsAndReturnsArityAndZeroVoteCount() throws Exception {
+        MockHttpSession session = loginAsAlice();
+        String body =
+                """
         {
           "title": "Multi demo",
           "slug": "multi-demo",
@@ -57,26 +58,27 @@ class QuestionArityRoundTripIT {
         }
         """;
 
-    mvc.perform(
-            post("/api/admin/polls")
+        mvc
+            .perform(post("/api/admin/polls")
                 .session(session)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.questions[0].minSelections").value(1))
-        .andExpect(jsonPath("$.questions[0].maxSelections").value(1))
-        .andExpect(jsonPath("$.questions[0].voteCount").value(0))
-        .andExpect(jsonPath("$.questions[1].minSelections").value(0))
-        .andExpect(jsonPath("$.questions[1].maxSelections").value(3))
-        .andExpect(jsonPath("$.questions[1].voteCount").value(0));
-  }
+                .content(body)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.questions[0].minSelections").value(1))
+            .andExpect(jsonPath("$.questions[0].maxSelections").value(1))
+            .andExpect(jsonPath("$.questions[0].voteCount").value(0))
+            .andExpect(jsonPath("$.questions[1].minSelections").value(0))
+            .andExpect(jsonPath("$.questions[1].maxSelections").value(3))
+            .andExpect(jsonPath("$.questions[1].voteCount").value(0));
+    }
 
-  @Test
-  void omittingArityDefaultsToOneOne() throws Exception {
-    MockHttpSession session = loginAsAlice();
-    String body =
-        """
+    @Test
+    void omittingArityDefaultsToOneOne() throws Exception {
+        MockHttpSession session = loginAsAlice();
+        String body =
+                """
         {
           "title": "Legacy",
           "slug": "legacy-poll",
@@ -86,29 +88,30 @@ class QuestionArityRoundTripIT {
         }
         """;
 
-    mvc.perform(
-            post("/api/admin/polls")
+        mvc
+            .perform(post("/api/admin/polls")
                 .session(session)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.questions[0].minSelections").value(1))
-        .andExpect(jsonPath("$.questions[0].maxSelections").value(1));
-  }
+                .content(body)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.questions[0].minSelections").value(1))
+            .andExpect(jsonPath("$.questions[0].maxSelections").value(1));
+    }
 
-  private MockHttpSession loginAsAlice() throws Exception {
-    MvcResult login =
-        mvc.perform(
-                post("/api/admin/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}"))
+    private MockHttpSession loginAsAlice() throws Exception {
+        MvcResult login = mvc
+            .perform(post("/api/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}")
+            )
             .andExpect(status().isNoContent())
             .andReturn();
-    MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
-    if (session == null) {
-      throw new IllegalStateException("login did not establish a session");
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        if (session == null) {
+            throw new IllegalStateException("login did not establish a session");
+        }
+        return session;
     }
-    return session;
-  }
 }

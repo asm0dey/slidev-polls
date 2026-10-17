@@ -5,7 +5,7 @@ package site.asm0dey.slidev.polls.core.error;
  * hash does not match any persisted row (FR-019, @TS-055).
  */
 public class DeckTokenInvalidException extends RuntimeException {
-  public DeckTokenInvalidException(String message) {
-    super(message);
-  }
+    public DeckTokenInvalidException(String message) {
+        super(message);
+    }
 }

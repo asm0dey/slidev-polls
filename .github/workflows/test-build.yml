@@ -114,6 +114,27 @@ jobs:
           key: maven-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pom.xml', '.mvn/wrapper/maven-wrapper.properties') }}
           restore-keys: maven-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: jOOQ codegen
+        # Same as the publish job: the Dockerfile needs generated jOOQ sources in the context.
+        run: ./mvnw -B -ntp -Pcodegen compile -Dspotless.check.skip=true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build backend image (layer-cached)
+        # Pre-build with the GHA layer cache so e2e doesn't re-download Maven and every
+        # dependency from Central on each run; compose then starts this image as-is.
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: slidev-polls-backend:dev
+          cache-from: |
+            type=gha,scope=e2e
+            type=gha,scope=linux/amd64
+          cache-to: type=gha,mode=max,scope=e2e
+
       - name: Install frontend dependencies
         working-directory: frontends
         run: bun install --frozen-lockfile
@@ -133,6 +154,8 @@ jobs:
         env:
           # Force colourised reporter output off — github runners don't render it cleanly.
           FORCE_COLOR: '0'
+          # Image was pre-built above with the layer cache; don't rebuild it uncached.
+          E2E_COMPOSE_BUILD: --no-build
 
       - name: Dump backend logs on failure
         if: failure()

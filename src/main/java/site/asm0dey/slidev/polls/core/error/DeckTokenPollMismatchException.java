@@ -5,7 +5,7 @@ package site.asm0dey.slidev.polls.core.error;
  * request is targeting (@TS-054).
  */
 public class DeckTokenPollMismatchException extends RuntimeException {
-  public DeckTokenPollMismatchException(String message) {
-    super(message);
-  }
+    public DeckTokenPollMismatchException(String message) {
+        super(message);
+    }
 }

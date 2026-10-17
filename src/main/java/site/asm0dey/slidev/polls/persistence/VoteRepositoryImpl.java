@@ -3,7 +3,6 @@ package site.asm0dey.slidev.polls.persistence;
 import static org.jooq.impl.DSL.exists;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.POLL_QUESTIONS;
 import static site.asm0dey.slidev.polls.persistence.jooq.Tables.VOTES;
-
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -45,156 +44,156 @@ import site.asm0dey.slidev.polls.core.service.VoteRepository;
  */
 @Repository
 public class VoteRepositoryImpl implements VoteRepository {
+    private final DSLContext dsl;
 
-  private final DSLContext dsl;
-
-  public VoteRepositoryImpl(DSLContext dsl) {
-    this.dsl = dsl;
-  }
-
-  @Override
-  public Vote insert(Vote vote) {
-    OffsetDateTime createdAt =
-        vote.createdAt() != null
-            ? OffsetDateTime.ofInstant(vote.createdAt(), java.time.ZoneOffset.UTC)
-            : OffsetDateTime.now();
-    UUID[] optionIdArray = vote.optionIds().toArray(new UUID[0]);
-    int inserted;
-    try {
-      inserted =
-          dsl.insertInto(
-                  VOTES,
-                  VOTES.ID,
-                  VOTES.POLL_ID,
-                  VOTES.QUESTION_ID,
-                  VOTES.OPTION_IDS,
-                  VOTES.VOTER_TOKEN,
-                  VOTES.CREATED_AT)
-              .select(
-                  dsl.select(
-                          DSL.val(vote.id()),
-                          DSL.val(vote.pollId()),
-                          DSL.val(vote.questionId()),
-                          DSL.val(optionIdArray, VOTES.OPTION_IDS.getDataType()),
-                          DSL.val(vote.voterToken()),
-                          DSL.val(createdAt))
-                      .from(POLL_QUESTIONS)
-                      .where(
-                          POLL_QUESTIONS
-                              .ID
-                              .eq(vote.questionId())
-                              .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))))
-              .execute();
-    } catch (IntegrityConstraintViolationException | DataIntegrityViolationException _) {
-      throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
+    public VoteRepositoryImpl(DSLContext dsl) {
+        this.dsl = dsl;
     }
-    if (inserted == 0) {
-      throw new QuestionNotActiveException("question " + vote.questionId() + " is not ACTIVE");
+
+    @Override
+    public Vote insert(Vote vote) {
+        OffsetDateTime createdAt = vote.createdAt() != null
+                ? OffsetDateTime.ofInstant(vote.createdAt(), java.time.ZoneOffset.UTC)
+                : OffsetDateTime.now();
+        UUID[] optionIdArray = vote.optionIds().toArray(new UUID[0]);
+        int inserted;
+        try {
+            inserted = dsl
+                .insertInto(
+                        VOTES,
+                        VOTES.ID,
+                        VOTES.POLL_ID,
+                        VOTES.QUESTION_ID,
+                        VOTES.OPTION_IDS,
+                        VOTES.VOTER_TOKEN,
+                        VOTES.CREATED_AT
+                )
+                .select(dsl
+                    .select(
+                            DSL.val(vote.id()),
+                            DSL.val(vote.pollId()),
+                            DSL.val(vote.questionId()),
+                            DSL.val(optionIdArray, VOTES.OPTION_IDS.getDataType()),
+                            DSL.val(vote.voterToken()),
+                            DSL.val(createdAt)
+                    )
+                    .from(POLL_QUESTIONS)
+                    .where(POLL_QUESTIONS.ID
+                        .eq(vote.questionId())
+                        .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))
+                    )
+                )
+                .execute();
+        } catch (IntegrityConstraintViolationException | DataIntegrityViolationException _) {
+            throw new AlreadyVotedException("vote already recorded for question " + vote.questionId());
+        }
+        if (inserted == 0) {
+            throw new QuestionNotActiveException("question " + vote.questionId() + " is not ACTIVE");
+        }
+        return new Vote(
+                vote.id(),
+                vote.pollId(),
+                vote.questionId(),
+                List.of(optionIdArray),
+                vote.voterToken(),
+                createdAt.toInstant()
+        );
     }
-    return new Vote(
-        vote.id(),
-        vote.pollId(),
-        vote.questionId(),
-        List.of(optionIdArray),
-        vote.voterToken(),
-        createdAt.toInstant());
-  }
 
-  @Override
-  public boolean alreadyVoted(UUID questionId, String voterToken) {
-    return dsl.selectOne()
-        .from(VOTES)
-        .where(VOTES.QUESTION_ID.eq(questionId).and(VOTES.VOTER_TOKEN.eq(voterToken)))
-        .fetchOptional()
-        .isPresent();
-  }
+    @Override
+    public boolean alreadyVoted(UUID questionId, String voterToken) {
+        return dsl
+            .selectOne()
+            .from(VOTES)
+            .where(VOTES.QUESTION_ID.eq(questionId).and(VOTES.VOTER_TOKEN.eq(voterToken)))
+            .fetchOptional()
+            .isPresent();
+    }
 
-  @Override
-  public Map<UUID, Long> tally(UUID questionId) {
-    // Fetch ballots as raw arrays and tally in-process. H2 supports UNNEST only as a constant
-    // table-valued source (no implicit lateral join to outer columns), and the cross-dialect
-    // alternatives (CROSS JOIN LATERAL, explicit unnest derived table) are not parsed by H2's
-    // SQL parser. A read-side fanout in Java sidesteps the portability gap; the row volume per
-    // question is bounded by the active voter count, which is the same upper bound the index
-    // scan would have hit anyway.
-    Map<UUID, Long> out = new HashMap<>();
-    dsl.select(VOTES.OPTION_IDS)
-        .from(VOTES)
-        .where(VOTES.QUESTION_ID.eq(questionId))
-        .fetch()
-        .forEach(
-            r -> {
-              for (UUID id : r.get(VOTES.OPTION_IDS)) {
-                out.merge(id, 1L, Long::sum);
-              }
+    @Override
+    public Map<UUID, Long> tally(UUID questionId) {
+        // Fetch ballots as raw arrays and tally in-process. H2 supports UNNEST only as a constant
+        // table-valued source (no implicit lateral join to outer columns), and the cross-dialect
+        // alternatives (CROSS JOIN LATERAL, explicit unnest derived table) are not parsed by H2's
+        // SQL parser. A read-side fanout in Java sidesteps the portability gap; the row volume per
+        // question is bounded by the active voter count, which is the same upper bound the index
+        // scan would have hit anyway.
+        Map<UUID, Long> out = new HashMap<>();
+        dsl
+            .select(VOTES.OPTION_IDS)
+            .from(VOTES)
+            .where(VOTES.QUESTION_ID.eq(questionId))
+            .fetch()
+            .forEach(r -> {
+                for (UUID id : r.get(VOTES.OPTION_IDS)) {
+                    out.merge(id, 1L, Long::sum);
+                }
             });
-    return out;
-  }
+        return out;
+    }
 
-  @Override
-  public long voterCount(UUID questionId) {
-    // One row in `votes` is exactly one ballot (the unique index on
-    // (question_id, voter_token) is what enforces this). COUNT(*) is the
-    // ballots-cast figure the multi-choice footer needs — distinct from the
-    // selections-summed total returned by tally().
-    Integer count =
-        dsl.selectCount()
+    @Override
+    public long voterCount(UUID questionId) {
+        // One row in `votes` is exactly one ballot (the unique index on
+        // (question_id, voter_token) is what enforces this). COUNT(*) is the
+        // ballots-cast figure the multi-choice footer needs — distinct from the
+        // selections-summed total returned by tally().
+        Integer count = dsl
+            .selectCount()
             .from(VOTES)
             .where(VOTES.QUESTION_ID.eq(questionId))
             .fetchOne(0, Integer.class);
-    return count == null ? 0L : count.longValue();
-  }
+        return count == null ? 0L : count.longValue();
+    }
 
-  @Override
-  public int deleteForPoll(UUID pollId) {
-    return dsl.deleteFrom(VOTES).where(VOTES.POLL_ID.eq(pollId)).execute();
-  }
+    @Override
+    public int deleteForPoll(UUID pollId) {
+        return dsl.deleteFrom(VOTES).where(VOTES.POLL_ID.eq(pollId)).execute();
+    }
 
-  @Override
-  public Optional<List<UUID>> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
-    UUID[] optionIds =
-        dsl.select(VOTES.OPTION_IDS)
+    @Override
+    public Optional<List<UUID>> deleteByQuestionAndVoter(UUID questionId, String voterToken) {
+        UUID[] optionIds = dsl
+            .select(VOTES.OPTION_IDS)
             .from(VOTES)
             .where(VOTES.QUESTION_ID.eq(questionId).and(VOTES.VOTER_TOKEN.eq(voterToken)))
             .fetchOne(VOTES.OPTION_IDS);
-    if (optionIds == null) {
-      return Optional.empty();
-    }
+        if (optionIds == null) {
+            return Optional.empty();
+        }
 
-    int deleted =
-        dsl.deleteFrom(VOTES)
-            .where(
-                VOTES
-                    .QUESTION_ID
-                    .eq(questionId)
-                    .and(VOTES.VOTER_TOKEN.eq(voterToken))
-                    .and(
-                        exists(
-                            dsl.selectOne()
-                                .from(POLL_QUESTIONS)
-                                .where(
-                                    POLL_QUESTIONS
-                                        .ID
-                                        .eq(questionId)
-                                        .and(
-                                            POLL_QUESTIONS.STATUS.eq(
-                                                QuestionStatus.ACTIVE.name()))))))
+        int deleted = dsl
+            .deleteFrom(VOTES)
+            .where(VOTES.QUESTION_ID
+                .eq(questionId)
+                .and(VOTES.VOTER_TOKEN.eq(voterToken))
+                .and(
+                        exists(dsl
+                            .selectOne()
+                            .from(POLL_QUESTIONS)
+                            .where(POLL_QUESTIONS.ID
+                                .eq(questionId)
+                                .and(POLL_QUESTIONS.STATUS.eq(QuestionStatus.ACTIVE.name()))
+                            )
+                        )
+                )
+            )
             .execute();
-    if (deleted == 0) {
-      // Disambiguate: either the question flipped to CLOSED (FR-010 enforcement) or
-      // a concurrent transaction deleted the row between our preflight and our DELETE
-      // (two-tab retract race, deleteForPoll). Re-read status to decide.
-      String status =
-          dsl.select(POLL_QUESTIONS.STATUS)
-              .from(POLL_QUESTIONS)
-              .where(POLL_QUESTIONS.ID.eq(questionId))
-              .fetchOne(POLL_QUESTIONS.STATUS);
-      if (!QuestionStatus.ACTIVE.name().equals(status)) {
-        throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
-      }
-      // Question still ACTIVE but row gone — idempotent no-op.
-      return Optional.empty();
+        if (deleted == 0) {
+            // Disambiguate: either the question flipped to CLOSED (FR-010 enforcement) or
+            // a concurrent transaction deleted the row between our preflight and our DELETE
+            // (two-tab retract race, deleteForPoll). Re-read status to decide.
+            String status = dsl
+                .select(POLL_QUESTIONS.STATUS)
+                .from(POLL_QUESTIONS)
+                .where(POLL_QUESTIONS.ID.eq(questionId))
+                .fetchOne(POLL_QUESTIONS.STATUS);
+            if (!QuestionStatus.ACTIVE.name().equals(status)) {
+                throw new QuestionNotActiveException("question " + questionId + " is not ACTIVE");
+            }
+            // Question still ACTIVE but row gone — idempotent no-op.
+            return Optional.empty();
+        }
+        return Optional.of(List.of(optionIds));
     }
-    return Optional.of(List.of(optionIds));
-  }
 }

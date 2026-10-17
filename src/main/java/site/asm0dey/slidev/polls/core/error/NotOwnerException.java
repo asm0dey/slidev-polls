@@ -6,7 +6,7 @@ package site.asm0dey.slidev.polls.core.error;
  * for debugging, without revealing its contents.
  */
 public class NotOwnerException extends RuntimeException {
-  public NotOwnerException(String message) {
-    super(message);
-  }
+    public NotOwnerException(String message) {
+        super(message);
+    }
 }

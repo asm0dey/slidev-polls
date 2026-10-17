@@ -25,6 +25,7 @@ services:
       retries: 20
 
   backend:
+    image: slidev-polls-backend:dev
     build:
       context: .
       dockerfile: Dockerfile

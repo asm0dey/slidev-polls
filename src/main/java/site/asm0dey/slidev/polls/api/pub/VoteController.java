@@ -38,47 +38,49 @@ import site.asm0dey.slidev.polls.core.slug.SlugValidator;
 @RestController
 @RequestMapping("/api/polls")
 public class VoteController {
+    private final VoteService voteService;
 
-  private final VoteService voteService;
-
-  public VoteController(VoteService voteService) {
-    this.voteService = voteService;
-  }
-
-  @PostMapping("/{slug}/votes")
-  public ResponseEntity<VoteAccepted> submit(
-      @PathVariable String slug, @Valid @RequestBody VoteRequest body, HttpServletRequest request) {
-    if (!SlugValidator.isValidFormat(slug)) {
-      // Match PublicPollController's rejection: unparseable slug at the edge is 404 NOT_FOUND;
-      // no point hitting the service only to fail the same way.
-      throw new NotFoundException("no poll with slug '" + slug + "'");
+    public VoteController(VoteService voteService) {
+        this.voteService = voteService;
     }
 
-    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
-    // {@code body.optionIds()} is @NotNull-validated at the binding boundary, so a legacy
-    // {"optionId": "..."} payload (which Jackson silently swallows under
-    // fail-on-unknown-properties: false) has already been rejected as 400 VALIDATION_FAILED by
-    // the time we get here. An empty list is an abstention; the service enforces arity bounds.
-    Vote recorded = voteService.recordVote(slug, body.optionIds(), voter.token());
+    @PostMapping("/{slug}/votes")
+    public ResponseEntity<VoteAccepted> submit(
+            @PathVariable String slug,
+            @Valid @RequestBody VoteRequest body,
+            HttpServletRequest request
+    ) {
+        if (!SlugValidator.isValidFormat(slug)) {
+            // Match PublicPollController's rejection: unparseable slug at the edge is 404 NOT_FOUND;
+            // no point hitting the service only to fail the same way.
+            throw new NotFoundException("no poll with slug '" + slug + "'");
+        }
 
-    ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.CREATED);
-    if (voter.setCookieHeader() != null) {
-      response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
-    }
-    return response.body(new VoteAccepted(recorded.id(), recorded.createdAt()));
-  }
+        VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
+        // {@code body.optionIds()} is @NotNull-validated at the binding boundary, so a legacy
+        // {"optionId": "..."} payload (which Jackson silently swallows under
+        // fail-on-unknown-properties: false) has already been rejected as 400 VALIDATION_FAILED by
+        // the time we get here. An empty list is an abstention; the service enforces arity bounds.
+        Vote recorded = voteService.recordVote(slug, body.optionIds(), voter.token());
 
-  @DeleteMapping("/{slug}/votes")
-  public ResponseEntity<Void> retract(@PathVariable String slug, HttpServletRequest request) {
-    if (!SlugValidator.isValidFormat(slug)) {
-      throw new NotFoundException("no poll with slug '" + slug + "'");
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.CREATED);
+        if (voter.setCookieHeader() != null) {
+            response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
+        }
+        return response.body(new VoteAccepted(recorded.id(), recorded.createdAt()));
     }
-    String voterToken = VoterTokenCookie.read(request);
-    if (voterToken == null) {
-      // No cookie → no row this voter could ever own. Return 204 without touching the service.
-      return ResponseEntity.noContent().build();
+
+    @DeleteMapping("/{slug}/votes")
+    public ResponseEntity<Void> retract(@PathVariable String slug, HttpServletRequest request) {
+        if (!SlugValidator.isValidFormat(slug)) {
+            throw new NotFoundException("no poll with slug '" + slug + "'");
+        }
+        String voterToken = VoterTokenCookie.read(request);
+        if (voterToken == null) {
+            // No cookie → no row this voter could ever own. Return 204 without touching the service.
+            return ResponseEntity.noContent().build();
+        }
+        voteService.retractVote(slug, voterToken);
+        return ResponseEntity.noContent().build();
     }
-    voteService.retractVote(slug, voterToken);
-    return ResponseEntity.noContent().build();
-  }
 }

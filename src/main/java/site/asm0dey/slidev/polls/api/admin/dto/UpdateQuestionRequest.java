@@ -20,23 +20,23 @@ import site.asm0dey.slidev.polls.core.service.CreatePollCommand;
  * sees a coherent pair.
  */
 public record UpdateQuestionRequest(
-    UUID id,
-    @NotBlank @Size(min = 1, max = 500) String prompt,
-    Integer minSelections,
-    Integer maxSelections,
-    @Valid @Size(min = 2) List<OptionUpdateBody> options) {
+        UUID id,
+        @NotBlank @Size(min = 1, max = 500) String prompt,
+        Integer minSelections,
+        Integer maxSelections,
+        @Valid @Size(min = 2) List<OptionUpdateBody> options
+) {
+    public record OptionUpdateBody(UUID id, @NotBlank @Size(min = 1, max = 200) String label) {}
 
-  public record OptionUpdateBody(UUID id, @NotBlank @Size(min = 1, max = 200) String label) {}
-
-  public CreatePollCommand.QuestionUpdate toUpdate() {
-    int min = minSelections == null ? 1 : minSelections;
-    int max = maxSelections == null ? 1 : maxSelections;
-    List<CreatePollCommand.OptionUpdate> opts = new ArrayList<>();
-    if (options != null) {
-      for (OptionUpdateBody body : options) {
-        opts.add(new CreatePollCommand.OptionUpdate(body.id(), body.label()));
-      }
+    public CreatePollCommand.QuestionUpdate toUpdate() {
+        int min = minSelections == null ? 1 : minSelections;
+        int max = maxSelections == null ? 1 : maxSelections;
+        List<CreatePollCommand.OptionUpdate> opts = new ArrayList<>();
+        if (options != null) {
+            for (OptionUpdateBody body : options) {
+                opts.add(new CreatePollCommand.OptionUpdate(body.id(), body.label()));
+            }
+        }
+        return new CreatePollCommand.QuestionUpdate(id, prompt, min, max, opts);
     }
-    return new CreatePollCommand.QuestionUpdate(id, prompt, min, max, opts);
-  }
 }

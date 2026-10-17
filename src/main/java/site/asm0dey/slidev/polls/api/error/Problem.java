@@ -14,10 +14,8 @@ import java.util.Map;
  * every other code so the envelope shape stays compact for non-validation failures.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record Problem(
-    ProblemCode code, String message, String correlationId, Map<String, List<String>> errors) {
-
-  public Problem(ProblemCode code, String message, String correlationId) {
-    this(code, message, correlationId, null);
-  }
+public record Problem(ProblemCode code, String message, String correlationId, Map<String, List<String>> errors) {
+    public Problem(ProblemCode code, String message, String correlationId) {
+        this(code, message, correlationId, null);
+    }
 }

@@ -16,10 +16,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
  * it on {@code /api/deck/**}, so the token cannot unlock any other admin surface ({@code @TS-057}).
  */
 public record DeckPrincipal(UUID tokenId, UUID pollId, String label) {
+    public static final String ROLE = "ROLE_DECK";
 
-  public static final String ROLE = "ROLE_DECK";
-
-  public Collection<GrantedAuthority> authorities() {
-    return List.of(new SimpleGrantedAuthority(ROLE));
-  }
+    public Collection<GrantedAuthority> authorities() {
+        return List.of(new SimpleGrantedAuthority(ROLE));
+    }
 }

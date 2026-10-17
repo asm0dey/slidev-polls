@@ -26,35 +26,35 @@ import site.asm0dey.slidev.polls.core.service.DeckTokenService;
 @RestController
 @RequestMapping("/api/admin/polls/{pollId}/deck-tokens")
 public class DeckTokenController {
+    private final DeckTokenService service;
 
-  private final DeckTokenService service;
+    public DeckTokenController(DeckTokenService service) {
+        this.service = service;
+    }
 
-  public DeckTokenController(DeckTokenService service) {
-    this.service = service;
-  }
+    @GetMapping
+    public List<DeckTokenDto> list(@PathVariable UUID pollId, @AuthenticationPrincipal UserDetails presenter) {
+        return service.list(pollId, presenter.getUsername()).stream().map(DeckTokenDto::from).toList();
+    }
 
-  @GetMapping
-  public List<DeckTokenDto> list(
-      @PathVariable UUID pollId, @AuthenticationPrincipal UserDetails presenter) {
-    return service.list(pollId, presenter.getUsername()).stream().map(DeckTokenDto::from).toList();
-  }
+    @PostMapping
+    public ResponseEntity<DeckTokenMintedDto> mint(
+            @PathVariable UUID pollId,
+            @RequestBody(required = false) MintDeckTokenRequest body,
+            @AuthenticationPrincipal UserDetails presenter
+    ) {
+        String label = body == null ? null : body.label();
+        DeckTokenService.Minted minted = service.mint(pollId, presenter.getUsername(), label);
+        return ResponseEntity.status(HttpStatus.CREATED).body(DeckTokenMintedDto.from(minted));
+    }
 
-  @PostMapping
-  public ResponseEntity<DeckTokenMintedDto> mint(
-      @PathVariable UUID pollId,
-      @RequestBody(required = false) MintDeckTokenRequest body,
-      @AuthenticationPrincipal UserDetails presenter) {
-    String label = body == null ? null : body.label();
-    DeckTokenService.Minted minted = service.mint(pollId, presenter.getUsername(), label);
-    return ResponseEntity.status(HttpStatus.CREATED).body(DeckTokenMintedDto.from(minted));
-  }
-
-  @DeleteMapping("/{tokenId}")
-  public ResponseEntity<Void> revoke(
-      @PathVariable UUID pollId,
-      @PathVariable UUID tokenId,
-      @AuthenticationPrincipal UserDetails presenter) {
-    service.revoke(pollId, tokenId, presenter.getUsername());
-    return ResponseEntity.noContent().build();
-  }
+    @DeleteMapping("/{tokenId}")
+    public ResponseEntity<Void> revoke(
+            @PathVariable UUID pollId,
+            @PathVariable UUID tokenId,
+            @AuthenticationPrincipal UserDetails presenter
+    ) {
+        service.revoke(pollId, tokenId, presenter.getUsername());
+        return ResponseEntity.noContent().build();
+    }
 }

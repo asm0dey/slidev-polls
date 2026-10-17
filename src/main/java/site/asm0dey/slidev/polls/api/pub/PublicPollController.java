@@ -36,71 +36,68 @@ import site.asm0dey.slidev.polls.realtime.sse.SnapshotPayload;
 @RestController
 @RequestMapping("/api/polls")
 public class PublicPollController {
+    private final PollRepository pollRepository;
+    private final VoteService voteService;
+    private final SnapshotBuilder snapshots;
 
-  private final PollRepository pollRepository;
-  private final VoteService voteService;
-  private final SnapshotBuilder snapshots;
-
-  public PublicPollController(
-      PollRepository pollRepository, VoteService voteService, SnapshotBuilder snapshots) {
-    this.pollRepository = pollRepository;
-    this.voteService = voteService;
-    this.snapshots = snapshots;
-  }
-
-  @GetMapping("/by-slug/{slug}")
-  public ResponseEntity<PublicPollView> getBySlug(
-      @PathVariable String slug, HttpServletRequest request) {
-    // @TS-045 — reject an unparseable slug at the edge; do not hit the repository.
-    if (!SlugValidator.isValidFormat(slug)) {
-      throw new NotFoundException("no poll with slug '" + slug + "'");
+    public PublicPollController(PollRepository pollRepository, VoteService voteService, SnapshotBuilder snapshots) {
+        this.pollRepository = pollRepository;
+        this.voteService = voteService;
+        this.snapshots = snapshots;
     }
-    Poll poll =
-        pollRepository
+
+    @GetMapping("/by-slug/{slug}")
+    public ResponseEntity<PublicPollView> getBySlug(@PathVariable String slug, HttpServletRequest request) {
+        // @TS-045 — reject an unparseable slug at the edge; do not hit the repository.
+        if (!SlugValidator.isValidFormat(slug)) {
+            throw new NotFoundException("no poll with slug '" + slug + "'");
+        }
+        Poll poll =
+                pollRepository
             .findBySlug(slug)
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
 
-    VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
-    Boolean alreadyVoted = null;
-    if (poll.activeQuestionId() != null) {
-      // Best-effort: report true only when the server has an identity AND has seen a vote from it
-      // on the current active question. A freshly-minted cookie has no history, so the hint is
-      // false for the first visit.
-      alreadyVoted = voteService.alreadyVoted(poll.activeQuestionId(), voter.token());
-    }
-    PublicPollView body = PublicPollView.from(poll, alreadyVoted);
+        VoterTokenCookie.Resolution voter = VoterTokenCookie.readOrIssue(request);
+        Boolean alreadyVoted = null;
+        if (poll.activeQuestionId() != null) {
+            // Best-effort: report true only when the server has an identity AND has seen a vote from it
+            // on the current active question. A freshly-minted cookie has no history, so the hint is
+            // false for the first visit.
+            alreadyVoted = voteService.alreadyVoted(poll.activeQuestionId(), voter.token());
+        }
+        PublicPollView body = PublicPollView.from(poll, alreadyVoted);
 
-    ResponseEntity.BodyBuilder response = ResponseEntity.ok();
-    if (voter.setCookieHeader() != null) {
-      response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+        if (voter.setCookieHeader() != null) {
+            response.header(HttpHeaders.SET_COOKIE, voter.setCookieHeader());
+        }
+        return response.body(body);
     }
-    return response.body(body);
-  }
 
-  /**
-   * Anonymous, snapshot-shaped view of a specific question regardless of its lifecycle status. The
-   * SSE stream only surfaces the currently-active question, so a deck slide pinned to a CLOSED
-   * question would otherwise render the "waiting" placeholder forever. This endpoint lets the panel
-   * render historical results without requiring the presenter to re-activate. The {@code
-   * activeQuestion} field in the response is populated from the requested question; callers
-   * treating it as "active" without inspecting status would be misled, which is acceptable because
-   * the panel only cares about prompt/options/tally for the requested id.
-   */
-  @GetMapping("/{slug}/questions/{questionId}/snapshot")
-  public SnapshotPayload questionSnapshot(
-      @PathVariable String slug, @PathVariable UUID questionId) {
-    if (!SlugValidator.isValidFormat(slug)) {
-      throw new NotFoundException("no poll with slug '" + slug + "'");
-    }
-    Poll poll =
-        pollRepository
+    /**
+     * Anonymous, snapshot-shaped view of a specific question regardless of its lifecycle status. The
+     * SSE stream only surfaces the currently-active question, so a deck slide pinned to a CLOSED
+     * question would otherwise render the "waiting" placeholder forever. This endpoint lets the panel
+     * render historical results without requiring the presenter to re-activate. The {@code
+     * activeQuestion} field in the response is populated from the requested question; callers
+     * treating it as "active" without inspecting status would be misled, which is acceptable because
+     * the panel only cares about prompt/options/tally for the requested id.
+     */
+    @GetMapping("/{slug}/questions/{questionId}/snapshot")
+    public SnapshotPayload questionSnapshot(@PathVariable String slug, @PathVariable UUID questionId) {
+        if (!SlugValidator.isValidFormat(slug)) {
+            throw new NotFoundException("no poll with slug '" + slug + "'");
+        }
+        Poll poll =
+                pollRepository
             .findBySlug(slug)
             .orElseThrow(() -> new NotFoundException("no poll with slug '" + slug + "'"));
-    return snapshots
-        .buildForQuestion(poll, questionId, Instant.now())
-        .orElseThrow(
-            () ->
-                new NotFoundException(
-                    "no question " + questionId + " in poll with slug '" + slug + "'"));
-  }
+        return snapshots
+            .buildForQuestion(poll, questionId, Instant.now())
+            .orElseThrow(() -> new NotFoundException("no question "
+                    + questionId
+                    + " in poll with slug '"
+                    + slug
+                    + "'"));
+    }
 }

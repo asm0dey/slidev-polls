@@ -13,10 +13,11 @@ import java.util.UUID;
  * authentication filter ({@code @TS-055}).
  */
 public record DeckToken(
-    UUID id,
-    UUID pollId,
-    String tokenHash,
-    String label,
-    Instant createdAt,
-    Instant revokedAt,
-    String mintedBy) {}
+        UUID id,
+        UUID pollId,
+        String tokenHash,
+        String label,
+        Instant createdAt,
+        Instant revokedAt,
+        String mintedBy
+) {}

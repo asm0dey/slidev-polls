@@ -5,7 +5,7 @@ package site.asm0dey.slidev.polls.core.error;
  * SlugValidator} (FR-005, @TS-011).
  */
 public class SlugInvalidException extends RuntimeException {
-  public SlugInvalidException(String slug) {
-    super("slug format is invalid: " + slug);
-  }
+    public SlugInvalidException(String slug) {
+        super("slug format is invalid: " + slug);
+    }
 }

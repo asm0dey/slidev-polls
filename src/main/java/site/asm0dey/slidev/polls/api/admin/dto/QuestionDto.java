@@ -12,25 +12,26 @@ import site.asm0dey.slidev.polls.core.domain.QuestionStatus;
  * lock structural edits once anyone has voted.
  */
 public record QuestionDto(
-    UUID id,
-    String prompt,
-    QuestionStatus status,
-    int minSelections,
-    int maxSelections,
-    int voteCount,
-    int ordinal,
-    List<OptionDto> options) {
-
-  public static QuestionDto from(Question question, int voteCount) {
-    List<OptionDto> opts = question.options().stream().map(OptionDto::from).toList();
-    return new QuestionDto(
-        question.id(),
-        question.prompt(),
-        question.status(),
-        question.minSelections(),
-        question.maxSelections(),
-        voteCount,
-        question.ordinal(),
-        opts);
-  }
+        UUID id,
+        String prompt,
+        QuestionStatus status,
+        int minSelections,
+        int maxSelections,
+        int voteCount,
+        int ordinal,
+        List<OptionDto> options
+) {
+    public static QuestionDto from(Question question, int voteCount) {
+        List<OptionDto> opts = question.options().stream().map(OptionDto::from).toList();
+        return new QuestionDto(
+                question.id(),
+                question.prompt(),
+                question.status(),
+                question.minSelections(),
+                question.maxSelections(),
+                voteCount,
+                question.ordinal(),
+                opts
+        );
+    }
 }

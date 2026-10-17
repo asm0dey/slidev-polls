@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
@@ -43,28 +42,30 @@ import tools.jackson.databind.ObjectMapper;
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class QrEndpointIT {
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private DSLContext dsl;
+    @Autowired
+    private PasswordEncoder encoder;
 
-  @Autowired private MockMvc mvc;
-  @Autowired private ObjectMapper objectMapper;
-  @Autowired private DSLContext dsl;
-  @Autowired private PasswordEncoder encoder;
+    @BeforeEach
+    void seedAlice() {
+        AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
+    }
 
-  @BeforeEach
-  void seedAlice() {
-    AdminUserTestFixtures.ensureAdmin(dsl, encoder, "alice", "correct-horse");
-  }
-
-  // @TS-026 — the QR PNG decodes to a URL ending in the poll's slug.
-  @Test
-  void qr_png_decodes_to_the_polls_public_url() throws Exception {
-    MockHttpSession session = loginAsAlice();
-    MvcResult created =
-        mvc.perform(
-                post("/api/admin/polls")
-                    .session(session)
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
+    // @TS-026 — the QR PNG decodes to a URL ending in the poll's slug.
+    @Test
+    void qr_png_decodes_to_the_polls_public_url() throws Exception {
+        MockHttpSession session = loginAsAlice();
+        MvcResult created = mvc
+            .perform(post("/api/admin/polls")
+                .session(session)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
                         """
                         {
                           "title": "QR decode target",
@@ -73,43 +74,43 @@ class QrEndpointIT {
                             { "prompt": "x?", "options": [ { "label": "a" }, { "label": "b" } ] }
                           ]
                         }
-                        """))
+                        """
+                )
+            )
             .andExpect(status().isCreated())
             .andReturn();
-    String pollId =
-        objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asString();
+        String pollId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asString();
 
-    MvcResult qr =
-        mvc.perform(get("/api/admin/polls/" + pollId + "/qr.png").session(session))
+        MvcResult qr = mvc
+            .perform(get("/api/admin/polls/" + pollId + "/qr.png").session(session))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", MediaType.IMAGE_PNG_VALUE))
             .andReturn();
 
-    byte[] bytes = qr.getResponse().getContentAsByteArray();
-    assertThat(bytes).isNotEmpty();
-    String decoded = decodeQr(bytes);
-    assertThat(decoded).matches("https?://.+/qr-decode-target");
-  }
+        byte[] bytes = qr.getResponse().getContentAsByteArray();
+        assertThat(bytes).isNotEmpty();
+        String decoded = decodeQr(bytes);
+        assertThat(decoded).matches("https?://.+/qr-decode-target");
+    }
 
-  private MockHttpSession loginAsAlice() throws Exception {
-    MvcResult login =
-        mvc.perform(
-                post("/api/admin/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}"))
+    private MockHttpSession loginAsAlice() throws Exception {
+        MvcResult login = mvc
+            .perform(post("/api/admin/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"alice\",\"password\":\"correct-horse\"}")
+            )
             .andExpect(status().isNoContent())
             .andReturn();
-    MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
-    if (session == null) {
-      throw new IllegalStateException("login did not establish a session");
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        if (session == null) {
+            throw new IllegalStateException("login did not establish a session");
+        }
+        return session;
     }
-    return session;
-  }
 
-  private static String decodeQr(byte[] png) throws Exception {
-    BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
-    BinaryBitmap bitmap =
-        new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
-    return new MultiFormatReader().decode(bitmap).getText();
-  }
+    private static String decodeQr(byte[] png) throws Exception {
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
+        return new MultiFormatReader().decode(bitmap).getText();
+    }
 }

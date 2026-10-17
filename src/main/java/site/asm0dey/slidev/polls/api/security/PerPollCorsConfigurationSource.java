@@ -28,65 +28,67 @@ import site.asm0dey.slidev.polls.core.service.PollRepository;
  */
 @Component
 public class PerPollCorsConfigurationSource implements CorsConfigurationSource {
+    private static final Pattern SLUG = Pattern.compile("^/api/polls/([^/]+)(?:/.*)?$");
+    private static final Pattern POLL_ID = Pattern.compile("^/api/deck/polls/([0-9a-fA-F-]{36})(?:/.*)?$");
+    private static final Pattern DECK_AUTH = Pattern.compile("^/api/deck/auth/.*$");
+    private static final List<String> ALLOWED_HEADERS = List.of("Content-Type", "X-Deck-Token", "X-XSRF-TOKEN");
+    private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+    private final PollRepository repo;
 
-  private static final Pattern SLUG = Pattern.compile("^/api/polls/([^/]+)(?:/.*)?$");
-  private static final Pattern POLL_ID =
-      Pattern.compile("^/api/deck/polls/([0-9a-fA-F-]{36})(?:/.*)?$");
-  private static final Pattern DECK_AUTH = Pattern.compile("^/api/deck/auth/.*$");
-
-  private static final List<String> ALLOWED_HEADERS =
-      List.of("Content-Type", "X-Deck-Token", "X-XSRF-TOKEN");
-  private static final List<String> ALLOWED_METHODS =
-      List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
-
-  private final PollRepository repo;
-
-  public PerPollCorsConfigurationSource(PollRepository repo) {
-    this.repo = repo;
-  }
-
-  @Override
-  public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
-    String uri = request.getRequestURI();
-    if (uri == null) return null;
-
-    Matcher slug = SLUG.matcher(uri);
-    if (slug.matches()) {
-      return repo.findBySlug(slug.group(1)).map(this::buildConfig).orElse(null);
+    public PerPollCorsConfigurationSource(PollRepository repo) {
+        this.repo = repo;
     }
-    Matcher pid = POLL_ID.matcher(uri);
-    if (pid.matches()) {
-      try {
-        UUID id = UUID.fromString(pid.group(1));
-        return repo.findById(id).map(this::buildConfig).orElse(null);
-      } catch (IllegalArgumentException e) {
+
+    @Override
+    public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri == null) {
+            return null;
+        }
+
+        Matcher slug = SLUG.matcher(uri);
+        if (slug.matches()) {
+            return repo.findBySlug(slug.group(1)).map(this::buildConfig).orElse(null);
+        }
+        Matcher pid = POLL_ID.matcher(uri);
+        if (pid.matches()) {
+            try {
+                UUID id = UUID.fromString(pid.group(1));
+                return repo.findById(id).map(this::buildConfig).orElse(null);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+        if (DECK_AUTH.matcher(uri).matches()) {
+            String origin = request.getHeader("Origin");
+            if (origin == null || origin.isBlank()) {
+                return null;
+            }
+            if (!repo.isOriginAllowedByAnyPoll(origin)) {
+                return null;
+            }
+            CorsConfiguration cfg = baseConfig();
+            cfg.setAllowedOrigins(List.of(origin));
+            return cfg;
+        }
         return null;
-      }
     }
-    if (DECK_AUTH.matcher(uri).matches()) {
-      String origin = request.getHeader("Origin");
-      if (origin == null || origin.isBlank()) return null;
-      if (!repo.isOriginAllowedByAnyPoll(origin)) return null;
-      CorsConfiguration cfg = baseConfig();
-      cfg.setAllowedOrigins(List.of(origin));
-      return cfg;
+
+    private CorsConfiguration buildConfig(Poll poll) {
+        if (poll.allowedOrigins().isEmpty()) {
+            return null;
+        }
+        CorsConfiguration cfg = baseConfig();
+        cfg.setAllowedOrigins(poll.allowedOrigins());
+        return cfg;
     }
-    return null;
-  }
 
-  private CorsConfiguration buildConfig(Poll poll) {
-    if (poll.allowedOrigins().isEmpty()) return null;
-    CorsConfiguration cfg = baseConfig();
-    cfg.setAllowedOrigins(poll.allowedOrigins());
-    return cfg;
-  }
-
-  private CorsConfiguration baseConfig() {
-    CorsConfiguration cfg = new CorsConfiguration();
-    cfg.setAllowedMethods(ALLOWED_METHODS);
-    cfg.setAllowedHeaders(ALLOWED_HEADERS);
-    cfg.setAllowCredentials(true);
-    cfg.setMaxAge(600L);
-    return cfg;
-  }
+    private CorsConfiguration baseConfig() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedMethods(ALLOWED_METHODS);
+        cfg.setAllowedHeaders(ALLOWED_HEADERS);
+        cfg.setAllowCredentials(true);
+        cfg.setMaxAge(600L);
+        return cfg;
+    }
 }

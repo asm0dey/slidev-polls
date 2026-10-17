@@ -37,33 +37,33 @@ import site.asm0dey.slidev.polls.core.service.PollService;
 @RestController
 @RequestMapping("/api/admin/polls")
 public class QrController {
+    private static final int QR_SIZE_PX = 256;
+    private final PollService pollService;
 
-  private static final int QR_SIZE_PX = 256;
-
-  private final PollService pollService;
-
-  public QrController(PollService pollService) {
-    this.pollService = pollService;
-  }
-
-  @GetMapping(path = "/{pollId}/qr.png", produces = MediaType.IMAGE_PNG_VALUE)
-  public ResponseEntity<byte[]> qr(
-      @PathVariable UUID pollId, Authentication authentication, HttpServletRequest request)
-      throws IOException, WriterException {
-    Poll poll = pollService.getForOwner(pollId, authentication.getName());
-    String url = PublicUrlBase.of(request) + "/" + poll.slug();
-    byte[] png = renderPng(url, QR_SIZE_PX);
-    return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(png);
-  }
-
-  private static byte[] renderPng(String payload, int size) throws IOException, WriterException {
-    Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-    hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
-    hints.put(EncodeHintType.MARGIN, 1);
-    BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size, hints);
-    try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-      MatrixToImageWriter.writeToStream(matrix, "PNG", baos);
-      return baos.toByteArray();
+    public QrController(PollService pollService) {
+        this.pollService = pollService;
     }
-  }
+
+    @GetMapping(path = "/{pollId}/qr.png", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> qr(
+            @PathVariable UUID pollId,
+            Authentication authentication,
+            HttpServletRequest request
+    ) throws IOException, WriterException {
+        Poll poll = pollService.getForOwner(pollId, authentication.getName());
+        String url = PublicUrlBase.of(request) + "/" + poll.slug();
+        byte[] png = renderPng(url, QR_SIZE_PX);
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(png);
+    }
+
+    private static byte[] renderPng(String payload, int size) throws IOException, WriterException {
+        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+        hints.put(EncodeHintType.MARGIN, 1);
+        BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size, hints);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            MatrixToImageWriter.writeToStream(matrix, "PNG", baos);
+            return baos.toByteArray();
+        }
+    }
 }
