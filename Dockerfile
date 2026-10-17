@@ -15,7 +15,7 @@
 #      on :8080. Per-layer COPY keeps `lib/` (big, rarely changes) in its
 #      own Docker layer separate from the app jar and AOT cache.
 
-FROM oven/bun:1@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS frontends-builder
+FROM oven/bun:1@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS frontends-builder
 WORKDIR /build
 COPY frontends/package.json frontends/bun.lock frontends/tsconfig.base.json frontends/eslint.config.js frontends/playwright.config.ts ./
 COPY frontends/shared ./shared
