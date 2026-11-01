@@ -15,7 +15,7 @@
 #      on :8080. Per-layer COPY keeps `lib/` (big, rarely changes) in its
 #      own Docker layer separate from the app jar and AOT cache.
 
-FROM oven/bun:1@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS frontends-builder
+FROM oven/bun:1@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS frontends-builder
 WORKDIR /build
 COPY frontends/package.json frontends/bun.lock frontends/tsconfig.base.json frontends/eslint.config.js frontends/playwright.config.ts ./
 COPY frontends/shared ./shared
@@ -30,7 +30,7 @@ RUN bun run --filter '@slidev-polls/shared'     build \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.4_9-glibc@sha256:0b1aac64cba1baab4c5b9ee53501a8e7386ea428ce00efd106790f5a9942990c AS backend-builder
+FROM bellsoft/hardened-liberica-runtime-container:jdk-25.0.5.0.3-glibc@sha256:9d312bd25b55ba2e40275ce270becaf7378c424b679febdf6547f6bede5b1b50 AS backend-builder
 WORKDIR /src
 
 COPY mvnw ./
@@ -55,7 +55,7 @@ RUN ./mvnw package -Dmaven.test.skip=true -Dspotless.check.skip=true
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.4_9-distroless-glibc@sha256:4bd607157e4e5f2a23d82a0124ccc943e4a937e7677ab81b8add04d4e211c23a AS aot-trainer
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.5.0.3-distroless-glibc@sha256:a640db53d76cb1d933ccd70c08b417f1e7c18fe339f0f49b1e69217173055d9a AS aot-trainer
 WORKDIR /app
 COPY --from=backend-builder /src/target/slidev-polls-0.0.1-SNAPSHOT.jar /tmp/slidev-polls-0.0.1-SNAPSHOT.jar
 
@@ -78,7 +78,7 @@ RUN ["java", \
 
 # ---------------------------------------------------------------------------
 
-FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.4_9-distroless-glibc@sha256:4bd607157e4e5f2a23d82a0124ccc943e4a937e7677ab81b8add04d4e211c23a AS runtime
+FROM bellsoft/hardened-liberica-runtime-container:jre-25.0.5.0.3-distroless-glibc@sha256:a640db53d76cb1d933ccd70c08b417f1e7c18fe339f0f49b1e69217173055d9a AS runtime
 WORKDIR /app
 COPY --from=aot-trainer /app/lib/ /app/lib/
 COPY --from=aot-trainer /app/slidev-polls-0.0.1-SNAPSHOT.jar /app/
