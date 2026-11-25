@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.2.0</version>
         <relativePath/>
     </parent>
 
@@ -46,7 +46,7 @@
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <db.codegen.schema>polls_codegen</db.codegen.schema>
-        <postgresql.version>42.7.14</postgresql.version>
+        <postgresql.version>42.7.15</postgresql.version>
         <testcontainers-jooq-codegen-maven-plugin.version>1.0.0</testcontainers-jooq-codegen-maven-plugin.version>
     </properties>
 
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
-            <version>1.86</version>
+            <version>1.87</version>
         </dependency>
 
         <!-- Persistence -->
@@ -182,7 +182,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>3.10.4</version>
+                <version>3.12.0</version>
                 <configuration>
                     <java>
                         <googleJavaFormat>
@@ -232,7 +232,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.2</version>
+                <version>3.8.0</version>
                 <executions>
                     <execution>
                         <id>add-jooq-generated-sources</id>
